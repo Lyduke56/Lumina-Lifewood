@@ -37,6 +37,32 @@ def save_dataset(
     return result.data[0]
 
 
+def save_generated_file(
+    dataset_id: str,
+    layout_json: dict,
+    chart_preview_json: dict,
+    conversation_id: str | None = None,
+    storage_path: str = "stub://not-yet-generated",
+) -> dict:
+    """Insert a (stub) dashboard output row into generated_files."""
+    client = get_client()
+    result = (
+        client.table("generated_files")
+        .insert(
+            {
+                "conversation_id": conversation_id,
+                "dataset_id": dataset_id,
+                "storage_path": storage_path,
+                "layout_json": layout_json,
+                "chart_preview_json": chart_preview_json,
+                "status": "stub",
+            }
+        )
+        .execute()
+    )
+    return result.data[0]
+
+
 if __name__ == "__main__":
     import sys
     from excel_parser import load_production_plan
