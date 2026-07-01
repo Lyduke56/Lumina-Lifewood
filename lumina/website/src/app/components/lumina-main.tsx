@@ -346,7 +346,7 @@ export default function App() {
               <path d="M5 15L10 9L14 13L19 7" stroke="#133020" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             {!sidebarCollapsed && (
-              <span className="ll-brand-font" style={{ fontSize: 18, fontWeight: 600, color: "#F5EEDB" }}>
+              <span className="ll-brand-font" style={{ fontSize: 18, fontWeight: 600, color: "#F5EEDB", fontFamily: 'Manrope' }}>
                 lumina
               </span>
             )}
