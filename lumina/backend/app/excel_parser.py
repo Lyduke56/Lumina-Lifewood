@@ -45,6 +45,37 @@ def load_production_plan(path: str | Path) -> list[dict]:
     return records
 
 
+def build_dashboard_stub(records: list[dict]) -> tuple[dict, dict]:
+    """Placeholder dashboard content — real generation is PBIP/fabric-cicd, not this."""
+    total_target_ops = sum(r["target_ops"] or 0 for r in records)
+    total_actual_ops = sum(r["recording_actual_ops"] or 0 for r in records)
+
+    layout_json = {
+        "sections": [
+            {
+                "number": 1,
+                "title": "Production Overview",
+                "summary": {
+                    "total_target_ops": total_target_ops,
+                    "total_actual_ops": total_actual_ops,
+                },
+            }
+        ]
+    }
+    chart_preview_json = {
+        "type": "line",
+        "series": [
+            {
+                "date": r["date"],
+                "target_ops": r["target_ops"],
+                "actual_ops": r["recording_actual_ops"],
+            }
+            for r in records
+        ],
+    }
+    return layout_json, chart_preview_json
+
+
 if __name__ == "__main__":
     import sys
 
