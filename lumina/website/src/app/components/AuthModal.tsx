@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
+import { Eye, EyeOff, X } from "lucide-react";
 
 export default function AuthModal({
   open,
@@ -15,14 +16,13 @@ export default function AuthModal({
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
   // Controlled visibility only — no auto-show based on session state.
-  // Whatever triggers `open` (a locked interaction, a "Log in" click, etc.)
-  // is what decides when this appears.
   if (!open || isLoading) return null;
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -35,7 +35,7 @@ export default function AuthModal({
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        onClose(); // successful login closes the modal
+        onClose();
       } else {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
@@ -62,7 +62,7 @@ export default function AuthModal({
           className="float-right -mt-2 -mr-2 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           aria-label="Close"
         >
-          ✕
+          <X size={16} />
         </button>
 
         <h2 className="mb-2 text-2xl font-bold tracking-tight text-[#133020]">
@@ -94,15 +94,26 @@ export default function AuthModal({
             <label className="mb-1 block text-sm font-medium text-[#133020]" htmlFor="password">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-[#046241]"
-              required
-              minLength={6}
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 p-2.5 pr-10 text-sm outline-none focus:border-[#046241]"
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
