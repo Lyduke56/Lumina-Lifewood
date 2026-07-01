@@ -1,0 +1,5 @@
+fastmcp
+pandas
+openpyxl
+supabase
+python-dotenv
