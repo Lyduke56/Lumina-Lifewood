@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import AuthModal from "./AuthModal";
+
 import {
   MessageSquare,
   LayoutDashboard,
@@ -21,6 +24,7 @@ import {
   FileDown,
   RefreshCw,
   CircleDot,
+  LogOut,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -58,6 +62,36 @@ const history = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("viz");
+  const { user, signOut } = useAuth();
+  const [authOpen, setAuthOpen] = useState(false);
+
+  // Gate: call this before any action that should require a logged-in user.
+  // Returns true if the user may proceed, false if the modal was shown instead.
+  function requireAuth() {
+    if (!user) {
+      setAuthOpen(true);
+      return false;
+    }
+    return true;
+  }
+
+  function handleSend() {
+    if (!requireAuth()) return;
+    // real send logic goes here once the chat API route exists
+  }
+
+  function handleUploadClick() {
+    if (!requireAuth()) return;
+    // real file picker trigger goes here
+  }
+
+  function handleComposerFocus() {
+    requireAuth();
+  }
+
+  const isLoggedOut = !user;
+  const displayName = user?.email ?? "Guest";
+  const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "?";
 
   return (
     <div className="ll-root">
@@ -119,6 +153,7 @@ export default function App() {
         }
         .ll-navitem:hover { background: rgba(245,238,219,0.06); color: var(--cream); }
         .ll-navitem.active { background: rgba(245,238,219,0.10); color: var(--cream); }
+        .ll-navitem.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 
         .ll-convo {
           display: flex; flex-direction: column; gap: 3px;
@@ -139,8 +174,16 @@ export default function App() {
         }
         .ll-btn-amber:hover { background: var(--amber-light); }
 
+        .ll-signin-btn {
+          background: transparent; color: var(--cream);
+          font-weight: 600; font-size: 12.5px; border: 1px solid rgba(245,238,219,0.3);
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+          padding: 7px 10px; border-radius: 8px; cursor: pointer; width: 100%;
+        }
+        .ll-signin-btn:hover { background: rgba(245,238,219,0.08); }
+
         /* ---- Center chat column ---- */
-        .ll-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--offwhite); }
+        .ll-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--offwhite); position: relative; }
         .ll-chat-header {
           height: 56px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
           padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--white);
@@ -177,6 +220,13 @@ export default function App() {
         .ll-pulse-bars span:nth-child(3) { height: 9px; animation-delay: 0.3s; }
         .ll-pulse-bars span:nth-child(4) { height: 16px; animation-delay: 0.45s; }
         @keyframes llbar { 0%,100% { transform: scaleY(0.5); } 50% { transform: scaleY(1); } }
+
+        .ll-empty-state {
+          flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: 10px; padding: 40px; text-align: center;
+        }
+        .ll-empty-state h3 { margin: 0; font-size: 16px; color: var(--forest); }
+        .ll-empty-state p { margin: 0; font-size: 13px; color: rgba(19,48,32,0.55); max-width: 320px; line-height: 1.5; }
 
         .ll-composer {
           border-top: 1px solid var(--line); background: var(--white); padding: 12px 20px 16px;
@@ -236,7 +286,7 @@ export default function App() {
               <rect width="24" height="24" rx="6" fill="#FFB347" />
               <path d="M5 15L10 9L14 13L19 7" stroke="#133020" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="ll-brand-font" style={{ fontSize: 18, fontWeight: 600, color: "#F5EEDB"}}>
+            <span className="ll-brand-font" style={{ fontSize: 18, fontWeight: 600, color: "#F5EEDB" }}>
               lumina
             </span>
           </div>
@@ -244,30 +294,50 @@ export default function App() {
 
         {/* auth / user card */}
         <div className="ll-sidebar-section" style={{ padding: "14px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 34, height: 34, borderRadius: "50%", background: "var(--emerald)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 13, fontWeight: 600, color: "#fff", flexShrink: 0,
-              }}
-            >
-              CR
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F5EEDB", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                Clyde Rosal
+          {user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 34, height: 34, borderRadius: "50%", background: "var(--emerald)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 13, fontWeight: 600, color: "#fff", flexShrink: 0,
+                }}
+              >
+                {initials}
               </div>
-              <div style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 4, color: "var(--tan-muted)" }}>
-                <CircleDot size={10} color="#FFB347" />
-                Signed in · Pro
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#F5EEDB", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {displayName}
+                </div>
+                <div style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 4, color: "var(--tan-muted)" }}>
+                  <CircleDot size={10} color="#FFB347" />
+                  Signed in
+                </div>
               </div>
+              <button
+                onClick={signOut}
+                className="ll-icon-btn"
+                style={{ color: "var(--tan-muted)" }}
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut size={15} />
+              </button>
             </div>
-          </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12.5, color: "var(--tan-muted)" }}>
+                You're browsing as a guest.
+              </div>
+              <button className="ll-signin-btn" onClick={() => setAuthOpen(true)}>
+                Log in / Sign up
+              </button>
+            </div>
+          )}
         </div>
 
         <div style={{ padding: "0 16px 14px" }}>
-          <button className="ll-btn-amber" style={{ width: "100%" }}>
+          <button className="ll-btn-amber" style={{ width: "100%" }} onClick={() => requireAuth()}>
             <Plus size={16} /> New chat
           </button>
         </div>
@@ -276,17 +346,19 @@ export default function App() {
           <div className="ll-navitem active">
             <MessageSquare size={16} /> Chats
           </div>
-          <div className="ll-navitem">
+          <div className={`ll-navitem ${isLoggedOut ? "disabled" : ""}`}>
             <LayoutDashboard size={16} /> Dashboard
           </div>
-          <div className="ll-navitem">
+          <div className={`ll-navitem ${isLoggedOut ? "disabled" : ""}`}>
             <Link2 size={16} /> Connections
-            <span
-              className="ll-mono"
-              style={{ marginLeft: "auto", fontSize: 10, background: "rgba(255,179,71,0.15)", color: "#FFC370", padding: "1px 6px", borderRadius: 5 }}
-            >
-              2
-            </span>
+            {user && (
+              <span
+                className="ll-mono"
+                style={{ marginLeft: "auto", fontSize: 10, background: "rgba(255,179,71,0.15)", color: "#FFC370", padding: "1px 6px", borderRadius: 5 }}
+              >
+                2
+              </span>
+            )}
           </div>
         </nav>
 
@@ -295,24 +367,32 @@ export default function App() {
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--tan-muted)", padding: "6px 10px", textTransform: "uppercase" }}>
             Recent
           </div>
-          {history.map((h) => (
-            <div key={h.id} className={`ll-convo ${h.active ? "active" : ""}`}>
-              <div className="ll-convo-title">{h.title}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--tan-muted)" }}>
-                {h.channel === "whatsapp" ? <Smartphone size={11} color="#FFC370" /> : <Globe size={11} />}
-                {h.time}
+          {user ? (
+            history.map((h) => (
+              <div key={h.id} className={`ll-convo ${h.active ? "active" : ""}`}>
+                <div className="ll-convo-title">{h.title}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--tan-muted)" }}>
+                  {h.channel === "whatsapp" ? <Smartphone size={11} color="#FFC370" /> : <Globe size={11} />}
+                  {h.time}
+                </div>
               </div>
+            ))
+          ) : (
+            <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>
+              Log in to see your conversation history.
             </div>
-          ))}
+          )}
         </div>
 
         <div className="ll-sidebar-section" style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div className="ll-navitem" style={{ padding: "6px 8px" }}>
             <Settings size={16} /> Settings
           </div>
-          <span className="ll-sidebar-muted" style={{ fontSize: 11 }}>
-            412 msgs synced
-          </span>
+          {user && (
+            <span className="ll-sidebar-muted" style={{ fontSize: 11 }}>
+              412 msgs synced
+            </span>
+          )}
         </div>
       </aside>
 
@@ -321,64 +401,81 @@ export default function App() {
         <div className="ll-chat-header">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <FileSpreadsheet size={16} color="var(--emerald)" />
-            <span style={{ fontSize: 13.5, fontWeight: 600 }}>Q3 regional revenue breakdown</span>
+            <span style={{ fontSize: 13.5, fontWeight: 600 }}>
+              {user ? "Q3 regional revenue breakdown" : "New conversation"}
+            </span>
           </div>
-          <div className="ll-badge-sync">
-            <CircleDot size={9} /> Synced across web & WhatsApp
-          </div>
+          {user && (
+            <div className="ll-badge-sync">
+              <CircleDot size={9} /> Synced across web & WhatsApp
+            </div>
+          )}
         </div>
 
-        <div className="ll-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div className="ll-msg-user">Q3_Sales_Report.xlsx — can you break this down by region?</div>
-          </div>
+        {user ? (
+          <div className="ll-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div className="ll-msg-user">Q3_Sales_Report.xlsx — can you break this down by region?</div>
+            </div>
 
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div className="ll-msg-assistant">
-              Parsed 1,842 rows across 4 sheets. Building your regional revenue visualization now.
-              <div className="ll-gen-card">
-                <div className="ll-pulse-bars">
-                  <span></span><span></span><span></span><span></span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div className="ll-msg-assistant">
+                Parsed 1,842 rows across 4 sheets. Building your regional revenue visualization now.
+                <div className="ll-gen-card">
+                  <div className="ll-pulse-bars">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
+                  Assigning charts to layout zones → compiling preview
                 </div>
-                Assigning charts to layout zones → compiling preview
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div className="ll-msg-assistant">
+                Here's what stands out: <strong>APAC revenue grew 34% QoQ</strong>, outpacing every other
+                region, while NA still leads in absolute revenue. I've assigned this to a KPI zone and a
+                trend zone — want me to compile the Power BI project now, or break APAC down by product
+                line first?
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <span className="ll-chan-tag">
+                <Smartphone size={11} /> sent from WhatsApp
+              </span>
+              <div className="ll-msg-user">show me last month too</div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div className="ll-msg-assistant">
+                Added August alongside September — the preview panel now shows both months side by side.
               </div>
             </div>
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div className="ll-msg-assistant">
-              Here's what stands out: <strong>APAC revenue grew 34% QoQ</strong>, outpacing every other
-              region, while NA still leads in absolute revenue. I've assigned this to a KPI zone and a
-              trend zone — want me to compile the Power BI project now, or break APAC down by product
-              line first?
-            </div>
+        ) : (
+          <div className="ll-empty-state">
+            <Sparkles size={28} color="var(--emerald)" />
+            <h3 className="ll-brand-font">Upload a plan to get started</h3>
+            <p>
+              Log in and drop in an Excel production plan — Lumina will parse it,
+              reason about the right charts, and generate a Power BI project you
+              can preview and download.
+            </p>
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <span className="ll-chan-tag">
-              <Smartphone size={11} /> sent from WhatsApp
-            </span>
-            <div className="ll-msg-user">show me last month too</div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div className="ll-msg-assistant">
-              Added August alongside September — the preview panel now shows both months side by side.
-            </div>
-          </div>
-        </div>
+        )}
 
         <div className="ll-composer">
           <div className="ll-composer-box">
-            <div className="ll-icon-btn">
+            <div className="ll-icon-btn" onClick={handleUploadClick}>
               <Paperclip size={16} />
             </div>
             <input
               type="text"
-              placeholder="Ask about your data, or drop in an Excel file…"
+              placeholder={user ? "Ask about your data, or drop in an Excel file…" : "Log in to start chatting…"}
+              onFocus={handleComposerFocus}
               style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "var(--forest)" }}
             />
-            <button className="ll-send-btn">
+            <button className="ll-send-btn" onClick={handleSend}>
               <Send size={15} />
             </button>
           </div>
@@ -391,18 +488,22 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                Regional Revenue.pbip
+                {user ? "Regional Revenue.pbip" : "No file yet"}
               </div>
-              <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.55)" }}>Updated just now</div>
-            </div>
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-              <div className="ll-icon-btn">
-                <RefreshCw size={14} />
-              </div>
-              <div className="ll-icon-btn">
-                <Share2 size={14} />
+              <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.55)" }}>
+                {user ? "Updated just now" : "Upload a plan to see a preview"}
               </div>
             </div>
+            {user && (
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <div className="ll-icon-btn">
+                  <RefreshCw size={14} />
+                </div>
+                <div className="ll-icon-btn">
+                  <Share2 size={14} />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="ll-preview-tabs">
@@ -419,92 +520,103 @@ export default function App() {
         </div>
 
         <div className="ll-scrollbar ll-preview-body">
-          {activeTab === "viz" && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600 }}>Revenue & QoQ growth by region</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11.5, color: "var(--amber-safe)", fontWeight: 500 }}>
-                  Combo chart <ChevronDown size={12} />
-                </span>
-              </div>
-              <div style={{ background: "var(--offwhite)", borderRadius: 12, padding: "12px 8px 4px", border: "1px solid var(--line)" }}>
-                <ResponsiveContainer width="100%" height={220}>
-                  <ComposedChart data={revenueData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(19,48,32,0.08)" vertical={false} />
-                    <XAxis dataKey="region" tick={{ fontSize: 11, fill: "#133020" }} axisLine={{ stroke: "rgba(19,48,32,0.15)" }} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#133020" }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid rgba(19,48,32,0.12)" }}
-                      labelStyle={{ fontWeight: 600, color: "#133020" }}
-                    />
-                    <Bar dataKey="revenue" fill="#046241" radius={[4, 4, 0, 0]} barSize={28} />
-                    <Line type="monotone" dataKey="growth" stroke="#A65A12" strokeWidth={2} dot={{ r: 3, fill: "#A65A12" }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-              <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 11.5, color: "rgba(19,48,32,0.65)" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: "#046241", display: "inline-block" }} /> Revenue ($K)
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: "#A65A12", display: "inline-block" }} /> QoQ growth (%)
-                </span>
-              </div>
-
-              <div style={{ marginTop: 18, padding: "10px 12px", background: "var(--emerald-tint)", borderRadius: 10, fontSize: 12, color: "var(--emerald-dark)" }}>
-                <strong>Sparkles</strong>Auto-detected: revenue column, region dimension, and a time
-                grain of "month." Chart type picked to compare a categorical value alongside a rate.
-              </div>
+          {!user ? (
+            <div className="ll-empty-state" style={{ padding: "24px 8px" }}>
+              <BarChart3 size={24} color="var(--tan-muted)" />
+              <p>Nothing to preview yet. Log in and upload a plan to see charts here.</p>
             </div>
-          )}
+          ) : (
+            <>
+              {activeTab === "viz" && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600 }}>Revenue & QoQ growth by region</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11.5, color: "var(--amber-safe)", fontWeight: 500 }}>
+                      Combo chart <ChevronDown size={12} />
+                    </span>
+                  </div>
+                  <div style={{ background: "var(--offwhite)", borderRadius: 12, padding: "12px 8px 4px", border: "1px solid var(--line)" }}>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <ComposedChart data={revenueData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(19,48,32,0.08)" vertical={false} />
+                        <XAxis dataKey="region" tick={{ fontSize: 11, fill: "#133020" }} axisLine={{ stroke: "rgba(19,48,32,0.15)" }} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: "#133020" }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid rgba(19,48,32,0.12)" }}
+                          labelStyle={{ fontWeight: 600, color: "#133020" }}
+                        />
+                        <Bar dataKey="revenue" fill="#046241" radius={[4, 4, 0, 0]} barSize={28} />
+                        <Line type="monotone" dataKey="growth" stroke="#A65A12" strokeWidth={2} dot={{ r: 3, fill: "#A65A12" }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 11.5, color: "rgba(19,48,32,0.65)" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: "#046241", display: "inline-block" }} /> Revenue ($K)
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: "#A65A12", display: "inline-block" }} /> QoQ growth (%)
+                    </span>
+                  </div>
 
-          {activeTab === "data" && (
-            <div>
-              <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 10 }}>Parsed source rows (5 of 1,842)</div>
-              <table className="ll-table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Region</th>
-                    <th>Revenue</th>
-                    <th>Units</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableRows.map((r, i) => (
-                    <tr key={i}>
-                      <td>{r.month}</td>
-                      <td>{r.region}</td>
-                      <td>{r.revenue}</td>
-                      <td>{r.units}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  <div style={{ marginTop: 18, padding: "10px 12px", background: "var(--emerald-tint)", borderRadius: 10, fontSize: 12, color: "var(--emerald-dark)" }}>
+                    <strong>Sparkles</strong>Auto-detected: revenue column, region dimension, and a time
+                    grain of "month." Chart type picked to compare a categorical value alongside a rate.
+                  </div>
+                </div>
+              )}
 
-          {activeTab === "export" && (
-            <div>
-              <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 10 }}>Download or open</div>
-              <button className="ll-export-btn">
-                Download Power BI project (.pbip) <Download size={14} />
-              </button>
-              <button className="ll-export-btn">
-                Download chart as .png <Download size={14} />
-              </button>
-              <button className="ll-export-btn">
-                Export data as .csv <Download size={14} />
-              </button>
-              <div style={{ marginTop: 14, fontSize: 11.5, color: "rgba(19,48,32,0.55)" }}>
-                Opens in Power BI Desktop with the Grid-Zone layout applied automatically. Use{" "}
-                <span className="ll-mono">Save As → .pbix</span> in Desktop if you need the compiled
-                format.
-              </div>
-            </div>
+              {activeTab === "data" && (
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 10 }}>Parsed source rows (5 of 1,842)</div>
+                  <table className="ll-table">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>Region</th>
+                        <th>Revenue</th>
+                        <th>Units</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableRows.map((r, i) => (
+                        <tr key={i}>
+                          <td>{r.month}</td>
+                          <td>{r.region}</td>
+                          <td>{r.revenue}</td>
+                          <td>{r.units}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === "export" && (
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 10 }}>Download or open</div>
+                  <button className="ll-export-btn">
+                    Download Power BI project (.pbip) <Download size={14} />
+                  </button>
+                  <button className="ll-export-btn">
+                    Download chart as .png <Download size={14} />
+                  </button>
+                  <button className="ll-export-btn">
+                    Export data as .csv <Download size={14} />
+                  </button>
+                  <div style={{ marginTop: 14, fontSize: 11.5, color: "rgba(19,48,32,0.55)" }}>
+                    Opens in Power BI Desktop with the Grid-Zone layout applied automatically. Use{" "}
+                    <span className="ll-mono">Save As → .pbix</span> in Desktop if you need the compiled
+                    format.
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </aside>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }
