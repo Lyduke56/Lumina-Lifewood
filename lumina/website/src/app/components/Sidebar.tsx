@@ -1,11 +1,12 @@
-import { 
-  MessageSquare, LayoutDashboard, Settings, Plus, 
-  ChevronLeft, ChevronRight, Smartphone, Globe, CircleDot, LogOut 
+import {
+  MessageSquare, LayoutDashboard, Settings, Plus,
+  ChevronLeft, ChevronRight, CircleDot, LogOut
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
+import type { Conversation } from "@/lib/types";
+import { formatRelativeTime } from "@/lib/format";
 
 type ViewMode = "chats" | "dashboard";
-
 
 interface SidebarProps {
   user: User | null;
@@ -13,13 +14,18 @@ interface SidebarProps {
   setView: (view: ViewMode) => void;
   collapsed: boolean;
   setCollapsed: (val: boolean | ((prev: boolean) => boolean)) => void;
-  history: any[]; // We will type this properly later
+  conversations: Conversation[];
+  activeConversationId: string | null;
+  onSelectConversation: (id: string) => void;
+  onNewChat: () => void;
   onRequireAuth: () => boolean;
   onSignOut: () => void;
 }
 
 export function Sidebar({
-  user, view, setView, collapsed, setCollapsed, history, onRequireAuth, onSignOut
+  user, view, setView, collapsed, setCollapsed,
+  conversations, activeConversationId, onSelectConversation,
+  onNewChat, onRequireAuth, onSignOut
 }: SidebarProps) {
   const isLoggedOut = !user;
   const displayName = user?.email ?? "Guest";
@@ -39,7 +45,7 @@ export function Sidebar({
         <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: collapsed ? "center" : "flex-start" }}>
           <img src="/lumina-symbol-final.svg" alt="Lumina Icon" style={{ flexShrink: 0, width: "64px", height: "auto", objectFit: "contain" }} />
           {!collapsed && (
-            <img src="/lumina-text-alt.svg" alt="Lumina" style={{ height: "36px", width: "auto", objectFit: "contain", transform: "translateY(1px)"}} />
+            <img src="/lumina-text-alt.svg" alt="Lumina" style={{ height: "36px", width: "auto", objectFit: "contain", transform: "translateY(1px)" }} />
           )}
         </div>
       </div>
@@ -81,7 +87,11 @@ export function Sidebar({
 
       {/* New Chat Button */}
       <div style={{ padding: collapsed ? "0 10px 14px" : "0 16px 14px" }}>
-        <button className="ll-btn-amber" style={{ width: "100%" }} onClick={() => onRequireAuth()}>
+        <button
+          className="ll-btn-amber"
+          style={{ width: "100%" }}
+          onClick={() => { if (onRequireAuth()) onNewChat(); }}
+        >
           <Plus size={16} />
           {!collapsed && "New chat"}
         </button>
@@ -89,30 +99,39 @@ export function Sidebar({
 
       {/* Navigation */}
       <nav className="ll-sidebar-section" style={{ padding: "12px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
-        <div className={`ll-navitem ${view === "chats" ? "active" : ""}`} onClick={() => { if(onRequireAuth()) setView("chats"); }}>
+        <div className={`ll-navitem ${view === "chats" ? "active" : ""}`} onClick={() => { if (onRequireAuth()) setView("chats"); }}>
           <MessageSquare size={16} />
           <span className="ll-navitem-label">Chats</span>
         </div>
-        <div className={`ll-navitem ${view === "dashboard" ? "active" : ""} ${isLoggedOut ? "disabled" : ""}`} onClick={() => { if(onRequireAuth()) setView("dashboard"); }}>
+        <div className={`ll-navitem ${view === "dashboard" ? "active" : ""} ${isLoggedOut ? "disabled" : ""}`} onClick={() => { if (onRequireAuth()) setView("dashboard"); }}>
           <LayoutDashboard size={16} />
           <span className="ll-navitem-label">Dashboard</span>
         </div>
       </nav>
 
-      {/* History */}
+      {/* History — real conversations, no channel distinction (WhatsApp deferred, no such column yet) */}
       {!collapsed && (
         <div className="ll-sidebar-section" style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--tan-muted)", padding: "6px 10px", textTransform: "uppercase" }}>Recent</div>
           {user ? (
-            history.map((h) => (
-              <div key={h.id} className={`ll-convo ${h.active ? "active" : ""}`}>
-                <div className="ll-convo-title">{h.title}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--tan-muted)" }}>
-                  {h.channel === "whatsapp" ? <Smartphone size={11} color="#FFC370" /> : <Globe size={11} />}
-                  {h.time}
-                </div>
+            conversations.length === 0 ? (
+              <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>
+                No conversations yet. Start one with "New chat."
               </div>
-            ))
+            ) : (
+              conversations.map((c) => (
+                <div
+                  key={c.id}
+                  className={`ll-convo ${c.id === activeConversationId ? "active" : ""}`}
+                  onClick={() => onSelectConversation(c.id)}
+                >
+                  <div className="ll-convo-title">{c.title ?? "New conversation"}</div>
+                  <div style={{ fontSize: 11, color: "var(--tan-muted)" }}>
+                    {formatRelativeTime(c.created_at)}
+                  </div>
+                </div>
+              ))
+            )
           ) : (
             <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>Log in to see your conversation history.</div>
           )}
@@ -126,7 +145,6 @@ export function Sidebar({
           <Settings size={16} />
           <span className="ll-navitem-label">Settings</span>
         </div>
-        {user && !collapsed && <span className="ll-sidebar-muted" style={{ fontSize: 11 }}>412 msgs synced</span>}
       </div>
     </aside>
   );
