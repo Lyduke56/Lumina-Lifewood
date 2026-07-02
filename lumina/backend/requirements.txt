@@ -4,3 +4,4 @@ openpyxl
 supabase
 python-dotenv
 fabric-cicd
+openai
