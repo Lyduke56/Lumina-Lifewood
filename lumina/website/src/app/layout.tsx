@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { AuthProvider } from "../contexts/AuthContext";
-import AuthModal from "./components/AuthModal";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -11,7 +10,10 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "lumina | illuminate insights",
-  description: "Agentic data visualization for Power BI",
+  description: "Your agentic data visualization assistant.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

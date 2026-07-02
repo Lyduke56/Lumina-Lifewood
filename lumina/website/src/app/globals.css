@@ -23,3 +23,222 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        .ll-root {
+          --cream: #F5EEDB;
+          --white: #FFFFFF;
+          --offwhite: #F9F7F7;
+          --forest: #133020;
+          --forest-soft: #1B4030;
+          --emerald: #046241;
+          --emerald-dark: #034D34;
+          --emerald-tint: #E7F0EA;
+          --amber: #FFB347;
+          --amber-light: #FFC370;
+          --amber-safe: #A65A12;
+          --tan-muted: #C9C2AC;
+          --line: rgba(19,48,32,0.10);
+
+          font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+          background: var(--cream);
+          color: var(--forest);
+          height: 100vh;
+          width: 100%;
+          display: flex;
+          overflow: hidden;
+        }
+        .ll-root *:focus-visible {
+          outline: 2px solid var(--emerald);
+          outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ll-root * { animation: none !important; transition: none !important; }
+        }
+        .ll-brand-font { font-family: 'Fraunces', serif; }
+        .ll-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* ---- Sidebar ---- */
+        .ll-sidebar {
+          width: 272px;
+          flex-shrink: 0;
+          background: var(--forest);
+          color: var(--cream);
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          transition: width 0.18s ease;
+          position: relative;
+        }
+        .ll-sidebar.collapsed { width: 72px; }
+
+        .ll-sidebar-collapse-btn {
+          position: absolute; top: 18px; right: -12px; z-index: 5;
+          width: 24px; height: 24px; border-radius: 50%;
+          background: var(--emerald); color: var(--white);
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; border: 2px solid var(--forest);
+        }
+        .ll-sidebar-collapse-btn:hover { background: var(--emerald-dark); }
+
+        .ll-sidebar-muted { color: var(--tan-muted); }
+        .ll-sidebar-section { border-top: 1px solid rgba(245,238,219,0.10); }
+
+        .ll-navitem {
+          display: flex; align-items: center; gap: 10px;
+          padding: 8px 10px; border-radius: 8px;
+          font-size: 13.5px; font-weight: 500;
+          color: var(--tan-muted);
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .ll-navitem:hover { background: rgba(245,238,219,0.06); color: var(--cream); }
+        .ll-navitem.active { background: rgba(245,238,219,0.10); color: var(--cream); }
+        .ll-navitem.disabled { opacity: 0.45; cursor: not-allowed; }
+        .ll-sidebar.collapsed .ll-navitem { justify-content: center; padding: 10px; }
+        .ll-sidebar.collapsed .ll-navitem-label { display: none; }
+
+        .ll-convo {
+          display: flex; flex-direction: column; gap: 3px;
+          padding: 8px 10px; border-radius: 8px; cursor: pointer;
+        }
+        .ll-convo:hover { background: rgba(245,238,219,0.06); }
+        .ll-convo.active { background: rgba(255,179,71,0.12); }
+        .ll-convo-title {
+          font-size: 13px; color: var(--cream); font-weight: 500;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .ll-btn-amber {
+          background: var(--amber); color: var(--forest);
+          font-weight: 600; font-size: 13.5px;
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+          padding: 9px 12px; border-radius: 10px; cursor: pointer; border: none;
+          white-space: nowrap;
+        }
+        .ll-btn-amber:hover { background: var(--amber-light); }
+
+        .ll-signin-btn {
+          background: transparent; color: var(--cream);
+          font-weight: 600; font-size: 12.5px; border: 1px solid rgba(245,238,219,0.3);
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+          padding: 7px 10px; border-radius: 8px; cursor: pointer; width: 100%;
+        }
+        .ll-signin-btn:hover { background: rgba(245,238,219,0.08); }
+
+        /* ---- Center chat column ---- */
+        .ll-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--offwhite); position: relative; }
+        .ll-chat-header {
+          height: 56px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+          padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--white);
+        }
+        .ll-badge-sync {
+          display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500;
+          color: var(--emerald); background: var(--emerald-tint);
+          padding: 4px 10px; border-radius: 999px;
+        }
+        .ll-msg-user {
+          align-self: flex-end; max-width: 70%; background: var(--emerald); color: var(--white);
+          padding: 10px 14px; border-radius: 14px 14px 4px 14px; font-size: 14px; line-height: 1.5;
+        }
+        .ll-msg-assistant {
+          align-self: flex-start; max-width: 78%; background: var(--white); border: 1px solid var(--line);
+          color: var(--forest); padding: 12px 16px; border-radius: 4px 14px 14px 14px; font-size: 14px; line-height: 1.6;
+        }
+        .ll-chan-tag {
+          display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500;
+          color: var(--amber-safe); margin-bottom: 4px;
+        }
+        .ll-gen-card {
+          border: 1px dashed rgba(4,98,65,0.35); background: var(--emerald-tint);
+          border-radius: 10px; padding: 10px 12px; margin-top: 10px;
+          display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--emerald-dark); font-weight: 500;
+        }
+        .ll-pulse-bars { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
+        .ll-pulse-bars span {
+          width: 3px; background: var(--emerald); border-radius: 2px;
+          animation: llbar 1s ease-in-out infinite;
+        }
+        .ll-pulse-bars span:nth-child(1) { height: 6px; animation-delay: 0s; }
+        .ll-pulse-bars span:nth-child(2) { height: 14px; animation-delay: 0.15s; }
+        .ll-pulse-bars span:nth-child(3) { height: 9px; animation-delay: 0.3s; }
+        .ll-pulse-bars span:nth-child(4) { height: 16px; animation-delay: 0.45s; }
+        @keyframes llbar { 0%,100% { transform: scaleY(0.5); } 50% { transform: scaleY(1); } }
+
+        .ll-empty-state {
+          flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: 10px; padding: 40px; text-align: center;
+        }
+        .ll-empty-state h3 { margin: 0; font-size: 16px; color: var(--forest); }
+        .ll-empty-state p { margin: 0; font-size: 13px; color: rgba(19,48,32,0.55); max-width: 320px; line-height: 1.5; }
+
+        .ll-composer {
+          border-top: 1px solid var(--line); background: var(--white); padding: 12px 20px 16px;
+        }
+        .ll-composer-box {
+          display: flex; align-items: center; gap: 8px;
+          border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--offwhite);
+        }
+        .ll-icon-btn {
+          display: flex; align-items: center; justify-content: center;
+          width: 32px; height: 32px; border-radius: 8px; color: var(--forest);
+          cursor: pointer; flex-shrink: 0;
+        }
+        .ll-icon-btn:hover { background: var(--line); }
+        .ll-send-btn {
+          width: 32px; height: 32px; border-radius: 8px; background: var(--emerald); color: var(--white);
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; border: none;
+        }
+        .ll-send-btn:hover { background: var(--emerald-dark); }
+
+        table.ll-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        table.ll-table th {
+          text-align: left; font-weight: 600; color: rgba(19,48,32,0.6); font-size: 11px;
+          text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--line);
+          position: sticky; top: 0; background: var(--white);
+        }
+        table.ll-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); }
+        table.ll-table tr:hover td { background: var(--offwhite); }
+
+        /* ---- Right preview panel (Chats view) ---- */
+        .ll-tab {
+          font-size: 13px; font-weight: 500;
+          padding: 8px 4px; margin-right: 16px; cursor: pointer;
+          display: flex; align-items: center; gap: 6px;
+        }
+        .ll-export-btn:hover { border-color: var(--emerald); }
+
+        .ll-status-badge {
+          display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;
+          padding: 2px 8px; border-radius: 999px;
+        }
+        .ll-status-badge.ready { background: var(--emerald-tint); color: var(--emerald-dark); }
+        .ll-status-badge.failed { background: #FBEAE9; color: #B3261E; }
+
+        /* ---- Dashboard split view ---- */
+        .ll-dashboard { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--offwhite); height: 100%; }
+        .ll-dashboard-header {
+          height: 56px; flex-shrink: 0; display: flex; align-items: center;
+          padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--white);
+        }
+        .ll-dashboard-half { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .ll-dashboard-divider { height: 1px; background: var(--line); flex-shrink: 0; }
+        .ll-dashboard-panel-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 14px 24px 10px; flex-shrink: 0;
+        }
+        .ll-dashboard-panel-title {
+          display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--forest);
+        }
+        .ll-dashboard-count {
+          font-size: 11px; font-weight: 600; color: rgba(19,48,32,0.5); background: var(--line);
+          padding: 1px 8px; border-radius: 999px;
+        }
+        .ll-dashboard-scroll { flex: 1; overflow-y: auto; padding: 0 24px 16px; }
+
+        .ll-scrollbar::-webkit-scrollbar { width: 6px; }
+        .ll-scrollbar::-webkit-scrollbar-thumb { background: rgba(19,48,32,0.15); border-radius: 4px; }
+
+
+     
