@@ -55,12 +55,50 @@ def save_generated_file(
                 "storage_path": storage_path,
                 "layout_json": layout_json,
                 "chart_preview_json": chart_preview_json,
-                "status": "generated",
+                "status": "ready",
             }
         )
         .execute()
     )
     return result.data[0]
+
+
+import shutil
+import tempfile
+from pathlib import Path
+
+
+def get_conversation_owner(conversation_id: str) -> str:
+    """Look up the user_id that owns a conversation."""
+    client = get_client()
+    result = (
+        client.table("conversations")
+        .select("user_id")
+        .eq("id", conversation_id)
+        .execute()
+    )
+    return result.data[0]["user_id"]
+
+
+def upload_generated_file(local_dir: Path, user_id: str, dataset_id: str) -> str:
+    """Zip a generated PBIP folder and upload it to the generated-files bucket.
+
+    Returns the object path within the bucket, e.g.
+    "{user_id}/{dataset_id}/production_plan_reference.zip" — the first path
+    segment must be the owning user's ID to satisfy the storage RLS policy.
+    """
+    client = get_client()
+    zip_base = Path(tempfile.mkdtemp()) / dataset_id
+    shutil.make_archive(str(zip_base), "zip", root_dir=local_dir)
+
+    object_path = f"{user_id}/{dataset_id}/production_plan_reference.zip"
+    with open(f"{zip_base}.zip", "rb") as f:
+        client.storage.from_("generated-files").upload(
+            object_path,
+            f.read(),
+            file_options={"content-type": "application/zip"},
+        )
+    return object_path
 
 
 if __name__ == "__main__":
