@@ -6,3 +6,7 @@ __pycache__/
 .pytest_cache/
 
 sample_ProductionPlan/
+app/clean_export.csv
+generated_dashboards/
+pbib_reference/**/.pbi/
+

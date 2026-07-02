@@ -55,7 +55,7 @@ def save_generated_file(
                 "storage_path": storage_path,
                 "layout_json": layout_json,
                 "chart_preview_json": chart_preview_json,
-                "status": "stub",
+                "status": "generated",
             }
         )
         .execute()

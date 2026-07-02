@@ -1,0 +1,66 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+  "name": "3b40e7c0fad582daecf1",
+  "position": {
+    "x": 864,
+    "y": 0,
+    "z": 1,
+    "height": 720,
+    "width": 416,
+    "tabOrder": 1
+  },
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {
+      "queryState": {
+        "Data": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "clean_export"
+                        }
+                      },
+                      "Property": "recording_actual_sentences"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(clean_export.recording_actual_sentences)",
+              "nativeQueryRef": "Sum of recording_actual_sentences"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Aggregation": {
+                "Expression": {
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "clean_export"
+                      }
+                    },
+                    "Property": "recording_actual_sentences"
+                  }
+                },
+                "Function": 0
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}
