@@ -1,0 +1,141 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+  "name": "f86d0e19ee8e9b2b4cec",
+  "position": {
+    "x": 10.142630744849445,
+    "y": 0,
+    "z": 0,
+    "height": 720.12678288431061,
+    "width": 843.86687797147385,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "lineChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "clean_export"
+                    }
+                  },
+                  "Property": "date"
+                }
+              },
+              "queryRef": "clean_export.date",
+              "nativeQueryRef": "date",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "clean_export"
+                        }
+                      },
+                      "Property": "target_ops"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(clean_export.target_ops)",
+              "nativeQueryRef": "Sum of target_ops"
+            },
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "clean_export"
+                        }
+                      },
+                      "Property": "recording_actual_ops"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(clean_export.recording_actual_ops)",
+              "nativeQueryRef": "Sum of recording_actual_ops"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "clean_export"
+                  }
+                },
+                "Property": "date"
+              }
+            },
+            "direction": "Ascending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "c565945ca2db8b04a68b",
+        "field": {
+          "Aggregation": {
+            "Expression": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "clean_export"
+                  }
+                },
+                "Property": "target_ops"
+              }
+            },
+            "Function": 0
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "d00fc20611138421eccb",
+        "field": {
+          "Aggregation": {
+            "Expression": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "clean_export"
+                  }
+                },
+                "Property": "recording_actual_ops"
+              }
+            },
+            "Function": 0
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
+  }
+}

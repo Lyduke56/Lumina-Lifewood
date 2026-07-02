@@ -3,3 +3,4 @@ pandas
 openpyxl
 supabase
 python-dotenv
+fabric-cicd

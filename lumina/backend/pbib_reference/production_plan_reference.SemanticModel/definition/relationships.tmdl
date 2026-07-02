@@ -1,0 +1,5 @@
+relationship 8c515d3a-63f3-4813-b779-324e33f8e40d
+	joinOnDateBehavior: datePartOnly
+	fromColumn: clean_export.date
+	toColumn: LocalDateTable_4a0d5e46-dc59-4b69-b031-8da13b9a5e63.Date
+
