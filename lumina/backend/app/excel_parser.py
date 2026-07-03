@@ -262,8 +262,14 @@ Respond with ONLY a JSON object mapping column numbers (as strings) to one of:
 Omit columns that don't map to any of these. No other text."""
 
     response = ask(prompt, temperature=0, use_fallback=False)
-    start, end = response.find("{"), response.rfind("}")
-    mapping = json.loads(response[start : end + 1])
+    try:
+        start, end = response.find("{"), response.rfind("}")
+        mapping = json.loads(response[start : end + 1])
+    except (json.JSONDecodeError, ValueError) as e:
+        raise ValueError(
+            "We couldn't automatically understand this file's columns. "
+            "Please double-check the file format, or try again in a moment."
+        ) from e
     return {int(k): v for k, v in mapping.items() if v in CANONICAL_FIELDS}
 
 
