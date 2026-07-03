@@ -17,16 +17,18 @@ client = OpenRouter = OpenAI(
 )
 
 
-def ask(prompt: str) -> str:
-    """Call the fallback chain of free OpenRouter models; returns the response text."""
-    completion = client.chat.completions.create(
-        model=FALLBACK_MODELS[0],
-        extra_body={
-            "models": FALLBACK_MODELS,
-            "route": "fallback",
-        },
-        messages=[{"role": "user", "content": prompt}],
-    )
+def ask(prompt: str, temperature: float = 1.0, use_fallback: bool = True) -> str:
+    """Call OpenRouter. By default uses the fallback chain of free models; set
+    use_fallback=False to pin the primary model only (for reproducible structured output).
+    """
+    kwargs = {
+        "model": FALLBACK_MODELS[0],
+        "temperature": temperature,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if use_fallback:
+        kwargs["extra_body"] = {"models": FALLBACK_MODELS, "route": "fallback"}
+    completion = client.chat.completions.create(**kwargs)
     return completion.choices[0].message.content
 
 

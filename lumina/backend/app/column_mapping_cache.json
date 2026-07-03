@@ -1,0 +1,79 @@
+{
+  "773cbf06d45b5fa71f5fdf1a316693c037e5451769e6ee6cad36c1e902174028": {
+    "column_map": {
+      "3": "target_quantity",
+      "5": "target_hours",
+      "6": "actual_quantity",
+      "8": "actual_hours",
+      "13": "target_quantity",
+      "16": "target_hours",
+      "17": "actual_quantity",
+      "19": "actual_hours"
+    },
+    "labels": [
+      "Date",
+      "TARGET | Month",
+      "TARGET | Target no. of Ops",
+      "TARGET | Total Sentences (300 sentences/Ops",
+      "TARGET | Total Hours per day",
+      "ACTUAL | PRODUCTION - RECORDING | Actual Number of Ops",
+      "ACTUAL | PRODUCTION - RECORDING | Total Sentences",
+      "ACTUAL | PRODUCTION - RECORDING | Total Hours",
+      "ACTUAL | PRODUCTION - RECORDING | Balance (Hour)",
+      "ACTUAL | PRODUCTION - RECORDING | Completion Rate (Hours)",
+      "ACTUAL | Accumulative | Target",
+      "ACTUAL | Accumulative | Actual",
+      "Target no. of Ops",
+      "Total Sentences/Ops",
+      "Total Sentences per day",
+      "Total Hours per day",
+      "PRODUCTION - QC | Actual Number of Ops",
+      "PRODUCTION - QC | Total Sentences",
+      "PRODUCTION - QC | Total Hours",
+      "PRODUCTION - QC | Balance (Hours)",
+      "PRODUCTION - QC | Completion Rate (Hours)"
+    ]
+  },
+  "77f0b1417b1d2df6805f3ec90cc0e74b258329305300211ddb58e6566a46698f": {
+    "column_map": {
+      "3": "target_quantity",
+      "7": "target_hours",
+      "8": "actual_quantity",
+      "11": "actual_hours",
+      "15": "actual_quantity",
+      "18": "actual_hours",
+      "22": "actual_quantity",
+      "25": "actual_hours"
+    },
+    "labels": [
+      "Date",
+      "Month",
+      "Target | Plan # of Ops",
+      "Target | Plan (Task per Ops)",
+      "Target | Total Plan  (Task/day)",
+      "Target | Estimate 5 mins per Task",
+      "Target | Estimate total hours",
+      "Production KEY - English (India) | Actual | Actual # of Ops",
+      "Production KEY - English (India) | Actual | Actual (Task per day)",
+      "Production KEY - English (India) | Actual | Actual Total Seconds",
+      "Production KEY - English (India) | Actual | Actual Total Hours",
+      "Production KEY - English (India) | Actual | % Completion",
+      "Production KEY - English (India) | Accumulative | Target",
+      "Production KEY - English (India) | Accumulative | Actual",
+      "Production KEY - Hindu (India) | Actual | Actual # of Ops",
+      "Production KEY - Hindu (India) | Actual | Actual (Task per day)",
+      "Production KEY - Hindu (India) | Actual | Actual Total Seconds",
+      "Production KEY - Hindu (India) | Actual | Actual Total Hours",
+      "Production KEY - Hindu (India) | Actual | % Completion",
+      "Production KEY - Hindu (India) | Accumulative | Target",
+      "Production KEY - Hindu (India) | Accumulative | Actual",
+      "Production KEY - Arabic (Saudi Arabia) | Actual | Actual # of Ops",
+      "Production KEY - Arabic (Saudi Arabia) | Actual | Actual (Task per day)",
+      "Production KEY - Arabic (Saudi Arabia) | Actual | Actual Total Seconds",
+      "Production KEY - Arabic (Saudi Arabia) | Actual | Actual Total Hours",
+      "Production KEY - Arabic (Saudi Arabia) | Actual | % Completion",
+      "Production KEY - Arabic (Saudi Arabia) | Accumulative | Target",
+      "Production KEY - Arabic (Saudi Arabia) | Accumulative | Actual"
+    ]
+  }
+}
