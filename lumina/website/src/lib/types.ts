@@ -14,33 +14,31 @@ export type GeneratedFile = {
   conversation_title: string | null;
 };
 
-// ── Report configuration produced by SetupCard ───────────────────────────────
-// Populated via the web setup card or incrementally via the WhatsApp bot.
-// Passed to the agent as initial context before the first chat message.
+// ── User profile (mirrors public.profiles table) ─────────────────────────────
+export type Profile = {
+  id: string;
+  full_name: string | null;
+  username: string;
+  contact_number: string | null;
+  organization: string | null;
+  avatar_url: string | null; // null = render initials client-side
+  created_at: string;
+  updated_at: string;
+};
 
+// ── Report configuration produced by SetupCard ───────────────────────────────
 export type ColorPresetId = "lifewood" | "plum-citrus" | "slate-coral" | "custom";
 export type FontPresetId  = "inter-inter" | "playfair-inter" | "montserrat-lato" | "fraunces-dm" | "custom";
 
 export type ReportConfig = {
-  // Basic
   reportName: string;
-
-  // Theme
   colorPreset: ColorPresetId;
-  primaryColor: string;   // hex — derived from preset or entered manually
-  accentColor: string;    // hex — derived from preset or entered manually
-
-  // Typography
+  primaryColor: string;
+  accentColor: string;
   fontPreset: FontPresetId;
-  headingFont: string;    // e.g. "Fraunces"
-  bodyFont: string;       // e.g. "DM Sans"
-
-  // Data
+  headingFont: string;
+  bodyFont: string;
   file: File | null;
-
-  // Optional
   instructions: string;
-
-  // Source — lets the UI know whether config arrived from web or WhatsApp
   source: "web" | "whatsapp";
 };

@@ -300,7 +300,7 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                   color: "rgba(19,48,32,0.55)",
                   fontFamily: `'${heading}', sans-serif`,
                 }}>
-                  {reportName.trim() || "No Title"} — Actual vs. Target
+                  {reportName.trim() || "No Title"} — Actual vs. Target (Mock Preview — not necessarily the actual output)
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <LegendDot color={primary} label="Actual" />
@@ -544,46 +544,102 @@ function SectionLabel({ children, optional }: { children: React.ReactNode; optio
 function ColorPickerInput({ label, value, onChange, fallback }: {
   label: string; value: string; onChange: (v: string) => void; fallback: string;
 }) {
+  // Format hex to ensure it has # prefix
+  const displayValue = value && !value.startsWith("#") ? `#${value}` : value;
+  
   return (
     <div>
       <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.5)", marginBottom: 5, fontWeight: 500 }}>{label}</div>
       <div style={{
-        display: "flex", alignItems: "center", gap: 7,
+        display: "flex", alignItems: "center", gap: 8,
         border: "1px solid var(--line)", borderRadius: 8,
-        padding: "6px 6px 6px 10px",
+        padding: "4px 8px 4px 4px",
         background: "var(--white)",
       }}>
         <input
           type="color"
-          value={value || fallback}
-          onChange={(e) => onChange(e.target.value)}
+          value={displayValue || fallback}
+          onChange={(e) => {
+            const newColor = e.target.value;
+            onChange(newColor);
+          }}
           style={{
-            width: 32,
-            height: 32,
+            width: 40,
+            height: 40,
             padding: 0,
             border: "none",
-            borderRadius: 4,
             cursor: "pointer",
             background: "none",
           }}
         />
-        <input
-          type="text" 
-          value={value} 
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={fallback} 
-          maxLength={7}
-          className="ll-mono"
-          style={{ 
-            flex: 1, 
-            border: "none", 
-            outline: "none", 
-            fontSize: 12.5, 
-            background: "transparent", 
-            color: "var(--forest)",
-            padding: "4px 0",
-          }}
-        />
+        <div style={{ 
+          display: "flex", 
+          flexDirection: "column",
+          flex: 1,
+          gap: 2,
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}>
+            <span style={{
+              fontSize: 11,
+              color: "rgba(19,48,32,0.4)",
+              fontWeight: 500,
+              fontFamily: "monospace",
+            }}>#</span>
+            <input
+              type="text" 
+              value={value?.replace("#", "") || ""} 
+              onChange={(e) => {
+                let newValue = e.target.value;
+                // Remove any non-hex characters
+                newValue = newValue.replace(/[^0-9a-fA-F]/g, "");
+                // Limit to 6 characters
+                newValue = newValue.slice(0, 6);
+                // Auto-add # prefix
+                if (newValue.length === 6) {
+                  onChange(`#${newValue}`);
+                } else {
+                  onChange(newValue ? `#${newValue}` : "");
+                }
+              }}
+              onBlur={(e) => {
+                // Auto-complete to 6 digits if user left it short
+                let val = e.target.value.replace(/[^0-9a-fA-F]/g, "");
+                if (val.length === 3) {
+                  // Expand 3-digit hex to 6-digit
+                  val = val.split('').map(c => c + c).join('');
+                  onChange(`#${val}`);
+                } else if (val.length > 0 && val.length < 6) {
+                  // Pad with zeros if user typed partial
+                  val = val.padEnd(6, '0');
+                  onChange(`#${val}`);
+                }
+              }}
+              placeholder={fallback.replace("#", "")} 
+              maxLength={6}
+              style={{ 
+                flex: 1, 
+                border: "none", 
+                outline: "none", 
+                fontSize: 13, 
+                background: "transparent", 
+                color: "var(--forest)",
+                padding: "2px 0",
+                fontFamily: "monospace",
+                textTransform: "uppercase",
+              }}
+            />
+          </div>
+          <div style={{
+            height: 2,
+            borderRadius: 1,
+            background: value || fallback,
+            transition: "background 0.15s",
+          }} />
+        </div>
       </div>
     </div>
   );
