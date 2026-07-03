@@ -14,11 +14,20 @@ from llm_client import ask
 
 REPORT_TYPES = {
     "Progress Overview": "target vs actual trends over time, and overall completion",
+    "Executive Summary": "a small number of high-level KPI cards only, minimal detail, for leadership or clients who just want the headline numbers",
 }
 
 
-def choose_visuals(report_type: str = "Progress Overview") -> list[dict]:
+def choose_visuals(
+    report_type: str = "Progress Overview", instructions: str | None = None
+) -> list[dict]:
     """Ask the LLM to choose a sensible set of visuals for the given report type."""
+    instructions_block = (
+        f'\nAdditional instructions from the user: "{instructions}"\n'
+        if instructions
+        else ""
+    )
+
     prompt = f"""You are choosing which charts to include in a Power BI dashboard for a production-plan tracking tool.
 
 Available data fields:
@@ -28,11 +37,14 @@ Available data fields:
 - completion_rate: actual_quantity / target_quantity for that day
 
 Report type: "{report_type}" — {REPORT_TYPES[report_type]}
-
+{instructions_block}
 Choose 3 to 5 visuals that best fit this report type. Each visual must be one of:
 {{"type": "card", "fields": ["<one field>"]}} — a single big-number KPI
 {{"type": "line", "fields": ["date", "<field1>", "<field2>", ...]}} — a trend line over time
 {{"type": "bar", "fields": ["date", "<field1>", "<field2>", ...]}} — a bar comparison over time
+{{"type": "table", "fields": ["date", "<field1>", "<field2>", ...]}} — a detailed row-by-row table
+
+If the user's instructions ask for something these visual types can't do, do the closest reasonable thing with what's available and don't invent a new "type" value.
 
 Respond with ONLY a JSON list of visual specs, no other text."""
 
@@ -56,7 +68,9 @@ VISUAL_TYPE_MAP = {
     "card": "cardVisual",
     "line": "lineChart",
     "bar": "clusteredColumnChart",
+    "table": "tableEx",
 }
+
 
 DEFAULT_VISUALS = [
     {"type": "card", "fields": ["actual_quantity"]},
@@ -181,6 +195,37 @@ def _card_visual_json(name: str, field: str, position: dict) -> dict:
     }
 
 
+def _table_visual_json(name: str, fields: list[str], position: dict) -> dict:
+    projections = []
+    for f in fields:
+        if f == "date":
+            projections.append(
+                {
+                    "field": _column_ref(f),
+                    "queryRef": f"{ENTITY}.{f}",
+                    "nativeQueryRef": f,
+                }
+            )
+        else:
+            projections.append(
+                {
+                    "field": _agg_ref(f),
+                    "queryRef": f"{_aggregation_label(f)}({ENTITY}.{f})",
+                    "nativeQueryRef": f"{_aggregation_label(f)} of {f}",
+                }
+            )
+    return {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+        "name": name,
+        "position": position,
+        "visual": {
+            "visualType": "tableEx",
+            "query": {"queryState": {"Values": {"projections": projections}}},
+            "drillFilterOtherVisuals": True,
+        },
+    }
+
+
 def _visual_position(index: int, total: int, page_width=1280, page_height=720) -> dict:
     """Simple placeholder layout: stack visuals full-width, evenly split vertically."""
     height = page_height / total
@@ -214,6 +259,8 @@ def apply_visuals(page_dir: Path, specs: list[dict]) -> None:
 
         if spec["type"] == "card":
             content = _card_visual_json(name, spec["fields"][0], position)
+        elif spec["type"] == "table":
+            content = _table_visual_json(name, spec["fields"], position)
         else:
             category_field, *y_fields = spec["fields"]
             content = _categorical_visual_json(
