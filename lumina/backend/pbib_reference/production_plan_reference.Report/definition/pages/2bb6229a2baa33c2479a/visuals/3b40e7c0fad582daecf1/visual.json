@@ -25,14 +25,14 @@
                           "Entity": "clean_export"
                         }
                       },
-                      "Property": "recording_actual_sentences"
+                      "Property": "actual_quantity"
                     }
                   },
                   "Function": 0
                 }
               },
-              "queryRef": "Sum(clean_export.recording_actual_sentences)",
-              "nativeQueryRef": "Sum of recording_actual_sentences"
+              "queryRef": "Sum(clean_export.actual_quantity)",
+              "nativeQueryRef": "Sum of actual_quantity"
             }
           ]
         }
@@ -49,7 +49,7 @@
                         "Entity": "clean_export"
                       }
                     },
-                    "Property": "recording_actual_sentences"
+                    "Property": "actual_quantity"
                   }
                 },
                 "Function": 0

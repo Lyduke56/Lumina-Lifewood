@@ -44,14 +44,14 @@
                           "Entity": "clean_export"
                         }
                       },
-                      "Property": "target_ops"
+                      "Property": "target_quantity"
                     }
                   },
                   "Function": 0
                 }
               },
-              "queryRef": "Sum(clean_export.target_ops)",
-              "nativeQueryRef": "Sum of target_ops"
+              "queryRef": "Sum(clean_export.target_quantity)",
+              "nativeQueryRef": "Sum of target_quantity"
             },
             {
               "field": {
@@ -63,14 +63,14 @@
                           "Entity": "clean_export"
                         }
                       },
-                      "Property": "recording_actual_ops"
+                      "Property": "actual_quantity"
                     }
                   },
                   "Function": 0
                 }
               },
-              "queryRef": "Sum(clean_export.recording_actual_ops)",
-              "nativeQueryRef": "Sum of recording_actual_ops"
+              "queryRef": "Sum(clean_export.actual_quantity)",
+              "nativeQueryRef": "Sum of actual_quantity"
             }
           ]
         }
@@ -109,7 +109,7 @@
                     "Entity": "clean_export"
                   }
                 },
-                "Property": "target_ops"
+                "Property": "target_quantity"
               }
             },
             "Function": 0
@@ -128,7 +128,7 @@
                     "Entity": "clean_export"
                   }
                 },
-                "Property": "recording_actual_ops"
+                "Property": "actual_quantity"
               }
             },
             "Function": 0
