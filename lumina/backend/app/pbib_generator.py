@@ -274,6 +274,37 @@ def apply_visuals(page_dir: Path, specs: list[dict]) -> None:
         )
 
 
+def add_page(output_dir: Path, display_name: str, specs: list[dict]) -> str:
+    """Create a new report page with the given display name and visuals. Returns the new page's id."""
+    pages_root = (
+        output_dir / "production_plan_reference.Report" / "definition" / "pages"
+    )
+    page_id = uuid.uuid4().hex[:20]
+    page_dir = pages_root / page_id
+    page_dir.mkdir(parents=True)
+
+    page_json = {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+        "name": page_id,
+        "displayName": display_name,
+        "displayOption": "FitToPage",
+        "height": 720,
+        "width": 1280,
+    }
+    (page_dir / "page.json").write_text(
+        json.dumps(page_json, indent=2), encoding="utf-8"
+    )
+
+    apply_visuals(page_dir, specs)
+
+    pages_json_path = pages_root / "pages.json"
+    pages_meta = json.loads(pages_json_path.read_text(encoding="utf-8"))
+    pages_meta["pageOrder"].append(page_id)
+    pages_json_path.write_text(json.dumps(pages_meta, indent=2), encoding="utf-8")
+
+    return page_id
+
+
 def generate_pbip(
     records: list[dict], dataset_id: str, visuals: list[dict] | None = None
 ) -> Path:
