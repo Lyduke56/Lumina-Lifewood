@@ -15,8 +15,8 @@ export function ChatPanel({ user, activeConversation, onRequireAuth, onUploadCli
     <main className="ll-chat">
       <div className="ll-chat-header">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <FileSpreadsheet size={16} color="var(--emerald)" />
-          <span style={{ fontSize: 13.5, fontWeight: 600 }}>
+          <FileSpreadsheet size={24} color="var(--emerald)" />
+          <span style={{ fontSize: 20, fontWeight: 600 }}>
             {user
               ? activeConversation?.title ?? "New conversation"
               : "New conversation"}

@@ -15,7 +15,8 @@ export function Dashboard({ user, conversations, files, onNavigateToChat }: Dash
     return (
       <div className="ll-dashboard">
         <div className="ll-dashboard-header">
-          <span style={{ fontSize: 13.5, fontWeight: 600 }}>Dashboard</span>
+          <LayoutDashboard size={24} color="var(--emerald)" />
+          <span style={{ fontSize: 20, fontWeight: 600 }}> Dashboard</span>
         </div>
         <div className="ll-empty-state">
           <LayoutDashboard size={28} color="var(--emerald)" />
@@ -29,13 +30,15 @@ export function Dashboard({ user, conversations, files, onNavigateToChat }: Dash
   return (
     <div className="ll-dashboard">
       <div className="ll-dashboard-header">
-        <span style={{ fontSize: 13.5, fontWeight: 600 }}>Dashboard</span>
+          <div className="ll-dashboard-panel-title">
+            <LayoutDashboard size={24} color="var(--emerald)" /> <span style={{ fontSize: 20, fontWeight: 600 }}> Dashboard</span>
+          </div>
       </div>
 
       <div className="ll-dashboard-half">
         <div className="ll-dashboard-panel-header">
           <div className="ll-dashboard-panel-title">
-            <MessageSquare size={15} color="var(--emerald)" /> Conversations
+            <MessageSquare size={20} color="var(--emerald)" /> Conversations
           </div>
           <span className="ll-dashboard-count">{conversations.length}</span>
         </div>
@@ -76,7 +79,7 @@ export function Dashboard({ user, conversations, files, onNavigateToChat }: Dash
       <div className="ll-dashboard-half">
         <div className="ll-dashboard-panel-header">
           <div className="ll-dashboard-panel-title">
-            <FolderOpen size={15} color="var(--emerald)" /> Generated Files
+            <FolderOpen size={20} color="var(--emerald)" /> Generated Files
           </div>
           <span className="ll-dashboard-count">{files.length}</span>
         </div>
