@@ -242,17 +242,37 @@ def _visual_position(index: int, total: int, page_width=1280, page_height=720) -
 def apply_visuals(page_dir: Path, specs: list[dict]) -> None:
     """Replace a page's visuals with ones generated from `specs`.
 
-    Each spec is {"type": "card"|"line"|"bar", "fields": [...]}. For "card", fields
-    is a single-item list. For "line"/"bar", fields[0] is the category field and the
-    rest are the Y-axis fields (summed).
+    Each spec is {"type": "card"|"line"|"bar"|"table", "fields": [...]}. For "card", fields
+    is a single-item list. For "line"/"bar", fields[0] is the category field and the rest
+    are the Y-axis fields (summed). For "table", fields are the columns to show.
+
+    Any field name not in the known canonical schema is dropped rather than written into
+    the report — a hallucinated field reference can leave a visual permanently broken for
+    anyone just viewing the finished file (no interactive "Fix this" prompt like there is
+    in Power BI Desktop while authoring). For "line"/"bar", an invalid field drops the whole
+    spec, since filtering it out could silently turn a numeric field into the category axis.
+    For "card"/"table", invalid fields are just filtered out of the list.
     """
+    known_fields = set(M_TYPES.keys())
+    valid_specs = []
+    for spec in specs:
+        if spec["type"] in ("line", "bar"):
+            if len(spec["fields"]) >= 2 and all(
+                f in known_fields for f in spec["fields"]
+            ):
+                valid_specs.append(spec)
+        else:
+            fields = [f for f in spec["fields"] if f in known_fields]
+            if fields:
+                valid_specs.append({"type": spec["type"], "fields": fields})
+
     visuals_dir = page_dir / "visuals"
     if visuals_dir.exists():
         shutil.rmtree(visuals_dir)
     visuals_dir.mkdir(parents=True)
 
-    total = len(specs)
-    for i, spec in enumerate(specs):
+    total = len(valid_specs)
+    for i, spec in enumerate(valid_specs):
         name = uuid.uuid4().hex[:20]
         position = _visual_position(i, total)
         visual_type = VISUAL_TYPE_MAP[spec["type"]]
