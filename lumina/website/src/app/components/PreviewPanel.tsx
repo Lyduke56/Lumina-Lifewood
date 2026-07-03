@@ -13,9 +13,9 @@ interface PreviewPanelProps {
   revenueData: any[];
 }
 
-const MIN_WIDTH = 280;
-const MAX_WIDTH = 600;
-const DEFAULT_WIDTH = 420;
+const MIN_WIDTH = 300;
+const MAX_WIDTH = 1000;
+const DEFAULT_WIDTH = 600;
 
 export function PreviewPanel({ user, revenueData }: PreviewPanelProps) {
   const [activeTab, setActiveTab] = useState("viz");
