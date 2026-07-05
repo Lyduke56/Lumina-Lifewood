@@ -42,5 +42,7 @@ export type ReportConfig = {
   bodyFont: string;
   file: File | null;
   instructions: string;
+  goodThreshold: number;
+  neutralThreshold: number;
   source: "web" | "whatsapp";
 };

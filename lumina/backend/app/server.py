@@ -19,6 +19,12 @@ def run_pipeline(
     report_type: str = "Progress Overview",
     report_name: str = "",
     instructions: str | None = None,
+    primary_color: str = "#133020",
+    accent_color: str = "#FFB347",
+    heading_font: str = "Fraunces",
+    body_font: str = "DM Sans",
+    good_threshold: float | None = None,
+    neutral_threshold: float | None = None,
 ) -> dict:
     """Parse a production-plan Excel file, store it, and generate a real PBIP dashboard.
     Shared implementation used by both the MCP tool and the HTTP entry point.
@@ -37,7 +43,17 @@ def run_pipeline(
     except Exception:
         visuals = DEFAULT_VISUALS
 
-    output_dir = generate_pbip(records, dataset_id=dataset["id"], visuals=visuals)
+    output_dir = generate_pbip(
+        records,
+        dataset_id=dataset["id"],
+        visuals=visuals,
+        primary_color=primary_color,
+        accent_color=accent_color,
+        heading_font=heading_font,
+        body_font=body_font,
+        good_threshold=good_threshold,
+        neutral_threshold=neutral_threshold,
+    )
     object_path = upload_generated_file(
         output_dir, user_id=user_id, dataset_id=dataset["id"]
     )
@@ -71,6 +87,12 @@ def process_production_plan(
     report_type: str = "Progress Overview",
     report_name: str = "",
     instructions: str = "",
+    primary_color: str = "#133020",
+    accent_color: str = "#FFB347",
+    heading_font: str = "Fraunces",
+    body_font: str = "DM Sans",
+    good_threshold: float | None = None,
+    neutral_threshold: float | None = None,
 ) -> dict:
     """Parse a production-plan Excel file, store it, and generate a real PBIP dashboard.
 
@@ -80,9 +102,25 @@ def process_production_plan(
         report_type: Which report type the dashboard should be built for (drives AI chart selection).
         report_name: The user-provided title for the report (weak context for AI chart selection).
         instructions: Free-text instructions from the user (drives AI chart selection).
+        primary_color: Hex color for the primary (first) chart series.
+        accent_color: Hex color for the accent (second) chart series.
+        heading_font: Font family for chart titles, headers, and KPI callout numbers.
+        body_font: Font family for data values, axis labels, and table content.
+        good_threshold: Average completion_rate at or above this is "good" (green). Omit to skip conditional formatting.
+        neutral_threshold: Average completion_rate at or above this (but below good_threshold) is "neutral" (amber); below it is "bad" (red).
     """
     return run_pipeline(
-        file_path, conversation_id, report_type, report_name, instructions or None
+        file_path,
+        conversation_id,
+        report_type,
+        report_name,
+        instructions or None,
+        primary_color,
+        accent_color,
+        heading_font,
+        body_font,
+        good_threshold,
+        neutral_threshold,
     )
 
 

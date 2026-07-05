@@ -25,13 +25,17 @@ async def generate_dashboard(
     report_type: str = Form("Progress Overview"),
     report_name: str = Form(""),
     instructions: str = Form(""),
+    primary_color: str = Form("#133020"),
+    accent_color: str = Form("#FFB347"),
+    heading_font: str = Form("Fraunces"),
+    body_font: str = Form("DM Sans"),
+    good_threshold: float | None = Form(None),
+    neutral_threshold: float | None = Form(None),
     authorization: str = Header(...),
 ):
     """Thin HTTP entry point for the web frontend's SetupCard modal. Accepts a
     multipart upload, verifies the caller actually owns the given conversation,
-    then runs the same pipeline the MCP tool uses. Theme/typography fields are
-    accepted by the frontend but not yet applied to the generated dashboard
-    (separate follow-up).
+    then runs the same pipeline the MCP tool uses.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -58,6 +62,12 @@ async def generate_dashboard(
             report_type,
             report_name,
             instructions or None,
+            primary_color,
+            accent_color,
+            heading_font,
+            body_font,
+            good_threshold,
+            neutral_threshold,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

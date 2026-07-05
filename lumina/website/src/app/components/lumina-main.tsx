@@ -76,11 +76,17 @@ export default function App() {
 
     if (conv && config.file) {
       const formData = new FormData();
-      formData.append("file", config.file);
+            formData.append("file", config.file);
       formData.append("conversation_id", conv.id);
       formData.append("report_type", config.reportType);
       formData.append("report_name", config.reportName);
       formData.append("instructions", config.instructions);
+      formData.append("primary_color", config.primaryColor);
+      formData.append("accent_color", config.accentColor);
+      formData.append("heading_font", config.headingFont);
+      formData.append("body_font", config.bodyFont);
+      formData.append("good_threshold", String(config.goodThreshold));
+      formData.append("neutral_threshold", String(config.neutralThreshold));
 
       try {
         const res = await fetch("http://localhost:8000/generate-dashboard", {

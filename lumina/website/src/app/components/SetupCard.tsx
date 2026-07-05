@@ -98,6 +98,10 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
   // Instructions
   const [instructions, setInstructions] = useState("");
 
+  const [goodThreshold, setGoodThreshold]       = useState(90);
+  const [neutralThreshold, setNeutralThreshold] = useState(70);
+
+
   // ── Load additional Google Fonts for preview ───────────────────────────
   useEffect(() => {
     const toLoad = FONT_PRESETS
@@ -152,6 +156,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
     onComplete({
       reportName:   reportName.trim(),
       reportType,
+      goodThreshold:    goodThreshold / 100,
+      neutralThreshold: neutralThreshold / 100,
       colorPreset,
       primaryColor: primary,
       accentColor:  accent,
@@ -524,6 +530,51 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
               This becomes the agent's first instruction and seeds the conversation.
             </div>
           </section>
+
+          {/* 6. KPI thresholds */}
+          <section>
+            <SectionLabel optional>Completion rate thresholds</SectionLabel>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.55)", marginBottom: 4 }}>Good at or above (%)</div>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={goodThreshold}
+                  onChange={(e) => setGoodThreshold(Number(e.target.value))}
+                  style={{
+                    width: "100%", padding: "9px 13px",
+                    border: "1px solid var(--line)", borderRadius: 9,
+                    fontSize: 13.5, color: "var(--forest)",
+                    background: "var(--offwhite)", outline: "none",
+                    fontFamily: `'${body}', sans-serif`,
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.55)", marginBottom: 4 }}>Neutral at or above (%)</div>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={neutralThreshold}
+                  onChange={(e) => setNeutralThreshold(Number(e.target.value))}
+                  style={{
+                    width: "100%", padding: "9px 13px",
+                    border: "1px solid var(--line)", borderRadius: 9,
+                    fontSize: 13.5, color: "var(--forest)",
+                    background: "var(--offwhite)", outline: "none",
+                    fontFamily: `'${body}', sans-serif`,
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.4)", marginTop: 5 }}>
+              Below the neutral threshold is flagged as needing attention. Applies to the completion rate KPI.
+            </div>
+          </section>
+
 
         </div>
 

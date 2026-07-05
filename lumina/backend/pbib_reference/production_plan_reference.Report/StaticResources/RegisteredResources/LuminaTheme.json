@@ -1,0 +1,29 @@
+{
+  "name": "LuminaTheme",
+  "dataColors": [
+    "#133020",
+    "#FFB347"
+  ],
+  "textClasses": {
+    "callout": {
+      "fontSize": 24,
+      "fontFace": "Fraunces",
+      "color": "#252423"
+    },
+    "title": {
+      "fontSize": 12,
+      "fontFace": "Fraunces",
+      "color": "#252423"
+    },
+    "header": {
+      "fontSize": 12,
+      "fontFace": "Fraunces",
+      "color": "#252423"
+    },
+    "label": {
+      "fontSize": 10,
+      "fontFace": "DM Sans",
+      "color": "#252423"
+    }
+  }
+}
