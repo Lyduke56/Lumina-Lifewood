@@ -15,18 +15,26 @@ from llm_client import ask
 REPORT_TYPES = {
     "Progress Overview": "target vs actual trends over time, and overall completion",
     "Executive Summary": "a small number of high-level KPI cards only, minimal detail, for leadership or clients who just want the headline numbers",
+    "Detailed Breakdown": "a full daily data table alongside trend charts, for someone who wants to inspect the underlying numbers in detail",
 }
 
 
 def choose_visuals(
-    report_type: str = "Progress Overview", instructions: str | None = None
+    report_type: str = "Progress Overview",
+    report_name: str = "",
+    instructions: str | None = None,
 ) -> list[dict]:
-    """Ask the LLM to choose a sensible set of visuals for the given report type."""
-    instructions_block = (
-        f'\nAdditional instructions from the user: "{instructions}"\n'
-        if instructions
-        else ""
-    )
+    """Ask the LLM to choose a sensible set of visuals for this dashboard."""
+    context_lines = []
+    if report_type in REPORT_TYPES:
+        context_lines.append(
+            f'Report type: "{report_type}" — {REPORT_TYPES[report_type]}'
+        )
+    if report_name:
+        context_lines.append(f'The report is titled: "{report_name}"')
+    if instructions:
+        context_lines.append(f'Additional instructions from the user: "{instructions}"')
+    context_block = "\n".join(context_lines)
 
     prompt = f"""You are choosing which charts to include in a Power BI dashboard for a production-plan tracking tool.
 
@@ -36,9 +44,11 @@ Available data fields:
 - target_hours / actual_hours: planned vs actual hours worked per day
 - completion_rate: actual_quantity / target_quantity for that day
 
-Report type: "{report_type}" — {REPORT_TYPES[report_type]}
-{instructions_block}
-Choose 3 to 5 visuals that best fit this report type. Each visual must be one of:
+{context_block}
+
+Choose 3 to 5 visuals that best fit the above (if none of it gives a strong signal, default to
+a general progress overview: trends over time plus an overall completion KPI). Each visual must
+be one of:
 {{"type": "card", "fields": ["<one field>"]}} — a single big-number KPI
 {{"type": "line", "fields": ["date", "<field1>", "<field2>", ...]}} — a trend line over time
 {{"type": "bar", "fields": ["date", "<field1>", "<field2>", ...]}} — a bar comparison over time

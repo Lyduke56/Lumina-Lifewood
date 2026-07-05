@@ -13,22 +13,15 @@ from pbib_generator import generate_pbip, choose_visuals, DEFAULT_VISUALS
 mcp = FastMCP("Lumina Backend")
 
 
-@mcp.tool
-def ping() -> str:
-    """Health check tool to confirm the MCP server is running."""
-    return "pong"
-
-
-@mcp.tool
-def process_production_plan(
-    file_path: str, conversation_id: str, report_type: str = "Progress Overview"
+def run_pipeline(
+    file_path: str,
+    conversation_id: str,
+    report_type: str = "Progress Overview",
+    report_name: str = "",
+    instructions: str | None = None,
 ) -> dict:
     """Parse a production-plan Excel file, store it, and generate a real PBIP dashboard.
-
-    Args:
-        file_path: Path to the .xlsx production plan file on disk.
-        conversation_id: The conversation this file belongs to (determines the owning user).
-        report_type: Which report type the dashboard should be built for (drives AI chart selection).
+    Shared implementation used by both the MCP tool and the HTTP entry point.
     """
     user_id = get_conversation_owner(conversation_id)
 
@@ -40,7 +33,7 @@ def process_production_plan(
     layout_json, chart_preview_json = build_dashboard_preview(records)
 
     try:
-        visuals = choose_visuals(report_type)
+        visuals = choose_visuals(report_type, report_name, instructions)
     except Exception:
         visuals = DEFAULT_VISUALS
 
@@ -63,6 +56,34 @@ def process_production_plan(
         "record_count": len(records),
         "storage_path": object_path,
     }
+
+
+@mcp.tool
+def ping() -> str:
+    """Health check tool to confirm the MCP server is running."""
+    return "pong"
+
+
+@mcp.tool
+def process_production_plan(
+    file_path: str,
+    conversation_id: str,
+    report_type: str = "Progress Overview",
+    report_name: str = "",
+    instructions: str = "",
+) -> dict:
+    """Parse a production-plan Excel file, store it, and generate a real PBIP dashboard.
+
+    Args:
+        file_path: Path to the .xlsx production plan file on disk.
+        conversation_id: The conversation this file belongs to (determines the owning user).
+        report_type: Which report type the dashboard should be built for (drives AI chart selection).
+        report_name: The user-provided title for the report (weak context for AI chart selection).
+        instructions: Free-text instructions from the user (drives AI chart selection).
+    """
+    return run_pipeline(
+        file_path, conversation_id, report_type, report_name, instructions or None
+    )
 
 
 if __name__ == "__main__":
