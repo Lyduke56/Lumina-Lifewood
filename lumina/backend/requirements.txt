@@ -5,3 +5,6 @@ supabase
 python-dotenv
 fabric-cicd
 openai
+fastapi
+uvicorn
+python-multipart

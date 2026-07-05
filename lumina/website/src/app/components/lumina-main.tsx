@@ -74,9 +74,29 @@ export default function App() {
       setView("chats");
     }
 
-    // TODO (Phase 6): pass config + config.file to the agent endpoint here.
-    // The agent receives reportName, primaryColor, accentColor, headingFont,
-    // bodyFont, instructions, and the uploaded file as multipart form data.
+    if (conv && config.file) {
+      const formData = new FormData();
+      formData.append("file", config.file);
+      formData.append("conversation_id", conv.id);
+      formData.append("report_type", config.reportType);
+      formData.append("report_name", config.reportName);
+      formData.append("instructions", config.instructions);
+
+      try {
+        const res = await fetch("http://localhost:8000/generate-dashboard", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          console.error("Dashboard generation failed:", err?.detail ?? res.statusText);
+        } else {
+          console.log("Dashboard generated:", await res.json());
+        }
+      } catch (e) {
+        console.error("Could not reach the dashboard generation service:", e);
+      }
+    }
   }
 
   // ── Setup cancelled: just close the card ─────────────────────────────────

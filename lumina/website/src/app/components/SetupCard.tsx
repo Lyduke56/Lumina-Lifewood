@@ -7,7 +7,7 @@ import {
   ComposedChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import type { ReportConfig, ColorPresetId, FontPresetId } from "@/lib/types";
+import type { ReportConfig, ColorPresetId, FontPresetId, ReportTypeId } from "@/lib/types";
 
 // ── Presets ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +23,14 @@ const COLOR_PRESETS: {
   { id: "slate-coral", label: "Slate + Coral", sub: "",                 primary: "#334155", accent: "#F87171" },
   { id: "custom",      label: "Custom",        sub: "",                 primary: "",        accent: ""        },
 ];
+
+const REPORT_TYPE_PRESETS: { id: ReportTypeId; label: string; sub: string }[] = [
+  { id: "Progress Overview",  label: "Progress Overview",  sub: "Trends over time + completion" },
+  { id: "Executive Summary",  label: "Executive Summary",  sub: "A few high-level KPIs only" },
+  { id: "Detailed Breakdown", label: "Detailed Breakdown", sub: "Full data table + trends" },
+  { id: "Custom",             label: "Custom",             sub: "Let AI decide from instructions" },
+];
+
 
 const FONT_PRESETS: {
   id: FontPresetId;
@@ -69,6 +77,8 @@ interface SetupCardProps {
 export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
   // Basic
   const [reportName, setReportName] = useState("");
+  const [reportType, setReportType] = useState<ReportTypeId>("Progress Overview");
+
 
   // Theme
   const [colorPreset, setColorPreset]   = useState<ColorPresetId>("lifewood");
@@ -141,6 +151,7 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
     const { heading, body }     = resolvedFonts();
     onComplete({
       reportName:   reportName.trim(),
+      reportType,
       colorPreset,
       primaryColor: primary,
       accentColor:  accent,
@@ -222,6 +233,36 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
               onFocus={(e) => { e.currentTarget.style.borderColor = "var(--emerald)"; e.currentTarget.style.background = "var(--white)"; }}
               onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--line)";    e.currentTarget.style.background = "var(--offwhite)"; }}
             />
+          </section>
+
+          {/* 2. Report type */}
+          <section>
+            <SectionLabel>Report type</SectionLabel>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>
+              {REPORT_TYPE_PRESETS.map((p) => {
+                const active = reportType === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setReportType(p.id)}
+                    style={{
+                      border: active ? "2px solid var(--emerald)" : "1px solid var(--line)",
+                      borderRadius: 10, padding: "10px 12px",
+                      background: active ? "var(--emerald-tint)" : "var(--offwhite)",
+                      cursor: "pointer", textAlign: "left",
+                      transition: "border-color .15s, background .15s",
+                    }}
+                  >
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--forest)" }}>
+                      {p.label}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "rgba(19,48,32,0.45)", marginTop: 2 }}>
+                      {p.sub}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </section>
 
           {/* 2. Color theme */}
