@@ -2,10 +2,11 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, Form, HTTPException
+from fastapi import FastAPI, UploadFile, Form, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from server import run_pipeline
+from supabase_client import get_authenticated_user_id, verify_conversation_owner
 
 app = FastAPI()
 
@@ -24,12 +25,26 @@ async def generate_dashboard(
     report_type: str = Form("Progress Overview"),
     report_name: str = Form(""),
     instructions: str = Form(""),
+    authorization: str = Header(...),
 ):
     """Thin HTTP entry point for the web frontend's SetupCard modal. Accepts a
-    multipart upload, runs the same pipeline the MCP tool uses, and returns the
-    result as JSON. Theme/typography fields (colors, fonts) are accepted by the
-    frontend but not yet applied to the generated dashboard — separate follow-up.
+    multipart upload, verifies the caller actually owns the given conversation,
+    then runs the same pipeline the MCP tool uses. Theme/typography fields are
+    accepted by the frontend but not yet applied to the generated dashboard
+    (separate follow-up).
     """
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401, detail="Missing or malformed Authorization header."
+        )
+    access_token = authorization.removeprefix("Bearer ")
+
+    try:
+        user_id = get_authenticated_user_id(access_token)
+        verify_conversation_owner(conversation_id, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
     temp_dir = Path(tempfile.mkdtemp())
     temp_path = temp_dir / file.filename
 

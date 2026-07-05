@@ -20,7 +20,7 @@ import type { ReportConfig } from "@/lib/types";
 type ViewMode = "chats" | "dashboard";
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [authOpen, setAuthOpen]       = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -85,6 +85,9 @@ export default function App() {
       try {
         const res = await fetch("http://localhost:8000/generate-dashboard", {
           method: "POST",
+          headers: session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : undefined,
           body: formData,
         });
         if (!res.ok) {
