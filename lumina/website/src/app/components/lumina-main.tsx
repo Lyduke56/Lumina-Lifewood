@@ -34,7 +34,7 @@ export default function App() {
   const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
 
   const { conversations, createConversation } = useConversations();
-  const { files } = useGeneratedFiles();
+  const { files, refresh: refreshGeneratedFiles } = useGeneratedFiles();
 
   const activeConversation =
     conversations.find((c) => c.id === activeConversationId) ?? null;
@@ -92,7 +92,10 @@ export default function App() {
           console.error("Dashboard generation failed:", err?.detail ?? res.statusText);
         } else {
           console.log("Dashboard generated:", await res.json());
+          await refreshGeneratedFiles();
+          setView("dashboard");
         }
+
       } catch (e) {
         console.error("Could not reach the dashboard generation service:", e);
       }

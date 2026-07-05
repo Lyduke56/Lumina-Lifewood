@@ -2,6 +2,7 @@ import { LayoutDashboard, MessageSquare, Clock, FolderOpen, CircleDot, Download 
 import { User } from "@supabase/supabase-js";
 import type { Conversation, GeneratedFile } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
+import { createClient } from "@/lib/supabase/client";
 
 interface DashboardProps {
   user: User | null;
@@ -11,6 +12,20 @@ interface DashboardProps {
 }
 
 export function Dashboard({ user, conversations, files, onNavigateToChat }: DashboardProps) {
+  const supabase = createClient();
+
+  async function handleDownload(storagePath: string) {
+    const { data, error } = await supabase.storage
+      .from("generated-files")
+      .createSignedUrl(storagePath, 60);
+
+    if (error || !data?.signedUrl) {
+      console.error("Could not create download link:", error);
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
+  }
+
   if (!user) {
     return (
       <div className="ll-dashboard">
@@ -117,10 +132,16 @@ export function Dashboard({ user, conversations, files, onNavigateToChat }: Dash
                       </td>
                       <td>
                         {f.status === "ready" && (
-                          <button className="ll-icon-btn" aria-label="Download" title="Download">
+                          <button
+                            className="ll-icon-btn"
+                            aria-label="Download"
+                            title="Download"
+                            onClick={() => handleDownload(f.storage_path)}
+                          >
                             <Download size={14} />
                           </button>
                         )}
+
                       </td>
                     </tr>
                   );
