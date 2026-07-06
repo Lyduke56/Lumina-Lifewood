@@ -15,13 +15,12 @@ const COLOR_PRESETS: {
   id: ColorPresetId;
   label: string;
   sub: string;
-  primary: string;
-  accent: string;
+  colors: string[];
 }[] = [
-  { id: "lifewood",    label: "Forest + Gold", sub: "Lifewood Default", primary: "#133020", accent: "#FFB347" },
-  { id: "plum-citrus", label: "Plum + Citrus",  sub: "",                 primary: "#4A235A", accent: "#F4D03F" },
-  { id: "slate-coral", label: "Slate + Coral", sub: "",                 primary: "#334155", accent: "#F87171" },
-  { id: "custom",      label: "Custom",        sub: "",                 primary: "",        accent: ""        },
+  { id: "lifewood",    label: "Forest + Gold", sub: "Lifewood Default", colors: ["#133020", "#FFB347", "#046241", "#FFC370", "#417256", "#C17710", "#708E7C", "#9CAFA4"] },
+  { id: "plum-citrus", label: "Plum + Citrus",  sub: "",                 colors: ["#4A235A", "#F4D03F", "#7D3C98", "#F8C471", "#6C3483", "#F5B041", "#A569BD", "#F39C12"] },
+  { id: "slate-coral", label: "Slate + Coral", sub: "",                 colors: ["#334155", "#F87171", "#475569", "#FCA5A5", "#1E293B", "#EF4444", "#64748B", "#FECACA"] },
+  { id: "custom",      label: "Custom",        sub: "",                 colors: [] },
 ];
 
 const REPORT_TYPE_PRESETS: { id: ReportTypeId; label: string; sub: string }[] = [
@@ -81,9 +80,19 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
 
 
   // Theme
-  const [colorPreset, setColorPreset]   = useState<ColorPresetId>("lifewood");
-  const [customPrimary, setCustomPrimary] = useState("#133020");
-  const [customAccent,  setCustomAccent]  = useState("#FFB347");
+  const [colorPreset, setColorPreset] = useState<ColorPresetId>("lifewood");
+  const [customColors, setCustomColors] = useState<string[]>([
+    "#133020", "#FFB347", "#046241", "#FFC370", "#417256", "#C17710", "#708E7C", "#9CAFA4",
+  ]);
+
+  function updateCustomColor(index: number, value: string) {
+    setCustomColors((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }
+
 
   // Typography
   const [fontPreset,    setFontPreset]    = useState<FontPresetId>("fraunces-dm");
@@ -120,10 +129,9 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
   }, []);
 
   // ── Derived values ─────────────────────────────────────────────────────
-  function resolvedColors() {
-    if (colorPreset === "custom") return { primary: customPrimary || "#133020", accent: customAccent || "#FFB347" };
-    const p = COLOR_PRESETS.find((p) => p.id === colorPreset)!;
-    return { primary: p.primary, accent: p.accent };
+  function resolvedColors(): string[] {
+    if (colorPreset === "custom") return customColors;
+    return COLOR_PRESETS.find((p) => p.id === colorPreset)!.colors;
   }
 
   function resolvedFonts() {
@@ -132,7 +140,7 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
     return { heading: p.heading, body: p.body };
   }
 
-  const { primary, accent } = resolvedColors();
+  const dataColors = resolvedColors();
   const { heading, body } = resolvedFonts();
 
   // ── File handling ──────────────────────────────────────────────────────
@@ -151,16 +159,14 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
 
   function handleSubmit() {
     if (!canSubmit) return;
-    const { primary, accent }   = resolvedColors();
-    const { heading, body }     = resolvedFonts();
+    const { heading, body } = resolvedFonts();
     onComplete({
       reportName:   reportName.trim(),
       reportType,
       goodThreshold:    goodThreshold / 100,
       neutralThreshold: neutralThreshold / 100,
       colorPreset,
-      primaryColor: primary,
-      accentColor:  accent,
+      dataColors: resolvedColors(),
       fontPreset,
       headingFont:  heading,
       bodyFont:     body,
@@ -292,11 +298,13 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                     }}
                   >
                     {p.id !== "custom" ? (
-                      <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 6 }}>
-                        <div style={{ width: 16, height: 16, borderRadius: "50%", background: p.primary }} />
-                        <div style={{ width: 16, height: 16, borderRadius: "50%", background: p.accent  }} />
+                      <div style={{ display: "flex", justifyContent: "center", gap: 4, marginBottom: 6 }}>
+                        {p.colors.slice(0, 5).map((c, i) => (
+                          <div key={i} style={{ width: 13, height: 13, borderRadius: "50%", background: c }} />
+                        ))}
                       </div>
                     ) : (
+
                       <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
                         <div style={{ width: 32, height: 16, borderRadius: 8, background: "linear-gradient(90deg,#a855f7,#ec4899,#f97316)" }} />
                       </div>
@@ -315,25 +323,23 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
             {/* Custom hex inputs with color pickers */}
             {colorPreset === "custom" && (
               <div style={{
-                display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
+                display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8,
                 padding: "12px 14px", borderRadius: 10,
                 background: "var(--offwhite)", border: "1px solid var(--line)",
                 marginBottom: 14,
               }}>
-                <ColorPickerInput 
-                  label="Primary color" 
-                  value={customPrimary} 
-                  onChange={setCustomPrimary} 
-                  fallback="#133020" 
-                />
-                <ColorPickerInput 
-                  label="Accent color"  
-                  value={customAccent}  
-                  onChange={setCustomAccent}  
-                  fallback="#FFB347" 
-                />
+                {customColors.map((c, i) => (
+                  <ColorPickerInput
+                    key={i}
+                    label={`Color ${i + 1}`}
+                    value={c}
+                    onChange={(v) => updateCustomColor(i, v)}
+                    fallback="#133020"
+                  />
+                ))}
               </div>
             )}
+
 
             {/* Live color preview chart */}
             <div style={{
@@ -350,8 +356,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                   {reportName.trim() || "No Title"} — Actual vs. Target (Mock Preview — not necessarily the actual output)
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <LegendDot color={primary} label="Actual" />
-                  <LegendDot color={accent}  label="Target" dot />
+                  <LegendDot color={dataColors[0]} label="Actual" />
+                  <LegendDot color={dataColors[1]} label="Target" dot />
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={130}>
@@ -383,11 +389,11 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                     }}
                     labelStyle={{ fontWeight: 600, color: "var(--forest)" }}
                   />
-                  <Bar dataKey="actual" fill={primary} radius={[4, 4, 0, 0]} barSize={22} />
+                  <Bar dataKey="actual" fill={dataColors[0]} radius={[4, 4, 0, 0]} barSize={22} />
                   <Line
                     type="monotone" dataKey="target"
-                    stroke={accent} strokeWidth={2.5}
-                    dot={{ r: 3.5, fill: accent, strokeWidth: 0 }}
+                    stroke={dataColors[1]} strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: dataColors[1], strokeWidth: 0 }}
                     activeDot={{ r: 5 }}
                   />
                 </ComposedChart>

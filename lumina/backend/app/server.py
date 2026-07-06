@@ -19,8 +19,7 @@ def run_pipeline(
     report_type: str = "Progress Overview",
     report_name: str = "",
     instructions: str | None = None,
-    primary_color: str = "#133020",
-    accent_color: str = "#FFB347",
+    data_colors: list[str] | None = None,
     heading_font: str = "Fraunces",
     body_font: str = "DM Sans",
     good_threshold: float | None = None,
@@ -47,8 +46,7 @@ def run_pipeline(
         records,
         dataset_id=dataset["id"],
         visuals=visuals,
-        primary_color=primary_color,
-        accent_color=accent_color,
+        data_colors=data_colors,
         heading_font=heading_font,
         body_font=body_font,
         good_threshold=good_threshold,
@@ -87,8 +85,7 @@ def process_production_plan(
     report_type: str = "Progress Overview",
     report_name: str = "",
     instructions: str = "",
-    primary_color: str = "#133020",
-    accent_color: str = "#FFB347",
+    data_colors: list[str] | None = None,
     heading_font: str = "Fraunces",
     body_font: str = "DM Sans",
     good_threshold: float | None = None,
@@ -102,8 +99,7 @@ def process_production_plan(
         report_type: Which report type the dashboard should be built for (drives AI chart selection).
         report_name: The user-provided title for the report (weak context for AI chart selection).
         instructions: Free-text instructions from the user (drives AI chart selection).
-        primary_color: Hex color for the primary (first) chart series.
-        accent_color: Hex color for the accent (second) chart series.
+        data_colors: Hex color palette (up to 8+) for chart series, in series order. Omit for the Lifewood default.
         heading_font: Font family for chart titles, headers, and KPI callout numbers.
         body_font: Font family for data values, axis labels, and table content.
         good_threshold: Average completion_rate at or above this is "good" (green). Omit to skip conditional formatting.
@@ -115,8 +111,7 @@ def process_production_plan(
         report_type,
         report_name,
         instructions or None,
-        primary_color,
-        accent_color,
+        data_colors,
         heading_font,
         body_font,
         good_threshold,

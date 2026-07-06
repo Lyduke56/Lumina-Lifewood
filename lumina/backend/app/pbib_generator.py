@@ -378,22 +378,35 @@ def add_page(
     return page_id
 
 
+DEFAULT_DATA_COLORS = [
+    "#133020",
+    "#FFB347",
+    "#046241",
+    "#FFC370",
+    "#417256",
+    "#C17710",
+    "#708E7C",
+    "#9CAFA4",
+]
+
+
 def apply_theme(
     output_dir: Path,
-    primary_color: str = "#133020",
-    accent_color: str = "#FFB347",
+    data_colors: list[str] | None = None,
     heading_font: str = "Fraunces",
     body_font: str = "DM Sans",
 ) -> None:
-    """Update the report's theme file with the user's chosen colors and fonts.
+    """Update the report's theme file with the user's chosen color palette and fonts.
 
-    primary/accent become the first two data-series colors (matches the SetupCard's
-    own preview, which binds "Actual"/"Target" to these two colors specifically —
-    not a general UI-chrome recolor). heading_font applies to the title/header/callout
-    text classes (chart titles, KPI headers, and the big KPI number itself);
-    body_font applies to the label class (data values, axis labels, table content).
-    Secondary text classes (e.g. boldLabel, largeTitle) auto-derive from these per
-    Power BI's own theme inheritance rules, so they don't need to be set explicitly.
+    data_colors replaces the full chart-series palette (not just the first two
+    colors) — Power BI assigns theme colors to chart series in order, so a real
+    theme needs more than 2 colors to look intentional once a report has more
+    than 2 series. Defaults to the Lifewood brand palette. heading_font applies
+    to the title/header/callout text classes (chart titles, KPI headers, and the
+    big KPI number itself); body_font applies to the label class (data values,
+    axis labels, table content). Secondary text classes (e.g. boldLabel,
+    largeTitle) auto-derive from these per Power BI's own theme inheritance
+    rules, so they don't need to be set explicitly.
     """
     theme_path = (
         output_dir
@@ -405,8 +418,7 @@ def apply_theme(
 
     theme = json.loads(theme_path.read_text(encoding="utf-8"))
 
-    theme["dataColors"][0] = primary_color
-    theme["dataColors"][1] = accent_color
+    theme["dataColors"] = data_colors or DEFAULT_DATA_COLORS
 
     text_classes = theme.get("textClasses", {})
     for cls in ("title", "header", "callout"):
@@ -464,8 +476,7 @@ def generate_pbip(
     records: list[dict],
     dataset_id: str,
     visuals: list[dict] | None = None,
-    primary_color: str = "#133020",
-    accent_color: str = "#FFB347",
+    data_colors: list[str] | None = None,
     heading_font: str = "Fraunces",
     body_font: str = "DM Sans",
     good_threshold: float | None = None,
@@ -530,7 +541,7 @@ def generate_pbip(
     apply_visuals(
         page_dir, visuals or DEFAULT_VISUALS, completion_thresholds=use_thresholds
     )
-    apply_theme(output_dir, primary_color, accent_color, heading_font, body_font)
+    apply_theme(output_dir, data_colors, heading_font, body_font)
 
     return output_dir
 

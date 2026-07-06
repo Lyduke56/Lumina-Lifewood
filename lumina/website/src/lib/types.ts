@@ -35,8 +35,7 @@ export type ReportConfig = {
   reportName: string;
   reportType: ReportTypeId;
   colorPreset: ColorPresetId;
-  primaryColor: string;
-  accentColor: string;
+  dataColors: string[];
   fontPreset: FontPresetId;
   headingFont: string;
   bodyFont: string;

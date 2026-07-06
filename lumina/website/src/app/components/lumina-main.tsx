@@ -81,8 +81,7 @@ export default function App() {
       formData.append("report_type", config.reportType);
       formData.append("report_name", config.reportName);
       formData.append("instructions", config.instructions);
-      formData.append("primary_color", config.primaryColor);
-      formData.append("accent_color", config.accentColor);
+      config.dataColors.forEach((c) => formData.append("data_colors", c));
       formData.append("heading_font", config.headingFont);
       formData.append("body_font", config.bodyFont);
       formData.append("good_threshold", String(config.goodThreshold));
