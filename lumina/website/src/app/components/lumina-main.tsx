@@ -76,7 +76,7 @@ export default function App() {
 
     if (conv && config.file) {
       const formData = new FormData();
-            formData.append("file", config.file);
+      formData.append("file", config.file);
       formData.append("conversation_id", conv.id);
       formData.append("report_type", config.reportType);
       formData.append("report_name", config.reportName);
