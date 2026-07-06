@@ -13,9 +13,9 @@ interface PreviewPanelProps {
   revenueData: any[];
 }
 
-const MIN_WIDTH = 300;
+const MIN_WIDTH = 400;
 const MAX_WIDTH = 1000;
-const DEFAULT_WIDTH = 600;
+const DEFAULT_WIDTH = 800;
 
 export function PreviewPanel({ user, revenueData }: PreviewPanelProps) {
   const [activeTab, setActiveTab] = useState("viz");
@@ -64,11 +64,6 @@ export function PreviewPanel({ user, revenueData }: PreviewPanelProps) {
     // Outer wrapper: relative so the drag handle + toggle button can be
     // positioned relative to this element rather than the viewport.
     <div style={{ position: "relative", display: "flex", flexShrink: 0 }}>
-
-      {/* ── Drag handle ─────────────────────────────────────────────────────
-          Sits at the LEFT edge of the panel. mousedown kicks off the resize.
-          Only rendered when the panel is open — no point dragging a closed panel.
-      */}
       {isOpen && (
         <div
           onMouseDown={onHandleMouseDown}

@@ -6,21 +6,27 @@ import { UploadCloud, X, FileSpreadsheet, ChevronDown } from "lucide-react";
 import {
   ComposedChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
 } from "recharts";
 import type { ReportConfig, ColorPresetId, FontPresetId, ReportTypeId } from "@/lib/types";
 
 // ── Presets ──────────────────────────────────────────────────────────────────
 
-const COLOR_PRESETS: {
+type ColorPreset = {
   id: ColorPresetId;
   label: string;
   sub: string;
-  colors: string[];
-}[] = [
-  { id: "lifewood",    label: "Forest + Gold", sub: "Lifewood Default", colors: ["#133020", "#FFB347", "#046241", "#FFC370", "#417256", "#C17710", "#708E7C", "#9CAFA4"] },
-  { id: "plum-citrus", label: "Plum + Citrus",  sub: "",                 colors: ["#4A235A", "#F4D03F", "#7D3C98", "#F8C471", "#6C3483", "#F5B041", "#A569BD", "#F39C12"] },
-  { id: "slate-coral", label: "Slate + Coral", sub: "",                 colors: ["#334155", "#F87171", "#475569", "#FCA5A5", "#1E293B", "#EF4444", "#64748B", "#FECACA"] },
-  { id: "custom",      label: "Custom",        sub: "",                 colors: [] },
+  colors: string[]; // 8 hex values, except "custom" which starts empty
+};
+
+const COLOR_PRESETS: ColorPreset[] = [
+  { id: "lifewood", label: "Lifewood", sub: "",
+    colors: ["#133020","#FFB347","#046241","#FFC370","#417256","#C17710","#708E7C","#9CA..."] },
+  { id: "plum-citrus", label: "Plum + Citrus", sub: "",
+    colors: ["#4A235A","#F4D03F","#7D3C98","#F8C471","#6C3483","#F5B041","#A569BD","#F3..."] },
+  { id: "slate-coral", label: "Slate + Coral", sub: "",
+    colors: ["#334155","#F87171","#475569","#FCA5A5","#1E293B","#EF4444","#647488","#FEC..."] },
+  { id: "custom", label: "Custom", sub: "", colors: [] },
 ];
 
 const REPORT_TYPE_PRESETS: { id: ReportTypeId; label: string; sub: string }[] = [
@@ -53,16 +59,24 @@ const BODY_FONT_OPTIONS = [
   "Open Sans", "Source Sans 3", "Nunito", "Mulish",
 ];
 
-// Mock data for the color preview chart
 const MOCK_DATA = [
-  { name: "Jan", actual: 42, target: 60 },
-  { name: "Feb", actual: 68, target: 65 },
-  { name: "Mar", actual: 55, target: 70 },
-  { name: "Apr", actual: 81, target: 74 },
-  { name: "May", actual: 74, target: 78 },
-  { name: "Jun", actual: 90, target: 85 },
-  { name: "Jul", actual: 86, target: 88 },
+  { name: "Jan", actual: 42, target: 60, prior: 35 },
+  { name: "Feb", actual: 68, target: 65, prior: 50 },
+  { name: "Mar", actual: 55, target: 70, prior: 48 },
+  { name: "Apr", actual: 81, target: 74, prior: 60 },
+  { name: "May", actual: 74, target: 78, prior: 65 },
+  { name: "Jun", actual: 90, target: 85, prior: 72 },
+  { name: "Jul", actual: 86, target: 88, prior: 80 },
 ];
+
+const MOCK_BREAKDOWN = [
+  { name: "On track", value: 45 },
+  { name: "At risk", value: 25 },
+  { name: "Behind", value: 18 },
+  { name: "Blocked", value: 8 },
+  { name: "Not started", value: 4 },
+];
+
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -403,13 +417,20 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                     }}
                   >
                     {p.id !== "custom" ? (
-                      <div style={{ display: "flex", justifyContent: "center", gap: 4, marginBottom: 6 }}>
-                        {p.colors.slice(0, 5).map((c, i) => (
-                          <div key={i} style={{ width: 13, height: 13, borderRadius: "50%", background: c }} />
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(4,1fr)",
+                        gap: 3,
+                        marginBottom: 6,
+                        maxWidth: 60,
+                        marginLeft: "auto",
+                        marginRight: "auto",
+                      }}>
+                        {p.colors.map((c, i) => (
+                          <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: c, border: "1px solid rgba(0,0,0,0.06)" }} />
                         ))}
                       </div>
                     ) : (
-
                       <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
                         <div style={{ width: 32, height: 16, borderRadius: 8, background: "linear-gradient(90deg,#a855f7,#ec4899,#f97316)" }} />
                       </div>
@@ -445,8 +466,7 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
               </div>
             )}
 
-
-            {/* Live color preview chart */}
+            {/* Live color preview charts */}
             <div style={{
               border: "1px solid var(--line)", borderRadius: 12,
               background: "var(--offwhite)", padding: "14px 12px 8px",
@@ -458,51 +478,72 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                   color: "rgba(19,48,32,0.55)",
                   fontFamily: `'${heading}', sans-serif`,
                 }}>
-                  {reportName.trim() || "No Title"} — Actual vs. Target (Mock Preview — not necessarily the actual output)
+                  {reportName.trim() || "No Title"} (Mock Preview — not necessarily the actual output)
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <LegendDot color={dataColors[0]} label="Actual" />
                   <LegendDot color={dataColors[1]} label="Target" dot />
+                  <LegendDot color={dataColors[2] ?? dataColors[0]} label="Prior" />
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={130}>
-                <ComposedChart data={MOCK_DATA} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(19,48,32,0.07)" vertical={false} />
-                  <XAxis
-                    dataKey="name"
-                    tick={{
-                      fontSize: 10.5,
-                      fill: "rgba(19,48,32,0.45)",
-                      fontFamily: `'${body}', sans-serif`,
-                    }}
-                    axisLine={false} tickLine={false}
-                  />
-                  <YAxis
-                    tick={{
-                      fontSize: 10,
-                      fill: "rgba(19,48,32,0.4)",
-                      fontFamily: `'${body}', sans-serif`,
-                    }}
-                    axisLine={false} tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      fontSize: 12, borderRadius: 8,
-                      border: "1px solid rgba(19,48,32,0.1)",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                      fontFamily: `'${body}', sans-serif`,
-                    }}
-                    labelStyle={{ fontWeight: 600, color: "var(--forest)" }}
-                  />
-                  <Bar dataKey="actual" fill={dataColors[0]} radius={[4, 4, 0, 0]} barSize={22} />
-                  <Line
-                    type="monotone" dataKey="target"
-                    stroke={dataColors[1]} strokeWidth={2.5}
-                    dot={{ r: 3.5, fill: dataColors[1], strokeWidth: 0 }}
-                    activeDot={{ r: 5 }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <ResponsiveContainer width="65%" height={130}>
+                  <ComposedChart data={MOCK_DATA} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(19,48,32,0.07)" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 10.5, fill: "rgba(19,48,32,0.45)", fontFamily: `'${body}', sans-serif` }}
+                      axisLine={false} tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "rgba(19,48,32,0.4)", fontFamily: `'${body}', sans-serif` }}
+                      axisLine={false} tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        fontSize: 12, borderRadius: 8,
+                        border: "1px solid rgba(19,48,32,0.1)",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                        fontFamily: `'${body}', sans-serif`,
+                      }}
+                      labelStyle={{ fontWeight: 600, color: "var(--forest)" }}
+                    />
+                    <Bar dataKey="prior" fill={dataColors[2] ?? dataColors[0]} radius={[4, 4, 0, 0]} barSize={14} />
+                    <Bar dataKey="actual" fill={dataColors[0]} radius={[4, 4, 0, 0]} barSize={14} />
+                    <Line
+                      type="monotone" dataKey="target"
+                      stroke={dataColors[1]} strokeWidth={2.5}
+                      dot={{ r: 3.5, fill: dataColors[1], strokeWidth: 0 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+
+                <ResponsiveContainer width="35%" height={130}>
+                  <PieChart>
+                    <Pie
+                      data={MOCK_BREAKDOWN}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={28}
+                      outerRadius={48}
+                      paddingAngle={2}
+                    >
+                      {MOCK_BREAKDOWN.map((_, i) => (
+                        <Cell key={i} fill={dataColors[(i + 3) % dataColors.length] ?? dataColors[0]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        fontSize: 11, borderRadius: 8,
+                        border: "1px solid rgba(19,48,32,0.1)",
+                        fontFamily: `'${body}', sans-serif`,
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </section>
 
