@@ -15,21 +15,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify the userId actually exists in auth.users before inserting.
-    // This prevents anyone from POSTing arbitrary userIds to this endpoint.
     const admin = createAdminClient();
-    const { data: authUser, error: authError } =
-      await admin.auth.admin.getUserById(userId);
 
-    if (authError || !authUser.user) {
-      return NextResponse.json(
-        { error: "User not found." },
-        { status: 404 }
-      );
-    }
-
-    // Insert the profile row — service role bypasses RLS so this works
-    // even before the user confirms their email.
+    // Insert the profile row using the service role client.
+    // - Bypasses RLS so it works before the user confirms their email.
+    // - The FK constraint (profiles.id → auth.users.id) acts as the
+    //   security check: if userId doesn't exist in auth.users the insert
+    //   will fail with a 23503 foreign key violation, so no extra
+    //   getUserById call is needed.
     const { error: insertError } = await admin.from("profiles").insert({
       id: userId,
       full_name: fullName.trim(),
@@ -40,11 +33,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (insertError) {
-      // Surface duplicate username clearly
+      // Duplicate username
       if (insertError.code === "23505") {
         return NextResponse.json(
           { error: "That username is already taken." },
           { status: 409 }
+        );
+      }
+      // userId doesn't exist in auth.users (spoofed request)
+      if (insertError.code === "23503") {
+        return NextResponse.json(
+          { error: "User not found." },
+          { status: 404 }
         );
       }
       throw insertError;

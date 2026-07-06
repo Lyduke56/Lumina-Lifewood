@@ -240,5 +240,79 @@ body {
         .ll-scrollbar::-webkit-scrollbar { width: 6px; }
         .ll-scrollbar::-webkit-scrollbar-thumb { background: rgba(19,48,32,0.15); border-radius: 4px; }
 
+/* ---- Login page ---- */
+        .ll-login-root {
+          height: 100vh; width: 100%; display: flex;
+          font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+          overflow: hidden;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ll-login-root * { animation: none !important; transition: none !important; }
+        }
 
-     
+        .ll-login-visual {
+          flex: 1.1; background: var(--forest); position: relative;
+          display: flex; flex-direction: column; justify-content: space-between;
+          padding: 48px; overflow: hidden;
+          min-width: 0;
+        }
+        .ll-login-visual-brand {
+          display: flex; align-items: center; gap: 12px; position: relative; z-index: 2;
+        }
+        .ll-login-visual-tagline {
+          position: relative; z-index: 2; max-width: 380px;
+        }
+        .ll-login-visual-tagline h2 {
+          font-family: 'Fraunces', serif; font-size: 26px; font-weight: 600;
+          color: var(--cream); margin: 0 0 8px; line-height: 1.3;
+        }
+        .ll-login-visual-tagline p {
+          font-size: 14px; color: var(--tan-muted); line-height: 1.6; margin: 0;
+        }
+
+        .ll-login-form-side {
+          flex: 1; background: var(--offwhite); display: flex;
+          align-items: center; justify-content: center; padding: 32px;
+          min-width: 0; overflow-y: auto;
+        }
+        .ll-login-card { width: 100%; max-width: 380px; }
+
+        @keyframes llNodePulse {
+          0%, 100% { opacity: 0.35; r: 3; }
+          50%      { opacity: 1;    r: 4.5; }
+        }
+        @keyframes llLineDraw {
+          0%   { stroke-dashoffset: 240; opacity: 0; }
+          15%  { opacity: 0.6; }
+          60%  { stroke-dashoffset: 0; opacity: 0.6; }
+          100% { stroke-dashoffset: 0; opacity: 0; }
+        }
+        @keyframes llFloatSlow {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-14px); }
+        }
+
+        @media (max-width: 860px) {
+          .ll-login-root { flex-direction: column; }
+          .ll-login-visual { flex: none; min-height: 220px; padding: 28px; }
+          .ll-login-form-side { flex: none; }
+        }
+
+        @keyframes llFadeSlideIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes llShake {
+        0%, 100% { transform: translateX(0); }
+        20%      { transform: translateX(-4px); }
+        40%      { transform: translateX(4px); }
+        60%      { transform: translateX(-3px); }
+        80%      { transform: translateX(3px); }
+      }
+      @keyframes llSpin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+
+      
+          

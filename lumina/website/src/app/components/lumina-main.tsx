@@ -8,7 +8,7 @@ import { ChatPanel }   from "./ChatPanel";
 import { PreviewPanel } from "./PreviewPanel";
 import { Dashboard }   from "./Dashboard";
 import { SetupCard }   from "./SetupCard";
-import AuthModal       from "./AuthModal";
+import { useRouter }   from "next/navigation";
 import SignOutModal    from "./SignOutModal";
 
 import { useConversations }  from "@/hooks/useConversations";
@@ -21,7 +21,7 @@ type ViewMode = "chats" | "dashboard";
 
 export default function App() {
   const { user, session } = useAuth();
-  const [authOpen, setAuthOpen]       = useState(false);
+  const router = useRouter();
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [view, setView]               = useState<ViewMode>("chats");
@@ -41,7 +41,7 @@ export default function App() {
 
   function requireAuth() {
     if (!user) {
-      setAuthOpen(true);
+      router.push("/login");
       return false;
     }
     return true;
@@ -110,7 +110,7 @@ export default function App() {
     }
   }
 
-  // ── Setup cancelled: just close the card ─────────────────────────────────
+  // ── Setup cancelled: close card
   function handleSetupCancel() {
     setShowSetup(false);
   }
@@ -149,6 +149,7 @@ export default function App() {
             onRequireAuth={requireAuth}
             onUploadClick={handleUploadClick}
             onSend={handleSend}
+            onNewChat={handleNewChat}
           />
           <PreviewPanel
             user={user}
@@ -166,7 +167,7 @@ export default function App() {
         />
       )}
 
-      {/* ── Setup card — rendered above everything else when active ───────── */}
+      {/* ── Setup card ── */}
       {showSetup && (
         <SetupCard
           onComplete={handleSetupComplete}
@@ -174,7 +175,6 @@ export default function App() {
         />
       )}
 
-      <AuthModal    open={authOpen}    onClose={() => setAuthOpen(false)}    />
       <SignOutModal open={signOutOpen} onClose={() => setSignOutOpen(false)} />
     </div>
   );

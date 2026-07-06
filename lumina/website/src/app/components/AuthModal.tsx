@@ -500,7 +500,7 @@ export default function AuthModal({
               >
                 {isLogin ? "Don't have an account? Sign up" : "Already have an account? Log in"}
               </button>
-            </div>
+            </div>  
           )}
         </div>
       </div>
