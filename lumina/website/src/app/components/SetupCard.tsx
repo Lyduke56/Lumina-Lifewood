@@ -71,9 +71,14 @@ interface SetupCardProps {
   onCancel:   () => void;
 }
 
+type TabId = "basics" | "design";
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
+  // Tabs
+  const [activeTab, setActiveTab] = useState<TabId>("basics");
+
   // Basic
   const [reportName, setReportName] = useState("");
   const [reportType, setReportType] = useState<ReportTypeId>("Progress Overview");
@@ -158,7 +163,10 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
   const canSubmit = reportName.trim().length > 0 && file !== null;
 
   function handleSubmit() {
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      setActiveTab("basics");
+      return;
+    }
     const { heading, body } = resolvedFonts();
     onComplete({
       reportName:   reportName.trim(),
@@ -220,6 +228,28 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
           </button>
         </div>
 
+        {/* ── Tabs ───────────────────────────────────────────────────── */}
+        <div style={{ display: "flex", gap: 18, padding: "0 26px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+          {(["basics", "design"] as const).map((tab) => {
+            const active = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "11px 2px",
+                  border: "none", borderBottom: active ? "2px solid var(--emerald)" : "2px solid transparent",
+                  background: "none", fontSize: 13, fontWeight: 600,
+                  color: active ? "var(--forest)" : "rgba(19,48,32,0.45)",
+                  cursor: "pointer",
+                }}
+              >
+                {tab === "basics" ? "Basics" : "Design"}
+              </button>
+            );
+          })}
+        </div>
+
         {/* ── Scrollable body ─────────────────────────────────────────── */}
         <div className="ll-scrollbar" style={{
           flex: 1, overflowY: "auto",
@@ -227,6 +257,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
           display: "flex", flexDirection: "column", gap: 26,
         }}>
 
+          {activeTab === "basics" && (
+          <>
           {/* 1. Report name */}
           <section>
             <SectionLabel>Report name</SectionLabel>
@@ -277,7 +309,80 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
             </div>
           </section>
 
-          {/* 2. Color theme */}
+          {/* 3. File upload */}
+          <section>
+            <SectionLabel>Production plan</SectionLabel>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleFileDrop}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                border: `2px dashed ${isDragging ? "var(--emerald)" : "var(--tan-muted)"}`,
+                borderRadius: 10, background: isDragging ? "var(--emerald-tint)" : "var(--offwhite)",
+                padding: "20px 16px", textAlign: "center", cursor: "pointer",
+                transition: "border-color .15s, background .15s",
+              }}
+            >
+              <input
+                ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv"
+                style={{ display: "none" }} onChange={handleFileInput}
+              />
+              {file ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <FileSpreadsheet size={18} color="var(--emerald)" />
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--forest)" }}>{file.name}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(19,48,32,0.4)", display: "flex", padding: 2 }}
+                    aria-label="Remove file"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <UploadCloud size={24} color="var(--tan-muted)" style={{ margin: "0 auto 8px" }} />
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--forest)", marginBottom: 3 }}>
+                    Drop your Excel file here
+                  </div>
+                  <div style={{ fontSize: 12, color: "rgba(19,48,32,0.45)" }}>
+                    or click to browse · .xlsx accepted
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* 4. Instructions */}
+          <section>
+            <SectionLabel optional>Optional instructions</SectionLabel>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={3}
+              placeholder="e.g. Highlight variance between actual and target output. Flag anything below 80% achievement."
+              style={{
+                width: "100%", resize: "none", padding: "9px 13px",
+                border: "1px solid var(--line)", borderRadius: 9,
+                fontSize: 13.5, color: "var(--forest)",
+                background: "var(--offwhite)", outline: "none",
+                lineHeight: 1.55,
+                fontFamily: `'${body}', sans-serif`,
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "var(--emerald)"; e.currentTarget.style.background = "var(--white)"; }}
+              onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--line)";    e.currentTarget.style.background = "var(--offwhite)"; }}
+            />
+            <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.4)", marginTop: 5 }}>
+              This becomes the agent's first instruction and seeds the conversation.
+            </div>
+          </section>
+          </>
+          )}
+
+          {activeTab === "design" && (
+          <>
+          {/* 1. Color theme */}
           <section>
             <SectionLabel>Color theme</SectionLabel>
 
@@ -348,8 +453,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
               transition: "all .2s",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, paddingLeft: 4 }}>
-                <span style={{ 
-                  fontSize: 11.5, fontWeight: 600, 
+                <span style={{
+                  fontSize: 11.5, fontWeight: 600,
                   color: "rgba(19,48,32,0.55)",
                   fontFamily: `'${heading}', sans-serif`,
                 }}>
@@ -365,25 +470,25 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(19,48,32,0.07)" vertical={false} />
                   <XAxis
                     dataKey="name"
-                    tick={{ 
-                      fontSize: 10.5, 
+                    tick={{
+                      fontSize: 10.5,
                       fill: "rgba(19,48,32,0.45)",
                       fontFamily: `'${body}', sans-serif`,
                     }}
                     axisLine={false} tickLine={false}
                   />
                   <YAxis
-                    tick={{ 
-                      fontSize: 10, 
+                    tick={{
+                      fontSize: 10,
                       fill: "rgba(19,48,32,0.4)",
                       fontFamily: `'${body}', sans-serif`,
                     }}
                     axisLine={false} tickLine={false}
                   />
                   <Tooltip
-                    contentStyle={{ 
-                      fontSize: 12, borderRadius: 8, 
-                      border: "1px solid rgba(19,48,32,0.1)", 
+                    contentStyle={{
+                      fontSize: 12, borderRadius: 8,
+                      border: "1px solid rgba(19,48,32,0.1)",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                       fontFamily: `'${body}', sans-serif`,
                     }}
@@ -401,7 +506,7 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
             </div>
           </section>
 
-          {/* 3. Typography */}
+          {/* 2. Typography */}
           <section>
             <SectionLabel>Typography</SectionLabel>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
@@ -468,76 +573,7 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
             )}
           </section>
 
-          {/* 4. File upload */}
-          <section>
-            <SectionLabel>Production plan</SectionLabel>
-            <div
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleFileDrop}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: `2px dashed ${isDragging ? "var(--emerald)" : "var(--tan-muted)"}`,
-                borderRadius: 10, background: isDragging ? "var(--emerald-tint)" : "var(--offwhite)",
-                padding: "20px 16px", textAlign: "center", cursor: "pointer",
-                transition: "border-color .15s, background .15s",
-              }}
-            >
-              <input
-                ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv"
-                style={{ display: "none" }} onChange={handleFileInput}
-              />
-              {file ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <FileSpreadsheet size={18} color="var(--emerald)" />
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--forest)" }}>{file.name}</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(19,48,32,0.4)", display: "flex", padding: 2 }}
-                    aria-label="Remove file"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <UploadCloud size={24} color="var(--tan-muted)" style={{ margin: "0 auto 8px" }} />
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--forest)", marginBottom: 3 }}>
-                    Drop your Excel file here
-                  </div>
-                  <div style={{ fontSize: 12, color: "rgba(19,48,32,0.45)" }}>
-                    or click to browse · .xlsx accepted
-                  </div>
-                </>
-              )}
-            </div>
-          </section>
-
-          {/* 5. Instructions */}
-          <section>
-            <SectionLabel optional>Optional instructions</SectionLabel>
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              rows={3}
-              placeholder="e.g. Highlight variance between actual and target output. Flag anything below 80% achievement."
-              style={{
-                width: "100%", resize: "none", padding: "9px 13px",
-                border: "1px solid var(--line)", borderRadius: 9,
-                fontSize: 13.5, color: "var(--forest)",
-                background: "var(--offwhite)", outline: "none",
-                lineHeight: 1.55, 
-                fontFamily: `'${body}', sans-serif`,
-              }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "var(--emerald)"; e.currentTarget.style.background = "var(--white)"; }}
-              onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--line)";    e.currentTarget.style.background = "var(--offwhite)"; }}
-            />
-            <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.4)", marginTop: 5 }}>
-              This becomes the agent's first instruction and seeds the conversation.
-            </div>
-          </section>
-
-          {/* 6. KPI thresholds */}
+          {/* 3. KPI thresholds */}
           <section>
             <SectionLabel optional>Completion rate thresholds</SectionLabel>
             <div style={{ display: "flex", gap: 10 }}>
@@ -580,7 +616,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
               Below the neutral threshold is flagged as needing attention. Applies to the completion rate KPI.
             </div>
           </section>
-
+          </>
+          )}
 
         </div>
 
@@ -611,9 +648,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
             )}
             <button
               onClick={handleSubmit}
-              disabled={!canSubmit}
               className="ll-btn-amber"
-              style={{ opacity: canSubmit ? 1 : 0.45, cursor: canSubmit ? "pointer" : "not-allowed" }}
+              style={{ opacity: canSubmit ? 1 : 0.45 }}
             >
               Generate report →
             </button>
@@ -644,7 +680,7 @@ function ColorPickerInput({ label, value, onChange, fallback }: {
 }) {
   // Format hex to ensure it has # prefix
   const displayValue = value && !value.startsWith("#") ? `#${value}` : value;
-  
+
   return (
     <div>
       <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.5)", marginBottom: 5, fontWeight: 500 }}>{label}</div>
@@ -670,8 +706,8 @@ function ColorPickerInput({ label, value, onChange, fallback }: {
             background: "none",
           }}
         />
-        <div style={{ 
-          display: "flex", 
+        <div style={{
+          display: "flex",
           flexDirection: "column",
           flex: 1,
           gap: 2,
@@ -688,8 +724,8 @@ function ColorPickerInput({ label, value, onChange, fallback }: {
               fontFamily: "monospace",
             }}>#</span>
             <input
-              type="text" 
-              value={value?.replace("#", "") || ""} 
+              type="text"
+              value={value?.replace("#", "") || ""}
               onChange={(e) => {
                 let newValue = e.target.value;
                 // Remove any non-hex characters
@@ -716,14 +752,14 @@ function ColorPickerInput({ label, value, onChange, fallback }: {
                   onChange(`#${val}`);
                 }
               }}
-              placeholder={fallback.replace("#", "")} 
+              placeholder={fallback.replace("#", "")}
               maxLength={6}
-              style={{ 
-                flex: 1, 
-                border: "none", 
-                outline: "none", 
-                fontSize: 13, 
-                background: "transparent", 
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontSize: 13,
+                background: "transparent",
                 color: "var(--forest)",
                 padding: "2px 0",
                 fontFamily: "monospace",
