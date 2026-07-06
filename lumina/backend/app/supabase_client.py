@@ -101,6 +101,25 @@ def upload_generated_file(local_dir: Path, user_id: str, dataset_id: str) -> str
     return object_path
 
 
+def get_authenticated_user_id(access_token: str) -> str:
+    """Verify a Supabase user access token and return the owning user_id."""
+    client = get_client()
+    try:
+        response = client.auth.get_user(access_token)
+    except Exception as e:
+        raise ValueError("Your session has expired. Please log in again.") from e
+    if not response or not response.user:
+        raise ValueError("Your session has expired. Please log in again.")
+    return response.user.id
+
+
+def verify_conversation_owner(conversation_id: str, user_id: str) -> None:
+    """Raise ValueError if `conversation_id` does not belong to `user_id`."""
+    owner_id = get_conversation_owner(conversation_id)
+    if owner_id != user_id:
+        raise ValueError("You don't have access to this conversation.")
+
+
 if __name__ == "__main__":
     import sys
     from excel_parser import load_production_plan

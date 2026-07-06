@@ -15,18 +15,26 @@ from llm_client import ask
 REPORT_TYPES = {
     "Progress Overview": "target vs actual trends over time, and overall completion",
     "Executive Summary": "a small number of high-level KPI cards only, minimal detail, for leadership or clients who just want the headline numbers",
+    "Detailed Breakdown": "a full daily data table alongside trend charts, for someone who wants to inspect the underlying numbers in detail",
 }
 
 
 def choose_visuals(
-    report_type: str = "Progress Overview", instructions: str | None = None
+    report_type: str = "Progress Overview",
+    report_name: str = "",
+    instructions: str | None = None,
 ) -> list[dict]:
-    """Ask the LLM to choose a sensible set of visuals for the given report type."""
-    instructions_block = (
-        f'\nAdditional instructions from the user: "{instructions}"\n'
-        if instructions
-        else ""
-    )
+    """Ask the LLM to choose a sensible set of visuals for this dashboard."""
+    context_lines = []
+    if report_type in REPORT_TYPES:
+        context_lines.append(
+            f'Report type: "{report_type}" — {REPORT_TYPES[report_type]}'
+        )
+    if report_name:
+        context_lines.append(f'The report is titled: "{report_name}"')
+    if instructions:
+        context_lines.append(f'Additional instructions from the user: "{instructions}"')
+    context_block = "\n".join(context_lines)
 
     prompt = f"""You are choosing which charts to include in a Power BI dashboard for a production-plan tracking tool.
 
@@ -36,9 +44,11 @@ Available data fields:
 - target_hours / actual_hours: planned vs actual hours worked per day
 - completion_rate: actual_quantity / target_quantity for that day
 
-Report type: "{report_type}" — {REPORT_TYPES[report_type]}
-{instructions_block}
-Choose 3 to 5 visuals that best fit this report type. Each visual must be one of:
+{context_block}
+
+Choose 3 to 5 visuals that best fit the above (if none of it gives a strong signal, default to
+a general progress overview: trends over time plus an overall completion KPI). Each visual must
+be one of:
 {{"type": "card", "fields": ["<one field>"]}} — a single big-number KPI
 {{"type": "line", "fields": ["date", "<field1>", "<field2>", ...]}} — a trend line over time
 {{"type": "bar", "fields": ["date", "<field1>", "<field2>", ...]}} — a bar comparison over time
@@ -166,32 +176,61 @@ def _categorical_visual_json(
     }
 
 
-def _card_visual_json(name: str, field: str, position: dict) -> dict:
+def _card_visual_json(
+    name: str, field: str, position: dict, conditional_measure: str | None = None
+) -> dict:
+    visual: dict = {
+        "visualType": "cardVisual",
+        "query": {
+            "queryState": {
+                "Data": {
+                    "projections": [
+                        {
+                            "field": _agg_ref(field),
+                            "queryRef": f"{_aggregation_label(field)}({ENTITY}.{field})",
+                            "nativeQueryRef": f"{_aggregation_label(field)} of {field}",
+                        }
+                    ]
+                }
+            },
+            "sortDefinition": {
+                "sort": [{"field": _agg_ref(field), "direction": "Descending"}],
+                "isDefaultSort": True,
+            },
+        },
+        "drillFilterOtherVisuals": True,
+    }
+
+    if conditional_measure:
+        visual["objects"] = {
+            "value": [
+                {
+                    "properties": {
+                        "fontColor": {
+                            "solid": {
+                                "color": {
+                                    "expr": {
+                                        "Measure": {
+                                            "Expression": {
+                                                "SourceRef": {"Entity": ENTITY}
+                                            },
+                                            "Property": conditional_measure,
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "selector": {"id": "default"},
+                }
+            ]
+        }
+
     return {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
         "name": name,
         "position": position,
-        "visual": {
-            "visualType": "cardVisual",
-            "query": {
-                "queryState": {
-                    "Data": {
-                        "projections": [
-                            {
-                                "field": _agg_ref(field),
-                                "queryRef": f"{_aggregation_label(field)}({ENTITY}.{field})",
-                                "nativeQueryRef": f"{_aggregation_label(field)} of {field}",
-                            }
-                        ]
-                    }
-                },
-                "sortDefinition": {
-                    "sort": [{"field": _agg_ref(field), "direction": "Descending"}],
-                    "isDefaultSort": True,
-                },
-            },
-            "drillFilterOtherVisuals": True,
-        },
+        "visual": visual,
     }
 
 
@@ -239,7 +278,9 @@ def _visual_position(index: int, total: int, page_width=1280, page_height=720) -
     }
 
 
-def apply_visuals(page_dir: Path, specs: list[dict]) -> None:
+def apply_visuals(
+    page_dir: Path, specs: list[dict], completion_thresholds: bool = False
+) -> None:
     """Replace a page's visuals with ones generated from `specs`.
 
     Each spec is {"type": "card"|"line"|"bar"|"table", "fields": [...]}. For "card", fields
@@ -278,7 +319,14 @@ def apply_visuals(page_dir: Path, specs: list[dict]) -> None:
         visual_type = VISUAL_TYPE_MAP[spec["type"]]
 
         if spec["type"] == "card":
-            content = _card_visual_json(name, spec["fields"][0], position)
+            field = spec["fields"][0]
+            conditional_measure = (
+                "Completion Status"
+                if completion_thresholds and field == "completion_rate"
+                else None
+            )
+            content = _card_visual_json(name, field, position, conditional_measure)
+
         elif spec["type"] == "table":
             content = _table_visual_json(name, spec["fields"], position)
         else:
@@ -294,7 +342,12 @@ def apply_visuals(page_dir: Path, specs: list[dict]) -> None:
         )
 
 
-def add_page(output_dir: Path, display_name: str, specs: list[dict]) -> str:
+def add_page(
+    output_dir: Path,
+    display_name: str,
+    specs: list[dict],
+    completion_thresholds: bool = False,
+) -> str:
     """Create a new report page with the given display name and visuals. Returns the new page's id."""
     pages_root = (
         output_dir / "production_plan_reference.Report" / "definition" / "pages"
@@ -315,7 +368,7 @@ def add_page(output_dir: Path, display_name: str, specs: list[dict]) -> str:
         json.dumps(page_json, indent=2), encoding="utf-8"
     )
 
-    apply_visuals(page_dir, specs)
+    apply_visuals(page_dir, specs, completion_thresholds)
 
     pages_json_path = pages_root / "pages.json"
     pages_meta = json.loads(pages_json_path.read_text(encoding="utf-8"))
@@ -325,8 +378,109 @@ def add_page(output_dir: Path, display_name: str, specs: list[dict]) -> str:
     return page_id
 
 
+DEFAULT_DATA_COLORS = [
+    "#133020",
+    "#FFB347",
+    "#046241",
+    "#FFC370",
+    "#417256",
+    "#C17710",
+    "#708E7C",
+    "#9CAFA4",
+]
+
+
+def apply_theme(
+    output_dir: Path,
+    data_colors: list[str] | None = None,
+    heading_font: str = "Fraunces",
+    body_font: str = "DM Sans",
+) -> None:
+    """Update the report's theme file with the user's chosen color palette and fonts.
+
+    data_colors replaces the full chart-series palette (not just the first two
+    colors) — Power BI assigns theme colors to chart series in order, so a real
+    theme needs more than 2 colors to look intentional once a report has more
+    than 2 series. Defaults to the Lifewood brand palette. heading_font applies
+    to the title/header/callout text classes (chart titles, KPI headers, and the
+    big KPI number itself); body_font applies to the label class (data values,
+    axis labels, table content). Secondary text classes (e.g. boldLabel,
+    largeTitle) auto-derive from these per Power BI's own theme inheritance
+    rules, so they don't need to be set explicitly.
+    """
+    theme_path = (
+        output_dir
+        / "production_plan_reference.Report"
+        / "StaticResources"
+        / "RegisteredResources"
+        / "LuminaTheme.json"
+    )
+
+    theme = json.loads(theme_path.read_text(encoding="utf-8"))
+
+    theme["dataColors"] = data_colors or DEFAULT_DATA_COLORS
+
+    text_classes = theme.get("textClasses", {})
+    for cls in ("title", "header", "callout"):
+        if cls in text_classes:
+            text_classes[cls]["fontFace"] = heading_font
+    if "label" in text_classes:
+        text_classes["label"]["fontFace"] = body_font
+
+    theme_path.write_text(json.dumps(theme, indent=2), encoding="utf-8")
+
+
+def apply_completion_thresholds(
+    output_dir: Path, good_threshold: float = 0.9, neutral_threshold: float = 0.7
+) -> None:
+    """Add a 'Completion Status' DAX measure (good/neutral/bad based on the given
+    thresholds against average completion_rate) to the semantic model, so a
+    completion_rate card can reference it for field-value conditional formatting.
+    """
+    tmdl_path = (
+        output_dir
+        / "production_plan_reference.SemanticModel"
+        / "definition"
+        / "tables"
+        / "clean_export.tmdl"
+    )
+    text = tmdl_path.read_text(encoding="utf-8")
+
+    measure_block = (
+        "\n\tmeasure 'Completion Status' = ```\n"
+        "\t\t\t\n"
+        "\t\t\tVAR CurrentRate = AVERAGE(clean_export[completion_rate])\n"
+        "\t\t\tRETURN\n"
+        "\t\t\t    SWITCH(\n"
+        "\t\t\t        TRUE(),\n"
+        f'\t\t\t        CurrentRate >= {good_threshold}, "good",\n'
+        f'\t\t\t        CurrentRate >= {neutral_threshold}, "neutral",\n'
+        '\t\t\t        "bad"\n'
+        "\t\t\t    )\n"
+        "\t\t\t\n"
+        "\t\t\t```\n"
+        f"\t\tlineageTag: {uuid.uuid4()}\n"
+    )
+
+    pattern = re.compile(r"(table clean_export\n\tlineageTag: [^\n]+\n)")
+    new_text, n = pattern.subn(lambda m: m.group(1) + measure_block, text, count=1)
+    if n != 1:
+        raise RuntimeError(
+            f"Could not find table header to insert measure after in {tmdl_path}"
+        )
+
+    tmdl_path.write_text(new_text, encoding="utf-8")
+
+
 def generate_pbip(
-    records: list[dict], dataset_id: str, visuals: list[dict] | None = None
+    records: list[dict],
+    dataset_id: str,
+    visuals: list[dict] | None = None,
+    data_colors: list[str] | None = None,
+    heading_font: str = "Fraunces",
+    body_font: str = "DM Sans",
+    good_threshold: float | None = None,
+    neutral_threshold: float | None = None,
 ) -> Path:
     """Copy the reference PBIP template, embed `records` as its data, and generate
     the visuals described by `visuals` (defaults to a baseline card + line chart).
@@ -373,6 +527,10 @@ def generate_pbip(
 
     tmdl_path.write_text(new_text, encoding="utf-8")
 
+    use_thresholds = good_threshold is not None and neutral_threshold is not None
+    if use_thresholds:
+        apply_completion_thresholds(output_dir, good_threshold, neutral_threshold)
+
     page_dir = (
         output_dir
         / "production_plan_reference.Report"
@@ -380,7 +538,10 @@ def generate_pbip(
         / "pages"
         / "2bb6229a2baa33c2479a"
     )
-    apply_visuals(page_dir, visuals or DEFAULT_VISUALS)
+    apply_visuals(
+        page_dir, visuals or DEFAULT_VISUALS, completion_thresholds=use_thresholds
+    )
+    apply_theme(output_dir, data_colors, heading_font, body_font)
 
     return output_dir
 
