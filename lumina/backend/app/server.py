@@ -1,4 +1,10 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
 from excel_parser import load_production_plan, build_dashboard_preview
 
@@ -7,8 +13,11 @@ from supabase_client import (
     save_generated_file,
     get_conversation_owner,
     upload_generated_file,
+    get_or_create_whatsapp_conversation,
 )
 from pbib_generator import generate_pbip, choose_visuals, DEFAULT_VISUALS
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 mcp = FastMCP("Lumina Backend")
 
@@ -79,6 +88,20 @@ def ping() -> str:
 
 
 @mcp.tool
+def get_or_create_conversation(phone_number: str) -> dict:
+    """Resolve a WhatsApp sender phone number to a Supabase conversation.
+
+    Looks up the user by profiles.contact_number (set during web signup), then
+    returns an existing WhatsApp conversation or creates one.
+
+    Args:
+        phone_number: E.164 or local format as received from WhatsApp/OpenClaw
+            (e.g. "+639123456789" or "639123456789").
+    """
+    return get_or_create_whatsapp_conversation(phone_number)
+
+
+@mcp.tool
 def process_production_plan(
     file_path: str,
     conversation_id: str,
@@ -94,7 +117,7 @@ def process_production_plan(
     """Parse a production-plan Excel file, store it, and generate a real PBIP dashboard.
 
     Args:
-        file_path: Path to the .xlsx production plan file on disk.
+        file_path: Absolute path to the .xlsx production plan file on disk.
         conversation_id: The conversation this file belongs to (determines the owning user).
         report_type: Which report type the dashboard should be built for (drives AI chart selection).
         report_name: The user-provided title for the report (weak context for AI chart selection).
@@ -119,5 +142,19 @@ def process_production_plan(
     )
 
 
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(_request: Request) -> PlainTextResponse:
+    return PlainTextResponse("ok")
+
+
 if __name__ == "__main__":
-    mcp.run()
+    transport = os.environ.get("MCP_TRANSPORT", "streamable-http")
+    if transport in ("http", "streamable-http"):
+        mcp.run(
+            transport="streamable-http",
+            host=os.environ.get("MCP_HOST", "0.0.0.0"),
+            port=int(os.environ.get("MCP_PORT", "8001")),
+            path=os.environ.get("MCP_PATH", "/mcp"),
+        )
+    else:
+        mcp.run(transport="stdio")

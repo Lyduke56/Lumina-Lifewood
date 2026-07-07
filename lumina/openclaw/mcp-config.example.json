@@ -1,0 +1,12 @@
+{
+  "mcp": {
+    "servers": {
+      "lumina-backend": {
+        "url": "http://127.0.0.1:8001/mcp",
+        "transport": "streamable-http",
+        "connectTimeout": 10,
+        "timeout": 120
+      }
+    }
+  }
+}

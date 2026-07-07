@@ -77,7 +77,66 @@ def get_conversation_owner(conversation_id: str) -> str:
         .eq("id", conversation_id)
         .execute()
     )
+    if not result.data:
+        raise ValueError(f"Conversation not found: {conversation_id}")
     return result.data[0]["user_id"]
+
+
+def get_user_id_by_phone(phone_number: str) -> str:
+    """Resolve a WhatsApp phone number to a Supabase user via profiles.contact_number."""
+    from phone_utils import phones_match
+
+    client = get_client()
+    result = (
+        client.table("profiles")
+        .select("id, contact_number")
+        .not_.is_("contact_number", "null")
+        .execute()
+    )
+    for row in result.data:
+        if phones_match(phone_number, row["contact_number"]):
+            return row["id"]
+    raise ValueError(
+        "No Lumina account is linked to this phone number. "
+        "Sign up at the web app and use the same contact number you message from on WhatsApp."
+    )
+
+
+def get_or_create_whatsapp_conversation(phone_number: str) -> dict:
+    """Find or create a conversation row for a WhatsApp sender.
+
+    Returns conversation_id, user_id, and whether a new row was created.
+    """
+    user_id = get_user_id_by_phone(phone_number)
+    client = get_client()
+    existing = (
+        client.table("conversations")
+        .select("id, title, created_at")
+        .eq("user_id", user_id)
+        .eq("title", "WhatsApp")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        row = existing.data[0]
+        return {
+            "conversation_id": row["id"],
+            "user_id": user_id,
+            "created": False,
+        }
+
+    created = (
+        client.table("conversations")
+        .insert({"user_id": user_id, "title": "WhatsApp"})
+        .select("id")
+        .execute()
+    )
+    return {
+        "conversation_id": created.data[0]["id"],
+        "user_id": user_id,
+        "created": True,
+    }
 
 
 def upload_generated_file(local_dir: Path, user_id: str, dataset_id: str) -> str:
