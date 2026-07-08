@@ -2,127 +2,59 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-
-import { Sidebar }     from "./Sidebar";
-import { ChatPanel }   from "./ChatPanel";
-import { PreviewPanel } from "./PreviewPanel";
-import { Dashboard }   from "./Dashboard";
-import { SetupCard }   from "./SetupCard";
-import { useRouter }   from "next/navigation";
-import SignOutModal    from "./SignOutModal";
-
-import { useConversations }  from "@/hooks/useConversations";
+import { Sidebar }       from "./Sidebar";
+import { StudioView }    from "./StudioView";
+import { FilesView }     from "./FilesView";
+import { FileDetailModal } from "./FileDetailModal";
+import SignOutModal      from "./SignOutModal";
+import { useRouter }     from "next/navigation";
 import { useGeneratedFiles } from "@/hooks/useGeneratedFiles";
-import { mockRevenueData }   from "@/mocks/data";
+import type { GeneratedFile } from "@/lib/types";
+import type { ChartPreviewJson } from "@/lib/types";
 
-import type { ReportConfig } from "@/lib/types";
-
-type ViewMode = "chats" | "dashboard";
+type ViewMode = "studio" | "files";
 
 export default function App() {
   const { user, session } = useAuth();
   const router = useRouter();
-  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen]         = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [view, setView]               = useState<ViewMode>("chats");
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [view, setView]                       = useState<ViewMode>("studio");
+  const [activeFileId, setActiveFileId]       = useState<string | null>(null);
+  const [sidebarFile, setSidebarFile]         = useState<GeneratedFile | null>(null);
 
-  // ── Setup card state ─────────────────────────────────────────────────────
-  // showSetup: controls whether the SetupCard overlay is visible
-  // reportConfig: null until the user completes setup; populated on submit
-  const [showSetup, setShowSetup]       = useState(false);
-  const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
+  // regen count map: fileId -> count (client-side only)
+  const [regenCounts, setRegenCounts] = useState<Record<string, number>>({});
 
-  const { conversations, createConversation } = useConversations();
-  const { files, refresh: refreshGeneratedFiles } = useGeneratedFiles();
-
-  const activeConversation =
-    conversations.find((c) => c.id === activeConversationId) ?? null;
+  const { files, refresh: refreshFiles } = useGeneratedFiles();
 
   function requireAuth() {
-    if (!user) {
-      router.push("/login");
-      return false;
-    }
+    if (!user) { router.push("/login"); return false; }
     return true;
   }
 
-  function handleSend() {
+  function handleNewReport() {
     if (!requireAuth()) return;
-    // real send logic goes here once the chat API route exists
+    setView("studio");
   }
 
-  function handleUploadClick() {
-    if (!requireAuth()) return;
-    // real upload logic goes here
+  function handleFileGenerated(fileId: string, _chartJson: ChartPreviewJson | null) {
+    refreshFiles();
+    setActiveFileId(fileId);
   }
 
-  // ── New chat: require auth, then show setup card ─────────────────────────
-  async function handleNewChat() {
-    if (!requireAuth()) return;
-    setShowSetup(true);
+  function handleSelectFile(id: string) {
+    const f = files.find((f) => f.id === id) ?? null;
+    setActiveFileId(id);
+    setSidebarFile(f);
   }
 
-  // ── Setup complete: store config, create conversation, close card ─────────
-  async function handleSetupComplete(config: ReportConfig) {
-    setReportConfig(config);
-    setShowSetup(false);
-
-    const conv = await createConversation();
-    if (conv) {
-      setActiveConversationId(conv.id);
-      setView("chats");
-    }
-
-    if (conv && config.file) {
-      const formData = new FormData();
-      formData.append("file", config.file);
-      formData.append("conversation_id", conv.id);
-      formData.append("report_type", config.reportType);
-      formData.append("report_name", config.reportName);
-      formData.append("instructions", config.instructions);
-      config.dataColors.forEach((c) => formData.append("data_colors", c));
-      formData.append("heading_font", config.headingFont);
-      formData.append("body_font", config.bodyFont);
-      formData.append("good_threshold", String(config.goodThreshold));
-      formData.append("neutral_threshold", String(config.neutralThreshold));
-
-      try {
-        const res = await fetch("http://localhost:8000/generate-dashboard", {
-          method: "POST",
-          headers: session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : undefined,
-          body: formData,
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => null);
-          console.error("Dashboard generation failed:", err?.detail ?? res.statusText);
-        } else {
-          console.log("Dashboard generated:", await res.json());
-          await refreshGeneratedFiles();
-          setView("dashboard");
-        }
-
-      } catch (e) {
-        console.error("Could not reach the dashboard generation service:", e);
-      }
-    }
-  }
-
-  // ── Setup cancelled: close card
-  function handleSetupCancel() {
-    setShowSetup(false);
-  }
-
-  function handleSelectConversation(id: string) {
-    setActiveConversationId(id);
-    setView("chats");
-  }
-
-  function handleNavigateToChat(conversationId: string) {
-    setActiveConversationId(conversationId);
-    setView("chats");
+  function handleRegenerate(file: GeneratedFile) {
+    setRegenCounts((prev) => ({
+      ...prev,
+      [file.id]: (prev[file.id] ?? 0) + 1,
+    }));
+    // TODO: wire up regen pipeline — for now just bumps the counter
   }
 
   return (
@@ -133,45 +65,38 @@ export default function App() {
         setView={setView}
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        onSelectConversation={handleSelectConversation}
-        onNewChat={handleNewChat}
+        files={files}
+        activeFileId={activeFileId}
+        onSelectFile={handleSelectFile}
+        onNewReport={handleNewReport}
         onRequireAuth={requireAuth}
         onSignOut={() => setSignOutOpen(true)}
       />
 
-      {view === "chats" && (
-        <>
-          <ChatPanel
-            user={user}
-            activeConversation={activeConversation}
-            onRequireAuth={requireAuth}
-            onUploadClick={handleUploadClick}
-            onSend={handleSend}
-            onNewChat={handleNewChat}
-          />
-          <PreviewPanel
-            user={user}
-            revenueData={mockRevenueData}
-          />
-        </>
-      )}
-
-      {view === "dashboard" && (
-        <Dashboard
-          user={user}
-          conversations={conversations}
-          files={files}
-          onNavigateToChat={handleNavigateToChat}
+      {/* ── Main content area ────────────────────────────────────── */}
+      {view === "studio" && (
+        <StudioView
+          session={session}
+          onFileGenerated={handleFileGenerated}
         />
       )}
 
-      {/* ── Setup card ── */}
-      {showSetup && (
-        <SetupCard
-          onComplete={handleSetupComplete}
-          onCancel={handleSetupCancel}
+      {view === "files" && (
+        <FilesView
+          user={user}
+          files={files}
+          regenCounts={regenCounts}
+          onRegenerate={handleRegenerate}
+        />
+      )}
+
+      {/* Sidebar file detail modal */}
+      {sidebarFile && (
+        <FileDetailModal
+          file={sidebarFile}
+          regenCount={regenCounts[sidebarFile.id] ?? 0}
+          onClose={() => setSidebarFile(null)}
+          onRegenerate={(f) => { handleRegenerate(f); setSidebarFile(null); }}
         />
       )}
 

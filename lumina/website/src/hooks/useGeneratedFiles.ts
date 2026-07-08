@@ -20,7 +20,7 @@ export function useGeneratedFiles() {
     setLoading(true);
     const { data, error } = await supabase
       .from("generated_files")
-      .select("id, storage_path, created_at, status, conversation_id, conversations(title)")
+      .select("id, storage_path, created_at, status, conversation_id, chart_preview_json, layout_json, conversations(title)")
       .order("created_at", { ascending: false });
 
     if (!error && data) {
@@ -32,12 +32,15 @@ export function useGeneratedFiles() {
           status: f.status,
           conversation_id: f.conversation_id,
           conversation_title: f.conversations?.title ?? null,
+          chart_preview_json: f.chart_preview_json ?? null,
+          layout_json: f.layout_json ?? null,
         }))
       );
     }
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
 
   useEffect(() => {
     refresh();

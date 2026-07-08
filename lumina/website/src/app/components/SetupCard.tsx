@@ -83,13 +83,21 @@ const MOCK_BREAKDOWN = [
 interface SetupCardProps {
   onComplete: (config: ReportConfig) => void;
   onCancel:   () => void;
+  /** When true, renders without the modal backdrop/fixed positioning */
+  inline?:    boolean;
+  /** When true, uses condensed layout (post-generation) */
+  compact?:   boolean;
+  /** How many times the user has regenerated this file */
+  regenCount?: number;
+  /** Max allowed regenerations */
+  maxRegen?:   number;
 }
 
 type TabId = "basics" | "design";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
+export function SetupCard({ onComplete, onCancel, inline = false, compact = false, regenCount = 0, maxRegen = 3 }: SetupCardProps) {
   // Tabs
   const [activeTab, setActiveTab] = useState<TabId>("basics");
 
@@ -198,52 +206,52 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
     });
   }
 
+  const isRegenDisabled = regenCount >= maxRegen;
+  const submitLabel = compact
+    ? isRegenDisabled
+      ? `Limit reached (${maxRegen}/${maxRegen})`
+      : `Regenerate (${regenCount + 1}/${maxRegen}) →`
+    : "Generate report →";
+
   // ── Render ─────────────────────────────────────────────────────────────
-  return (
-    // Backdrop
-    <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 50,
-        background: "rgba(19,48,32,0.45)",
-        backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "20px 16px",
-      }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-    >
-      {/* Card — 4:3 ratio: 840 × 630 */}
-      <div style={{
-        background: "var(--white)",
-        borderRadius: 18,
-        width: "min(1024px, 96vw)",
-        height: "min(768px, 92vh)",
-        display: "flex", flexDirection: "column",
-        boxShadow: "0 12px 48px rgba(19,48,32,0.2)",
-        overflow: "hidden",
-      }}>
+  const card = (
+    <div style={{
+      background: "var(--white)",
+      borderRadius: inline ? 0 : 18,
+      width: inline ? "100%" : "min(1024px, 96vw)",
+      height: inline ? "100%" : "min(768px, 92vh)",
+      display: "flex", flexDirection: "column",
+      boxShadow: inline ? "none" : "0 12px 48px rgba(19,48,32,0.2)",
+      overflow: "hidden",
+    }}>
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "18px 26px 14px",
+          padding: compact ? "14px 20px 10px" : "18px 26px 14px",
           borderBottom: "1px solid var(--line)",
           flexShrink: 0,
         }}>
           <div>
-            <div className="ll-brand-font" style={{ fontSize: 18, fontWeight: 600, color: "var(--forest)" }}>
-              New report
+            <div className="ll-brand-font" style={{ fontSize: compact ? 15 : 18, fontWeight: 600, color: "var(--forest)" }}>
+              {compact ? "Adjust & Regenerate" : "New report"}
             </div>
             <div style={{ fontSize: 12.5, color: "rgba(19,48,32,0.5)", marginTop: 2 }}>
-              Configure your report before the conversation starts.
+              {compact
+                ? "Tweak settings and regenerate (up to 3 times)."
+                : "Configure your report, then hit Generate."}
             </div>
           </div>
-          <button onClick={onCancel} className="ll-icon-btn" aria-label="Close">
-            <X size={16} />
-          </button>
+          {/* Show X only in compact mode (to reset the studio) */}
+          {compact && (
+            <button onClick={onCancel} className="ll-icon-btn" aria-label="Reset">
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {/* ── Tabs ───────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 18, padding: "0 26px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 18, padding: compact ? "0 20px" : "0 26px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
           {(["basics", "design"] as const).map((tab) => {
             const active = activeTab === tab;
             return (
@@ -267,8 +275,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
         {/* ── Scrollable body ─────────────────────────────────────────── */}
         <div className="ll-scrollbar" style={{
           flex: 1, overflowY: "auto",
-          padding: "22px 26px",
-          display: "flex", flexDirection: "column", gap: 26,
+          padding: compact ? "16px 20px" : "22px 26px",
+          display: "flex", flexDirection: "column", gap: compact ? 18 : 26,
         }}>
 
           {activeTab === "basics" && (
@@ -449,8 +457,8 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
             {/* Custom hex inputs with color pickers */}
             {colorPreset === "custom" && (
               <div style={{
-                display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8,
-                padding: "12px 14px", borderRadius: 10,
+                display: "grid", gridTemplateColumns: compact ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: compact ? 6 : 8,
+                padding: compact ? "8px 10px" : "12px 14px", borderRadius: 10,
                 background: "var(--offwhite)", border: "1px solid var(--line)",
                 marginBottom: 14,
               }}>
@@ -461,6 +469,7 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
                     value={c}
                     onChange={(v) => updateCustomColor(i, v)}
                     fallback="#133020"
+                    compact={compact}
                   />
                 ))}
               </div>
@@ -665,24 +674,43 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
         {/* ── Footer — actions ─────────────────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "14px 26px",
+          padding: compact ? "10px 20px" : "14px 26px",
           borderTop: "1px solid var(--line)",
           flexShrink: 0, background: "var(--white)",
         }}>
-          <button
-            onClick={onCancel}
-            style={{
-              background: "none", border: "1px solid var(--line)",
-              borderRadius: 9, padding: "8px 18px",
-              fontSize: 13.5, fontWeight: 500,
-              color: "rgba(19,48,32,0.6)", cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
+          {/* Left side: reset link (inline) or cancel button (modal) */}
+          {inline ? (
+            compact ? (
+              <button
+                onClick={onCancel}
+                style={{
+                  background: "none", border: "none",
+                  fontSize: 12.5, fontWeight: 500,
+                  color: "rgba(19,48,32,0.4)", cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                Start over
+              </button>
+            ) : (
+              <span style={{ fontSize: 12.5, color: "rgba(19,48,32,0.35)" }}>Drag & drop a .xlsx file above</span>
+            )
+          ) : (
+            <button
+              onClick={onCancel}
+              style={{
+                background: "none", border: "1px solid var(--line)",
+                borderRadius: 9, padding: "8px 18px",
+                fontSize: 13.5, fontWeight: 500,
+                color: "rgba(19,48,32,0.6)", cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {!canSubmit && (
+            {!canSubmit && !isRegenDisabled && (
               <span style={{ fontSize: 12, color: "rgba(19,48,32,0.4)" }}>
                 {!reportName.trim() ? "Add a report name" : "Upload a file to continue"}
               </span>
@@ -690,13 +718,30 @@ export function SetupCard({ onComplete, onCancel }: SetupCardProps) {
             <button
               onClick={handleSubmit}
               className="ll-btn-amber"
-              style={{ opacity: canSubmit ? 1 : 0.45 }}
+              disabled={isRegenDisabled}
+              style={{ opacity: (canSubmit && !isRegenDisabled) ? 1 : 0.45 }}
             >
-              Generate report →
+              {submitLabel}
             </button>
           </div>
         </div>
       </div>
+  );
+
+  if (inline) return card;
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 50,
+        background: "rgba(19,48,32,0.45)",
+        backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "20px 16px",
+      }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      {card}
     </div>
   );
 }
@@ -716,19 +761,21 @@ function SectionLabel({ children, optional }: { children: React.ReactNode; optio
   );
 }
 
-function ColorPickerInput({ label, value, onChange, fallback }: {
-  label: string; value: string; onChange: (v: string) => void; fallback: string;
+function ColorPickerInput({ label, value, onChange, fallback, compact }: {
+  label: string; value: string; onChange: (v: string) => void; fallback: string; compact?: boolean;
 }) {
   // Format hex to ensure it has # prefix
   const displayValue = value && !value.startsWith("#") ? `#${value}` : value;
 
   return (
     <div>
-      <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.5)", marginBottom: 5, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: compact ? 10 : 11.5, color: "rgba(19,48,32,0.5)", marginBottom: compact ? 2 : 5, fontWeight: 500 }}>
+        {compact ? `Color ${label.split(" ")[1]}` : label}
+      </div>
       <div style={{
-        display: "flex", alignItems: "center", gap: 8,
+        display: "flex", alignItems: "center", gap: compact ? 4 : 8,
         border: "1px solid var(--line)", borderRadius: 8,
-        padding: "4px 8px 4px 4px",
+        padding: compact ? "1px 4px 1px 1px" : "2px 6px 2px 2px",
         background: "var(--white)",
       }}>
         <input
@@ -739,27 +786,29 @@ function ColorPickerInput({ label, value, onChange, fallback }: {
             onChange(newColor);
           }}
           style={{
-            width: 40,
-            height: 40,
+            width: compact ? 22 : 28,
+            height: compact ? 22 : 28,
             padding: 0,
             border: "none",
             cursor: "pointer",
             background: "none",
+            borderRadius: 4,
+            overflow: "hidden",
           }}
         />
         <div style={{
           display: "flex",
           flexDirection: "column",
           flex: 1,
-          gap: 2,
+          gap: compact ? 1 : 2,
         }}>
           <div style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
+            gap: compact ? 4 : 6,
           }}>
             <span style={{
-              fontSize: 11,
+              fontSize: compact ? 10 : 11,
               color: "rgba(19,48,32,0.4)",
               fontWeight: 500,
               fontFamily: "monospace",
@@ -799,7 +848,7 @@ function ColorPickerInput({ label, value, onChange, fallback }: {
                 flex: 1,
                 border: "none",
                 outline: "none",
-                fontSize: 13,
+                fontSize: compact ? 11.5 : 13,
                 background: "transparent",
                 color: "var(--forest)",
                 padding: "2px 0",
@@ -809,7 +858,7 @@ function ColorPickerInput({ label, value, onChange, fallback }: {
             />
           </div>
           <div style={{
-            height: 2,
+            height: compact ? 1.5 : 2,
             borderRadius: 1,
             background: value || fallback,
             transition: "background 0.15s",

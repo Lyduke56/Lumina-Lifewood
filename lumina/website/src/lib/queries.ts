@@ -55,6 +55,8 @@ export async function getGeneratedFiles(): Promise<GeneratedFile[]> {
     status: f.status,
     conversation_id: f.conversation_id,
     conversation_title: f.conversations?.title ?? null,
+    chart_preview_json: f.chart_preview_json ?? null,
+    layout_json: f.layout_json ?? null,
   }));
 }
 

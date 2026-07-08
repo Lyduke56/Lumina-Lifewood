@@ -1,12 +1,13 @@
 import {
-  MessageSquare, LayoutDashboard, Settings, Plus,
-  ChevronLeft, ChevronRight, CircleDot, LogOut
+  LayoutDashboard, Settings, Plus,
+  ChevronLeft, ChevronRight, CircleDot, LogOut,
+  Pencil, FolderOpen,
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
-import type { Conversation } from "@/lib/types";
+import type { GeneratedFile } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
 
-type ViewMode = "chats" | "dashboard";
+type ViewMode = "studio" | "files";
 
 interface SidebarProps {
   user: User | null;
@@ -14,18 +15,18 @@ interface SidebarProps {
   setView: (view: ViewMode) => void;
   collapsed: boolean;
   setCollapsed: (val: boolean | ((prev: boolean) => boolean)) => void;
-  conversations: Conversation[];
-  activeConversationId: string | null;
-  onSelectConversation: (id: string) => void;
-  onNewChat: () => void;
+  files: GeneratedFile[];
+  activeFileId: string | null;
+  onSelectFile: (id: string) => void;
+  onNewReport: () => void;
   onRequireAuth: () => boolean;
   onSignOut: () => void;
 }
 
 export function Sidebar({
   user, view, setView, collapsed, setCollapsed,
-  conversations, activeConversationId, onSelectConversation,
-  onNewChat, onRequireAuth, onSignOut
+  files, activeFileId, onSelectFile,
+  onNewReport, onRequireAuth, onSignOut,
 }: SidebarProps) {
   const isLoggedOut = !user;
   const displayName = user?.email ?? "Guest";
@@ -79,61 +80,90 @@ export function Sidebar({
           </button>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 12.5, color: "var(--tan-muted)" }}>You're browsing as a guest.</div>
+            <div style={{ fontSize: 12.5, color: "var(--tan-muted)" }}>You&apos;re browsing as a guest.</div>
             <button className="ll-signin-btn" onClick={() => onRequireAuth()}>Log in / Sign up</button>
           </div>
         )}
       </div>
 
-      {/* New Chat Button */}
+      {/* New Report Button */}
       <div style={{ padding: collapsed ? "0 10px 14px" : "0 16px 14px" }}>
         <button
           className="ll-btn-amber"
           style={{ width: "100%" }}
-          onClick={() => { if (onRequireAuth()) onNewChat(); }}
+          onClick={() => { if (onRequireAuth()) onNewReport(); }}
         >
           <Plus size={16} />
-          {!collapsed && "New chat"}
+          {!collapsed && "New report"}
         </button>
       </div>
 
       {/* Navigation */}
       <nav className="ll-sidebar-section" style={{ padding: "12px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
-        <div className={`ll-navitem ${view === "chats" ? "active" : ""}`} onClick={() => { if (onRequireAuth()) setView("chats"); }}>
-          <MessageSquare size={16} />
-          <span className="ll-navitem-label">Chats</span>
+        <div
+          className={`ll-navitem ${view === "studio" ? "active" : ""}`}
+          onClick={() => { if (onRequireAuth()) setView("studio"); }}
+        >
+          <Pencil size={16} />
+          <span className="ll-navitem-label">Studio</span>
         </div>
-        <div className={`ll-navitem ${view === "dashboard" ? "active" : ""} ${isLoggedOut ? "disabled" : ""}`} onClick={() => { if (onRequireAuth()) setView("dashboard"); }}>
+        <div
+          className={`ll-navitem ${view === "files" ? "active" : ""} ${isLoggedOut ? "disabled" : ""}`}
+          onClick={() => { if (onRequireAuth()) setView("files"); }}
+        >
           <LayoutDashboard size={16} />
-          <span className="ll-navitem-label">Dashboard</span>
+          <span className="ll-navitem-label">Files</span>
         </div>
       </nav>
 
-      {/* History — real conversations, no channel distinction (WhatsApp deferred, no such column yet) */}
+      {/* Recent Files */}
       {!collapsed && (
         <div className="ll-sidebar-section" style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--tan-muted)", padding: "6px 10px", textTransform: "uppercase" }}>Recent</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--tan-muted)", padding: "6px 10px", textTransform: "uppercase" }}>
+            Recent Files
+          </div>
           {user ? (
-            conversations.length === 0 ? (
+            files.length === 0 ? (
               <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>
-                No conversations yet. Start one with "New chat."
+                No files yet. Generate a report to get started.
               </div>
             ) : (
-              conversations.map((c) => (
-                <div
-                  key={c.id}
-                  className={`ll-convo ${c.id === activeConversationId ? "active" : ""}`}
-                  onClick={() => onSelectConversation(c.id)}
-                >
-                  <div className="ll-convo-title">{c.title ?? "New conversation"}</div>
-                  <div style={{ fontSize: 11, color: "var(--tan-muted)" }}>
-                    {formatRelativeTime(c.created_at)}
+              files.slice(0, 12).map((f) => {
+                const name = f.conversation_title && f.conversation_title !== "WhatsApp"
+                  ? f.conversation_title
+                  : f.storage_path.split("/").pop()?.replace(/\.zip$/, "") ?? "Report";
+                const isWhatsapp = f.conversation_title === "WhatsApp";
+
+                return (
+                  <div
+                    key={f.id}
+                    className={`ll-convo ${f.id === activeFileId ? "active" : ""}`}
+                    onClick={() => onSelectFile(f.id)}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <FolderOpen size={12} color={f.id === activeFileId ? "var(--amber)" : "var(--tan-muted)"} style={{ flexShrink: 0 }} />
+                      <div className="ll-convo-title">{name}</div>
+                      {isWhatsapp && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999,
+                          background: "rgba(4,98,65,0.2)", color: "var(--emerald)",
+                          flexShrink: 0, textTransform: "uppercase", letterSpacing: ".04em",
+                        }}>
+                          WA
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--tan-muted)", paddingLeft: 18 }}>
+                      {formatRelativeTime(f.created_at)}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )
           ) : (
-            <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>Log in to see your conversation history.</div>
+            <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>
+              Log in to see your recent files.
+            </div>
           )}
         </div>
       )}

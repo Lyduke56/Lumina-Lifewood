@@ -3,7 +3,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+_backend_root = Path(__file__).resolve().parent.parent
+load_dotenv(_backend_root / ".env")
+load_dotenv(_backend_root / ".env.local", override=True)
+
 
 _client = None
 

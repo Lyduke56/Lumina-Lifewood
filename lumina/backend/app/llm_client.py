@@ -3,7 +3,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+_backend_root = Path(__file__).resolve().parent.parent
+load_dotenv(_backend_root / ".env")
+load_dotenv(_backend_root / ".env.local", override=True)
+
 
 FALLBACK_MODELS = [
     "nvidia/nemotron-3-super-120b-a12b:free",

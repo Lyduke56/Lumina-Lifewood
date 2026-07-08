@@ -12,6 +12,26 @@ export type GeneratedFile = {
   status: "compiling" | "ready" | "failed";
   conversation_id: string;
   conversation_title: string | null;
+  // chart data for in-app preview
+  chart_preview_json: ChartPreviewJson | null;
+  layout_json: Record<string, unknown> | null;
+  // client-side regen tracking (not persisted)
+  regen_count?: number;
+};
+
+export type ChartPreviewJson = {
+  visuals: Array<{
+    type: "card" | "line" | "bar" | "table";
+    fields: string[];
+  }>;
+  records: Array<{
+    date: string;
+    target_quantity: number | null;
+    actual_quantity: number | null;
+    target_hours: number | null;
+    actual_hours: number | null;
+    completion_rate: number | null;
+  }>;
 };
 
 // ── User profile (mirrors public.profiles table) ─────────────────────────────

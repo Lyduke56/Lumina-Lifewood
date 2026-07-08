@@ -17,7 +17,10 @@ from supabase_client import (
 )
 from pbib_generator import generate_pbip, choose_visuals, DEFAULT_VISUALS
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+_backend_root = Path(__file__).resolve().parent.parent
+load_dotenv(_backend_root / ".env")
+load_dotenv(_backend_root / ".env.local", override=True)
+
 
 mcp = FastMCP("Lumina Backend")
 
@@ -44,12 +47,12 @@ def run_pipeline(
         source_file_path=file_path, parsed_rows=records, conversation_id=conversation_id
     )
 
-    layout_json, chart_preview_json = build_dashboard_preview(records)
-
     try:
         visuals = choose_visuals(report_type, report_name, instructions)
     except Exception:
         visuals = DEFAULT_VISUALS
+
+    layout_json, chart_preview_json = build_dashboard_preview(records, visuals)
 
     output_dir = generate_pbip(
         records,

@@ -121,7 +121,7 @@ def load_production_plan(path: str | Path) -> list[dict]:
     return records
 
 
-def build_dashboard_preview(records: list[dict]) -> tuple[dict, dict]:
+def build_dashboard_preview(records: list[dict], visuals: list[dict]) -> tuple[dict, dict]:
     """Lightweight summary + chart series for the in-app preview panel, ahead of the full PBIP download."""
     total_target = sum(r["target_quantity"] or 0 for r in records)
     total_actual = sum(r["actual_quantity"] or 0 for r in records)
@@ -139,12 +139,15 @@ def build_dashboard_preview(records: list[dict]) -> tuple[dict, dict]:
         ]
     }
     chart_preview_json = {
-        "type": "line",
-        "series": [
+        "visuals": visuals,
+        "records": [
             {
                 "date": r["date"],
                 "target_quantity": r["target_quantity"],
                 "actual_quantity": r["actual_quantity"],
+                "target_hours": r["target_hours"],
+                "actual_hours": r["actual_hours"],
+                "completion_rate": r["completion_rate"],
             }
             for r in records
         ],
