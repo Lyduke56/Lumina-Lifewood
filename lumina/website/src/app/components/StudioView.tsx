@@ -18,19 +18,19 @@ interface StudioViewProps {
 type StudioState =
   | { phase: "idle" }
   | { phase: "generating" }
-  | { phase: "generated"; conversationId: string; chartPreviewJson: ChartPreviewJson | null; dataColors: string[]; regenCount: number; lastConfig: ReportConfig };
+  | { phase: "generated"; conversationId: string; chartPreviewJson: ChartPreviewJson | null; dataColors: string[]; regenCount: number; lastConfig: ReportConfig; storagePath: string };
 
 export function StudioView({ session, onFileGenerated }: StudioViewProps) {
   const [state, setState] = useState<StudioState>({ phase: "idle" });
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
-  async function ensureConversation(): Promise<string | null> {
+  async function ensureConversation(title: string | null = null): Promise<string | null> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     const { data, error } = await supabase
       .from("conversations")
-      .insert({ user_id: user.id, title: null })
+      .insert({ user_id: user.id, title: title })
       .select("id")
       .single();
     if (error) { console.error(error); return null; }
@@ -87,6 +87,7 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
         dataColors: config.dataColors,
         regenCount,
         lastConfig: config,
+        storagePath: result.storage_path,
       });
 
       onFileGenerated(result.generated_file_id, chartPreviewJson);
@@ -97,7 +98,8 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
   }
 
   async function handleComplete(config: ReportConfig) {
-    const conversationId = await ensureConversation();
+    const fileName = config.reportName || config.file?.name?.replace(/\.[^/.]+$/, "") || "Report";
+    const conversationId = await ensureConversation(fileName);
     if (!conversationId) { setError("Could not create conversation. Are you logged in?"); return; }
     await runGenerate(config, conversationId, 0);
   }
@@ -106,6 +108,31 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
     if (state.phase !== "generated") return;
     if (state.regenCount >= MAX_REGEN) return;
     await runGenerate(config, state.conversationId, state.regenCount + 1);
+  }
+
+  async function handleDownload() {
+    if (state.phase !== "generated") return;
+    if (!state.storagePath) {
+      alert("Please regenerate the report to enable downloading (hot-reload state missing path).");
+      return;
+    }
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storagePath: state.storagePath })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create signed URL");
+      
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = state.storagePath.split("/").pop() || "Report.zip";
+      a.click();
+    } catch (err: any) {
+      console.error(err);
+      alert("Download failed: " + (err.message || JSON.stringify(err)));
+    }
   }
 
   const isGenerated = state.phase === "generated";
@@ -181,6 +208,7 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
               isMock={!state.chartPreviewJson}
               dataColors={state.dataColors}
               status="ready"
+              onDownload={handleDownload}
             />
           </div>
         </div>

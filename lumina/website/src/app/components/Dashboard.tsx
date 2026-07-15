@@ -15,15 +15,23 @@ export function Dashboard({ user, conversations, files, onNavigateToChat }: Dash
   const supabase = createClient();
 
   async function handleDownload(storagePath: string) {
-    const { data, error } = await supabase.storage
-      .from("generated-files")
-      .createSignedUrl(storagePath, 60);
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storagePath })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create signed URL");
 
-    if (error || !data?.signedUrl) {
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = storagePath.split("/").pop() || "Report.zip";
+      a.click();
+    } catch (error: any) {
       console.error("Could not create download link:", error);
-      return;
+      alert("Download failed: " + (error.message || JSON.stringify(error)));
     }
-    window.open(data.signedUrl, "_blank");
   }
 
   if (!user) {

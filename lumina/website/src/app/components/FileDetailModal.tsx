@@ -26,11 +26,23 @@ export function FileDetailModal({
   const regenLeft = MAX_REGEN - regenCount;
 
   async function handleDownload() {
-    const { data, error } = await supabase.storage
-      .from("generated-files")
-      .createSignedUrl(file.storage_path, 60);
-    if (error || !data?.signedUrl) return;
-    window.open(data.signedUrl, "_blank");
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storagePath: file.storage_path })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create signed URL");
+
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = file.storage_path.split("/").pop() || "Report.zip";
+      a.click();
+    } catch (err: any) {
+      console.error(err);
+      alert("Download failed: " + (err.message || JSON.stringify(err)));
+    }
   }
 
   return (

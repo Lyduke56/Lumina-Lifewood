@@ -146,15 +146,25 @@ export function FilesView({ user, files, regenCounts, onRegenerate }: FilesViewP
 // ── Download button ───────────────────────────────────────────────────────────
 
 function DownloadButton({ storagePath }: { storagePath: string }) {
-  const supabase = createClient();
-
   async function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
-    const { data, error } = await supabase.storage
-      .from("generated-files")
-      .createSignedUrl(storagePath, 60);
-    if (error || !data?.signedUrl) return;
-    window.open(data.signedUrl, "_blank");
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storagePath })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create signed URL");
+      
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = storagePath.split("/").pop() || "Report.zip";
+      a.click();
+    } catch (err: any) {
+      console.error(err);
+      alert("Download failed: " + (err.message || JSON.stringify(err)));
+    }
   }
 
   return (
