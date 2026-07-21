@@ -1,3 +1,7 @@
+import { useRef } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+gsap.registerPlugin(useGSAP);
 import {
   LayoutDashboard, Settings, Plus,
   ChevronLeft, ChevronRight, CircleDot, LogOut,
@@ -7,7 +11,7 @@ import { User } from "@supabase/supabase-js";
 import type { GeneratedFile } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
 
-type ViewMode = "studio" | "files";
+type ViewMode = "studio" | "files" | "dashboard";
 
 interface SidebarProps {
   user: User | null;
@@ -31,9 +35,20 @@ export function Sidebar({
   const isLoggedOut = !user;
   const displayName = user?.email ?? "Guest";
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "?";
+  
+  const containerRef = useRef<HTMLElement>(null);
+  useGSAP(() => {
+    gsap.from(".ll-sidebar-section, .ll-btn-amber, .ll-sidebar-collapse-btn", {
+      x: -10,
+      opacity: 0,
+      duration: 0.6,
+      stagger: 0.04,
+      ease: "power3.out",
+    });
+  }, { scope: containerRef, dependencies: [] });
 
   return (
-    <aside className={`ll-sidebar ${collapsed ? "collapsed" : ""}`}>
+    <aside className={`ll-sidebar ${collapsed ? "collapsed" : ""}`} ref={containerRef}>
       <button
         className="ll-sidebar-collapse-btn"
         onClick={() => setCollapsed((v) => !v)}
@@ -128,37 +143,39 @@ export function Sidebar({
                 No files yet. Generate a report to get started.
               </div>
             ) : (
-              files.slice(0, 12).map((f) => {
-                const name = f.conversation_title && f.conversation_title !== "WhatsApp"
-                  ? f.conversation_title
-                  : f.storage_path.split("/").pop()?.replace(/\.zip$/, "") ?? "Report";
-                const isWhatsapp = f.conversation_title === "WhatsApp";
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {files.slice(0, 12).map((f) => {
+                  const name = f.conversation_title && f.conversation_title !== "WhatsApp"
+                    ? f.conversation_title
+                    : f.storage_path.split("/").pop()?.replace(/\.zip$/, "") ?? "Report";
+                  const isWhatsapp = f.conversation_title === "WhatsApp";
 
-                return (
-                  <div
-                    key={f.id}
-                    className={`ll-convo ${f.id === activeFileId ? "active" : ""}`}
-                    onClick={() => onSelectFile(f.id)}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <FolderOpen size={12} color={f.id === activeFileId ? "var(--amber)" : "var(--tan-muted)"} style={{ flexShrink: 0 }} />
-                      <div className="ll-convo-title">{name}</div>
-                      {isWhatsapp && (
-                        <span style={{
-                          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999,
-                          background: "rgba(4,98,65,0.2)", color: "var(--emerald)",
-                          flexShrink: 0, textTransform: "uppercase", letterSpacing: ".04em",
-                        }}>
-                          WA
-                        </span>
-                      )}
+                  return (
+                    <div
+                      key={f.id}
+                      className={`ll-convo ${f.id === activeFileId ? "active" : ""}`}
+                      onClick={() => onSelectFile(f.id)}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <FolderOpen size={12} color={f.id === activeFileId ? "var(--amber)" : "var(--tan-muted)"} style={{ flexShrink: 0 }} />
+                        <div className="ll-convo-title">{name}</div>
+                        {isWhatsapp && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999,
+                            background: "rgba(4,98,65,0.2)", color: "var(--emerald)",
+                            flexShrink: 0, textTransform: "uppercase", letterSpacing: ".04em",
+                          }}>
+                            WA
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--tan-muted)", paddingLeft: 18 }}>
+                        {formatRelativeTime(f.created_at)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--tan-muted)", paddingLeft: 18 }}>
-                      {formatRelativeTime(f.created_at)}
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )
           ) : (
             <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>
@@ -169,13 +186,18 @@ export function Sidebar({
       )}
       {collapsed && <div style={{ flex: 1 }} />}
 
-      {/* Settings Footer */}
-      <div className="ll-sidebar-section" style={{ padding: collapsed ? "12px 10px" : "12px 16px", display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "space-between" }}>
-        <div className="ll-navitem" style={{ padding: "6px 8px" }}>
-          <Settings size={16} />
-          <span className="ll-navitem-label">Settings</span>
+      {/* Branding Footer */}
+      {!collapsed ? (
+        <div style={{ padding: "16px", paddingBottom: "32px", display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexShrink: 0, width: "100%" }}>
+          <img src="/lifewood-full-cream.svg" alt="Lifewood" style={{ height: 12, width: "auto" }} />
+          <span style={{ color: "#C9C2AC", opacity: 0.5, fontSize: 13 }}>|</span>
+          <img src="/lumina-full-cream.svg" alt="Lumina" style={{ height: 20, width: "auto", transform: "translateY(1px)" }} />
         </div>
-      </div>
+      ) : (
+        <div style={{ padding: "16px", display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: 32, flexShrink: 0, width: "100%" }}>
+          <img src="/lumina-symbol-final.svg" alt="Lumina" style={{ height: 18, width: "auto" }} />
+        </div>
+      )}
     </aside>
   );
 }

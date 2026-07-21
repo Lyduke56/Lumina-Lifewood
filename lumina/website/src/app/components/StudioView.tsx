@@ -2,11 +2,20 @@
 
 import { useState } from "react";
 import { SetupCard } from "./SetupCard";
-import { LivePreview } from "./LivePreview";
+import { WebDashboard } from "./WebDashboard";
 import { Loader2 } from "lucide-react";
 import type { ReportConfig, ChartPreviewJson } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
+
+function hexToRgba(hex: string, alpha: number) {
+  if (!hex || !hex.startsWith("#")) return `rgba(0,0,0,${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (isNaN(r)) return `rgba(0,0,0,${alpha})`;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 const MAX_REGEN = 3;
 
@@ -186,27 +195,39 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
       )}
 
       {/* ── SetupCard panel (left, or full-screen) ──────────────── */}
-      <div
-        className={`ll-studio-setup ${isGenerated ? "ll-studio-setup--compact" : "ll-studio-setup--full"}`}
-      >
-        <SetupCard
-          onComplete={isGenerated ? handleRegenerate : handleComplete}
-          onCancel={() => { setState({ phase: "idle" }); setError(null); }}
-          inline
-          compact={isGenerated}
-          regenCount={state.phase === "generated" ? state.regenCount : 0}
-          maxRegen={MAX_REGEN}
-        />
-      </div>
+      {!isGenerated && (
+        <div className="ll-studio-setup ll-studio-setup--full">
+          <SetupCard
+            onComplete={handleComplete}
+            onCancel={() => { setState({ phase: "idle" }); setError(null); }}
+            inline
+            compact={false}
+            regenCount={0}
+            maxRegen={MAX_REGEN}
+          />
+        </div>
+      )}
 
-      {/* ── Live preview panel (right, only after generate) ─────── */}
+      {/* ── Web Dashboard panel (right, only after generate) ─────── */}
       {isGenerated && (
-        <div className="ll-studio-preview">
-          <div className="ll-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
-            <LivePreview
+        <div 
+          className="ll-studio-preview" 
+          style={{ 
+            backgroundColor: "#F9F7F7",
+            backgroundImage: `radial-gradient(circle at 10% 20%, ${hexToRgba(state.dataColors[0] || "#E7F0EA", 0.05)} 0%, transparent 40%, ${hexToRgba(state.dataColors[1] || "#FFEFD6", 0.08)} 100%)`,
+            position: "relative"
+          }}
+        >
+          {/* Abstract floating shapes for spatial depth */}
+          <div style={{ position: "absolute", top: "10%", right: "5%", width: "40vw", height: "40vw", background: `radial-gradient(circle, ${hexToRgba(state.dataColors[1] || "#FFB347", 0.08)} 0%, transparent 70%)`, borderRadius: "50%", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", bottom: "10%", left: "10%", width: "50vw", height: "50vw", background: `radial-gradient(circle, ${hexToRgba(state.dataColors[0] || "#046241", 0.05)} 0%, transparent 70%)`, borderRadius: "50%", pointerEvents: "none" }} />
+
+          <div className="ll-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "24px 28px", position: "relative", zIndex: 1 }}>
+            <WebDashboard
               chartData={state.chartPreviewJson}
               isMock={!state.chartPreviewJson}
               dataColors={state.dataColors}
+              fileName={state.lastConfig?.reportName || state.lastConfig?.file?.name?.replace(/\.[^/.]+$/, "") || "Generated Report"}
               status="ready"
               onDownload={handleDownload}
             />

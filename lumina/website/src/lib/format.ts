@@ -9,7 +9,7 @@ export function formatRelativeTime(isoString: string): string {
 
   const isToday = date.toDateString() === now.toDateString();
   if (isToday) {
-    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    return "Today";
   }
 
   const yesterday = new Date(now);

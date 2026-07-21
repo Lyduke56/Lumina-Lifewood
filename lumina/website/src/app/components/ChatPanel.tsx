@@ -1,3 +1,7 @@
+import { useRef } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+gsap.registerPlugin(useGSAP);
 import {
   FileSpreadsheet, Sparkles, Paperclip,
   Send, MessageSquare, ArrowRight,
@@ -25,9 +29,20 @@ export function ChatPanel({
 
   // Composer is only shown once there's an active configured conversation
   const showComposer = !!user && !!activeConversation;
+  
+  const containerRef = useRef<HTMLElement>(null);
+  useGSAP(() => {
+    gsap.from(".ll-chat-header, .ll-empty-state", {
+      y: 15,
+      opacity: 0,
+      duration: 0.6,
+      stagger: 0.1,
+      ease: "power3.out"
+    });
+  }, { scope: containerRef, dependencies: [activeConversation?.id, user?.id] });
 
   return (
-    <main className="ll-chat">
+    <main className="ll-chat" ref={containerRef}>
 
       {/* Header */}
       <div className="ll-chat-header">

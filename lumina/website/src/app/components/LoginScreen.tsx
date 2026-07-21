@@ -28,14 +28,8 @@ function getInitials(fullName: string): string {
 
 // Field styles 
 
-const inputBase: React.CSSProperties = {
-  width: "100%", padding: "13px 14px",
-  border: "1.5px solid #e5e7eb", borderRadius: 10,
-  fontSize: 15, color: "#133020",
-  background: "#f9f7f7", outline: "none",
-  fontFamily: "'JetBrains Mono', monospace",
-  transition: "border-color .15s, background .15s",
-};
+// Field styles 
+
 
 // Labels/headings
 const labelStyle: React.CSSProperties = {
@@ -79,9 +73,8 @@ function PasswordInput({
         value={value} required={required} minLength={minLength}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        style={{ ...inputBase, paddingRight: 44 }}
-        onFocus={(e) => { e.currentTarget.style.borderColor = "#046241"; e.currentTarget.style.background = "#fff"; }}
-        onBlur={(e)  => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f9f7f7"; }}
+        className="ll-input"
+        style={{ paddingRight: 44 }}
       />
       <button
         type="button" tabIndex={-1} onClick={() => setShow((v) => !v)}
@@ -355,6 +348,20 @@ export default function LoginScreen() {
           0%, 100% { background-position: 0% 0%; }
           50%      { background-position: 100% 100%; }
         }
+        .ll-input {
+          width: 100%; padding: 13px 14px;
+          border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px;
+          font-size: 15px; color: #F5EEDB;
+          background: rgba(255, 255, 255, 0.06); outline: none;
+          font-family: 'JetBrains Mono', monospace;
+          transition: border-color .2s, background .2s, box-shadow .2s;
+        }
+        .ll-input::placeholder { color: rgba(245, 238, 219, 0.4); }
+        .ll-input:focus {
+          border-color: #FFB347;
+          background: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 0 0 3px rgba(255, 179, 71, 0.15);
+        }
       `}</style>
 
       {/* Left — visual*/}
@@ -369,7 +376,7 @@ export default function LoginScreen() {
       }}>
         <AuthVisual light />
 
-        <div style={{ position: "relative", zIndex: 2, textAlign: "center" }}>
+        <div style={{ position: "relative", zIndex: 2, textAlign: "center", animation: "llFloatSlow 6s ease-in-out infinite" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 25 }}>
             <img src="/lumina-symbol-final.svg" alt="" style={{ height: 140, width: "auto" }} />
             <img src="/lumina-text.svg" alt="Lumina" style={{ height: 150, width: "auto" }} />
@@ -398,12 +405,19 @@ export default function LoginScreen() {
 
       {/* Right — form / intro */}
       <div style={{
-        gridColumn: 2, gridRow: 1,
-        background: "#133020", display: "flex", flexDirection: "column",
+        gridColumn: 2, gridRow: "1 / span 2",
+        background: "radial-gradient(circle at top right, #1B3F2B 0%, #133020 60%)", display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center", padding: 40,
         minWidth: 0, overflowY: "auto",
       }}>
-        <div style={{ width: "100%", maxWidth: 360 }}>
+        <div style={{ 
+          width: "100%", maxWidth: 420, 
+          background: "rgba(255, 255, 255, 0.03)", 
+          backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.2)",
+          borderRadius: 24, padding: "40px 32px"
+        }}>
           <div key={`${mode}-${step}`} style={{ animation: "llFadeSlideIn 0.35s ease-out" }}>
           {/* ── Intro: two entry buttons ─────────────────────────────── */}
           {mode === "intro" && (
@@ -505,9 +519,7 @@ export default function LoginScreen() {
                     <input
                       id="login-email" type="email" value={email} autoFocus required
                       onChange={(e) => setEmail(e.target.value)}
-                      style={inputBase}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = "#046241"; e.currentTarget.style.background = "#fff"; }}
-                      onBlur={(e)  => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f9f7f7"; }}
+                      className="ll-input"
                     />
                   </Field>
                   <Field id="login-password" label="Password" required>
@@ -534,9 +546,7 @@ export default function LoginScreen() {
                     <input
                       id="su-email" type="email" value={email} autoFocus required
                       onChange={(e) => setEmail(e.target.value)}
-                      style={inputBase}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = "#046241"; e.currentTarget.style.background = "#fff"; }}
-                      onBlur={(e)  => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f9f7f7"; }}
+                      className="ll-input"
                     />
                   </Field>
                   <Field id="su-password" label="Password" required hint="Minimum 8 characters.">
@@ -578,9 +588,7 @@ export default function LoginScreen() {
                       id="su-fullname" type="text" value={fullName} autoFocus required
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Juan dela Cruz"
-                      style={inputBase}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = "#046241"; e.currentTarget.style.background = "#fff"; }}
-                      onBlur={(e)  => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f9f7f7"; }}
+                      className="ll-input"
                     />
                   </Field>
 
@@ -591,15 +599,14 @@ export default function LoginScreen() {
                         id="su-username" type="text" value={username} required
                         onChange={(e) => handleUsernameChange(e.target.value)}
                         placeholder="juandelacruz"
+                        className="ll-input"
                         style={{
-                          ...inputBase, paddingLeft: 28,
+                          paddingLeft: 28,
                           borderColor:
-                            usernameStatus === "taken" ? "#ef4444"
-                            : usernameStatus === "available" ? "#046241"
-                            : "#e5e7eb",
+                            usernameStatus === "taken" ? "#ff8a8a"
+                            : usernameStatus === "available" ? "#5FD3A0"
+                            : "rgba(255,255,255,0.15)",
                         }}
-                        onFocus={(e) => { e.currentTarget.style.background = "#fff"; }}
-                        onBlur={(e)  => { e.currentTarget.style.background = "#f9f7f7"; }}
                       />
                     </div>
                     {/* Keep only this custom hint to preserve the dynamic coloring */}
@@ -613,9 +620,7 @@ export default function LoginScreen() {
                       id="su-contact" type="tel" value={contactNumber} required
                       onChange={(e) => setContactNumber(e.target.value)}
                       placeholder="+63 912 345 6789"
-                      style={inputBase}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = "#046241"; e.currentTarget.style.background = "#fff"; }}
-                      onBlur={(e)  => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f9f7f7"; }}
+                      className="ll-input"
                     />
                   </Field>
 
@@ -624,9 +629,7 @@ export default function LoginScreen() {
                       id="su-org" type="text" value={organization}
                       onChange={(e) => setOrganization(e.target.value)}
                       placeholder="Lifewood Data Technology"
-                      style={inputBase}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = "#046241"; e.currentTarget.style.background = "#fff"; }}
-                      onBlur={(e)  => { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "#f9f7f7"; }}
+                      className="ll-input"
                     />
                   </Field>
 
@@ -656,10 +659,11 @@ export default function LoginScreen() {
         gridColumn: 2, gridRow: 2,
         height: 80, display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center", gap: 6,
-        borderTop: "1px solid rgba(245,238,219,0.1)", background: "#133020",
+        background: "transparent",
         fontSize: 11.5, color: "#C9C2AC", fontFamily: "'JetBrains Mono', monospace",
+        zIndex: 10, pointerEvents: "none"
       }}>
-         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 , fontSize: 25}}>
+         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20 , fontSize: 25, pointerEvents: "auto" }}>
             <img src="/lifewood-full-cream.svg" alt="Lifewood" style={{ height: 20, width: "auto" }} />
             |
             <img src="/lumina-full-cream.svg" alt="Lumina" style={{ height: 35, width: "auto", transform: "translateY(1px)" }} />

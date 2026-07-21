@@ -54,6 +54,11 @@ def run_pipeline(
 
     layout_json, chart_preview_json = build_dashboard_preview(records, visuals)
 
+    if data_colors:
+        chart_preview_json["data_colors"] = data_colors
+    chart_preview_json["heading_font"] = heading_font
+    chart_preview_json["body_font"] = body_font
+
     output_dir = generate_pbip(
         records,
         dataset_id=dataset["id"],
