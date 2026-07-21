@@ -1,10 +1,19 @@
 "use client";
 
 import { X, Download, RefreshCw, AlertTriangle } from "lucide-react";
-import { LivePreview } from "./LivePreview";
+import { WebDashboard } from "./WebDashboard";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/format";
 import type { GeneratedFile } from "@/lib/types";
+
+function hexToRgba(hex: string, alpha: number) {
+  if (!hex || !hex.startsWith("#")) return `rgba(0,0,0,${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (isNaN(r)) return `rgba(0,0,0,${alpha})`;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 const MAX_REGEN = 3;
 
@@ -45,25 +54,25 @@ export function FileDetailModal({
     }
   }
 
+  const dataColors = file.chart_preview_json?.data_colors || [];
+
   return (
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 60,
-        background: "rgba(19,48,32,0.5)",
-        backdropFilter: "blur(6px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "20px 16px",
-      }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{
-        background: "var(--white)",
-        borderRadius: 18,
-        width: "min(860px, 96vw)",
-        maxHeight: "92vh",
+        backgroundColor: "#F9F7F7",
+        backgroundImage: `radial-gradient(circle at 10% 20%, ${hexToRgba(dataColors[0] || "#E7F0EA", 0.05)} 0%, transparent 40%, ${hexToRgba(dataColors[1] || "#FFEFD6", 0.08)} 100%)`,
         display: "flex", flexDirection: "column",
-        boxShadow: "0 16px 56px rgba(19,48,32,0.24)",
-        overflow: "hidden",
+      }}
+    >
+      {/* Abstract floating shapes for spatial depth */}
+      <div style={{ position: "absolute", top: "10%", right: "5%", width: "40vw", height: "40vw", background: `radial-gradient(circle, ${hexToRgba(dataColors[1] || "#FFB347", 0.08)} 0%, transparent 70%)`, borderRadius: "50%", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "10%", left: "10%", width: "50vw", height: "50vw", background: `radial-gradient(circle, ${hexToRgba(dataColors[0] || "#046241", 0.05)} 0%, transparent 70%)`, borderRadius: "50%", pointerEvents: "none" }} />
+
+      <div style={{
+        position: "relative", zIndex: 1,
+        flex: 1, display: "flex", flexDirection: "column",
+        width: "100%", height: "100%",
       }}>
 
         {/* Header */}
@@ -101,12 +110,13 @@ export function FileDetailModal({
 
         {/* Preview body */}
         <div className="ll-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-          <LivePreview
+          <WebDashboard 
             chartData={file.chart_preview_json}
             fileName={displayName}
             status={file.status}
             onDownload={handleDownload}
             isMock={!file.chart_preview_json}
+            dataColors={dataColors.length > 0 ? dataColors : undefined}
           />
         </div>
 
@@ -116,7 +126,8 @@ export function FileDetailModal({
           padding: "14px 24px",
           borderTop: "1px solid var(--line)",
           flexShrink: 0,
-          background: "var(--white)",
+          background: "rgba(255,255,255,0.4)",
+          backdropFilter: "blur(12px)",
         }}>
           {/* Regen info */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

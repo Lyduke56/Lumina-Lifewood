@@ -20,6 +20,9 @@ export type GeneratedFile = {
 };
 
 export type ChartPreviewJson = {
+  data_colors?: string[];
+  heading_font?: string;
+  body_font?: string;
   visuals: Array<{
     type: "card" | "line" | "bar" | "table";
     fields: string[];

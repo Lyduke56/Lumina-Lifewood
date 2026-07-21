@@ -8,6 +8,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+gsap.registerPlugin(useGSAP);
 import type { ReportConfig, ColorPresetId, FontPresetId, ReportTypeId } from "@/lib/types";
 
 // ── Presets ──────────────────────────────────────────────────────────────────
@@ -98,8 +101,20 @@ type TabId = "basics" | "design";
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function SetupCard({ onComplete, onCancel, inline = false, compact = false, regenCount = 0, maxRegen = 3 }: SetupCardProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Tabs
   const [activeTab, setActiveTab] = useState<TabId>("basics");
+
+  useGSAP(() => {
+    gsap.from(".ll-tab-content > *", {
+      y: 10,
+      opacity: 0,
+      duration: 0.4,
+      stagger: 0.05,
+      ease: "power3.out"
+    });
+  }, { scope: containerRef, dependencies: [activeTab] });
 
   // Basic
   const [reportName, setReportName] = useState("");
@@ -273,14 +288,14 @@ export function SetupCard({ onComplete, onCancel, inline = false, compact = fals
         </div>
 
         {/* ── Scrollable body ─────────────────────────────────────────── */}
-        <div className="ll-scrollbar" style={{
+        <div className="ll-scrollbar" ref={containerRef} style={{
           flex: 1, overflowY: "auto",
           padding: compact ? "16px 20px" : "22px 26px",
-          display: "flex", flexDirection: "column", gap: compact ? 18 : 26,
+          display: "flex", flexDirection: "column",
         }}>
 
           {activeTab === "basics" && (
-          <>
+          <div className="ll-tab-content" style={{ display: "flex", flexDirection: "column", gap: compact ? 18 : 26 }}>
           {/* 1. Report name */}
           <section>
             <SectionLabel>Report name</SectionLabel>
@@ -399,11 +414,11 @@ export function SetupCard({ onComplete, onCancel, inline = false, compact = fals
               This becomes the agent's first instruction and seeds the conversation.
             </div>
           </section>
-          </>
+          </div>
           )}
 
           {activeTab === "design" && (
-          <>
+          <div className="ll-tab-content" style={{ display: "flex", flexDirection: "column", gap: compact ? 18 : 26 }}>
           {/* 1. Color theme */}
           <section>
             <SectionLabel>Color theme</SectionLabel>
@@ -666,7 +681,7 @@ export function SetupCard({ onComplete, onCancel, inline = false, compact = fals
               Below the neutral threshold is flagged as needing attention. Applies to the completion rate KPI.
             </div>
           </section>
-          </>
+          </div>
           )}
 
         </div>

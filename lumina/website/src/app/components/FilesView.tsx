@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { FolderOpen, CircleDot, Download, Clock, Eye } from "lucide-react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+gsap.registerPlugin(useGSAP);
 import { User } from "@supabase/supabase-js";
 import type { GeneratedFile } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
-import { FileDetailModal } from "./FileDetailModal";
 import { createClient } from "@/lib/supabase/client";
 
 interface FilesViewProps {
@@ -13,14 +15,30 @@ interface FilesViewProps {
   files: GeneratedFile[];
   regenCounts: Record<string, number>;
   onRegenerate: (file: GeneratedFile) => void;
+  onSelectFile: (id: string) => void;
 }
 
-export function FilesView({ user, files, regenCounts, onRegenerate }: FilesViewProps) {
-  const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
+export function FilesView({ user, files, regenCounts, onRegenerate, onSelectFile }: FilesViewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (files.length > 0) {
+      gsap.fromTo(".ll-file-card", 
+        { y: 20, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.5,
+          stagger: 0.05,
+          ease: "power3.out"
+        }
+      );
+    }
+  }, { scope: containerRef, dependencies: [files.length] });
 
   if (!user) {
     return (
-      <div className="ll-files-view">
+      <div className="ll-files-view" ref={containerRef}>
         <div className="ll-files-header">
           <FolderOpen size={20} color="var(--emerald)" />
           <span style={{ fontSize: 18, fontWeight: 700 }}>Files</span>
@@ -35,7 +53,7 @@ export function FilesView({ user, files, regenCounts, onRegenerate }: FilesViewP
   }
 
   return (
-    <div className="ll-files-view">
+    <div className="ll-files-view" ref={containerRef}>
       {/* Header */}
       <div className="ll-files-header">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -66,10 +84,10 @@ export function FilesView({ user, files, regenCounts, onRegenerate }: FilesViewP
                 <div
                   key={f.id}
                   className="ll-file-card"
-                  onClick={() => setSelectedFile(f)}
+                  onClick={() => onSelectFile(f.id)}
                   tabIndex={0}
                   role="button"
-                  onKeyDown={(e) => { if (e.key === "Enter") setSelectedFile(f); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") onSelectFile(f.id); }}
                 >
                   {/* Card top bar with source badge */}
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
@@ -102,6 +120,11 @@ export function FilesView({ user, files, regenCounts, onRegenerate }: FilesViewP
                     {displayName}
                   </div>
 
+                  {/* Reference File Name */}
+                  <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.45)", marginBottom: 8 }}>
+                    Reference: {f.storage_path.split("/").pop()}
+                  </div>
+
                   {/* Date */}
                   <div style={{ fontSize: 11.5, color: "rgba(19,48,32,0.5)", display: "flex", alignItems: "center", gap: 4, marginBottom: 14 }}>
                     <Clock size={11} />
@@ -112,7 +135,7 @@ export function FilesView({ user, files, regenCounts, onRegenerate }: FilesViewP
                   <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
                     <button
                       className="ll-file-action-btn"
-                      onClick={(e) => { e.stopPropagation(); setSelectedFile(f); }}
+                      onClick={(e) => { e.stopPropagation(); onSelectFile(f.id); }}
                     >
                       <Eye size={13} /> Preview
                     </button>
@@ -126,19 +149,6 @@ export function FilesView({ user, files, regenCounts, onRegenerate }: FilesViewP
           </div>
         )}
       </div>
-
-      {/* Detail modal */}
-      {selectedFile && (
-        <FileDetailModal
-          file={selectedFile}
-          regenCount={regenCounts[selectedFile.id] ?? 0}
-          onClose={() => setSelectedFile(null)}
-          onRegenerate={(f) => {
-            onRegenerate(f);
-            setSelectedFile(null);
-          }}
-        />
-      )}
     </div>
   );
 }
