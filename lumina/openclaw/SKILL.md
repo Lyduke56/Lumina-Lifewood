@@ -25,19 +25,20 @@ Use this skill when a WhatsApp user sends a production plan Excel file (`.xlsx`)
 
 2. **Resolve the file path**
    - Inbound WhatsApp files land under `~/.openclaw/media/inbound/`.
-   - Use the full absolute path shown in logs, e.g. `/home/user/.openclaw/media/inbound/abc123/production_plan.xlsx`.
-   - Verify the file exists before calling the backend.
+   - Use the full absolute path exactly as shown in the attachment logs.
+   - **Do NOT attempt to read, verify, or list the file yourself using file system tools.**
 
 3. **Get or create a conversation**
    ```
-   get_or_create_conversation(phone_number="<sender phone>")
+   lumina-backend__get_or_create_conversation(phone_number="<sender phone>")
    ```
    - Save the returned `conversation_id`.
    - If this fails with "No Lumina account is linked", tell the user to sign up on the Lumina web app using the **same contact number** they message from on WhatsApp.
 
-4. **Process the file**
+4. **Process the file IMMEDIATELY**
+   - Do not ask the user for confirmation. Execute this tool immediately.
    ```
-   process_production_plan(
+   lumina-backend__process_production_plan(
      file_path="<absolute path to .xlsx>",
      conversation_id="<from step 3>",
      report_type="Progress Overview",
@@ -49,7 +50,7 @@ Use this skill when a WhatsApp user sends a production plan Excel file (`.xlsx`)
 5. **Reply on WhatsApp** with a concise summary:
    - Record count (`record_count`)
    - Confirmation the dashboard was generated
-   - Mention they can view/download it on the Lumina web dashboard
+   - **CRITICAL:** Do NOT show the raw `/media/...` storage path in your reply. Instead, just tell them to log into the Lumina Web App to view and download their dashboard.
    - On failure: explain clearly what went wrong (wrong file format, unregistered phone, backend error)
 
 ## Example user-facing success message
