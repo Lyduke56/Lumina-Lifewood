@@ -85,6 +85,40 @@ def get_conversation_owner(conversation_id: str) -> str:
     return result.data[0]["user_id"]
 
 
+def get_user_profile(user_id: str) -> dict:
+    """Return display-friendly profile info (full_name, email) for a user.
+
+    Falls back gracefully if fields are missing.
+    """
+    client = get_client()
+    # Get full_name from profiles table
+    profile_result = (
+        client.table("profiles")
+        .select("full_name, username")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    full_name = None
+    username = None
+    if profile_result.data:
+        full_name = profile_result.data[0].get("full_name")
+        username = profile_result.data[0].get("username")
+
+    # Get email from auth.users via admin API
+    try:
+        auth_result = client.auth.admin.get_user_by_id(user_id)
+        email = auth_result.user.email if auth_result and auth_result.user else None
+    except Exception:
+        email = None
+
+    display_name = full_name or username or email or "your account"
+    return {
+        "display_name": display_name,
+        "email": email,
+    }
+
+
 def get_user_id_by_phone(phone_number: str) -> str:
     """Resolve a WhatsApp phone number to a Supabase user via profiles.contact_number."""
     from phone_utils import phones_match
