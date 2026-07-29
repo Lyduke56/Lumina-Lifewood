@@ -27,6 +27,9 @@ Activate this skill when a WhatsApp user sends a production plan `.xlsx` file.
 - **Do NOT** show raw storage paths (e.g. `/media/uuid/...`) in any user-facing reply.
 - **Do NOT** ask the user for confirmation before processing. Act immediately.
 - **Do NOT** output internal health check results, ping responses, memory index messages, or any backend status information into the WhatsApp chat. These are developer-only diagnostics and must never appear in user-facing messages.
+- **Reply templates are VERBATIM** — use the exact wording from the Step 7 reply templates. Do not paraphrase, summarize, or reword them under any circumstances.
+- **Completed means DONE** — once `process_production_plan` returns a result (success or failure), your reply MUST use completed-status language. Never use hedging phrases like "shortly," "being prepared," or "will be ready soon" when the backend has already returned a result.
+- **All success template fields are REQUIRED** — do not silently drop `record_count`, `user_profile.display_name`, or the web app link from the success reply. The only sanctioned omission is `user_profile.email` when it is null (see Step 7 fallback rule).
 
 ---
 
@@ -76,6 +79,23 @@ lumina-backend__process_production_plan(
 )
 ```
 
+### Handling Other Message Types
+
+**Non-.xlsx file (photo, PDF, CSV):**
+> Lumina only accepts Excel files in `.xlsx` format. Please export your production plan as an `.xlsx` file and resend it.
+
+**Second `.xlsx` received while the first is still processing:**
+> Still processing your previous file — please wait until I confirm it's done before sending another.
+
+**Text message only — first-time user** (no prior context or MEMORY.md entry for this number):
+> Welcome to Lumina — Lifewood's production dashboard assistant. Send me your production plan `.xlsx` file and I'll generate your Power BI dashboard. You can view all your dashboards at https://lumina-lifewood.vercel.app.
+
+**Text message only — returning user** (prior context or MEMORY.md entry exists):
+> Welcome back. Send your production plan `.xlsx` file whenever you're ready and I'll generate your dashboard.
+
+**Off-topic question:**
+> Lumina is focused on production plan processing. For anything else, I'm not the right tool — but send your `.xlsx` file and I'll get your dashboard ready.
+
 ### Step 7 — Reply with the Result
 
 **On success:**
@@ -99,6 +119,9 @@ If `user_profile.email` is null, omit the email and just say:
 
 **On failure — multi-sheet file:**
 > Your file contains multiple data sheets. Lumina requires a single consolidated sheet. Please remove the extra sheets and resend the file.
+
+**On failure — unreadable, corrupted, or password-protected file:**
+> Your file couldn't be opened. This can happen if the file is corrupted, password-protected, or saved in an unsupported format. Please check the file, remove any password protection, and resend it as a standard `.xlsx`.
 
 ---
 
