@@ -16,21 +16,18 @@ the work happening instead of a spinner.
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Iterator
 from typing import Any
 
 import agent_tools
-from llm_client import client
+from llm_client import DEFAULT_MODEL, SUPPORTS_MODEL_FALLBACK, client
 
-# Free models are rate limited and individually unreliable — a 429 from one provider
-# should not end a customer's conversation. OpenRouter is asked to try these in order,
-# the same arrangement llm_client already uses for its one-shot calls.
-AGENT_MODEL = os.getenv("LUMINA_AGENT_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
+AGENT_MODEL = DEFAULT_MODEL
 
-# OpenRouter accepts at most three. The last is its own free router, which picks any
-# free model that supports what the request needs — a backstop when the two named ones
-# are both rate limited.
+# Free models are rate limited, and one provider being busy should not end a customer's
+# conversation. OpenRouter can be asked to try several in turn; it accepts at most three,
+# and its own free router is a useful last resort because it picks any free model that
+# supports what the request needs. Other providers serve one model per request.
 AGENT_FALLBACKS = [AGENT_MODEL, "openai/gpt-oss-20b:free", "openrouter/free"]
 
 # Decision 7 warns that agents wander. This is the hard stop.
@@ -98,7 +95,13 @@ def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
             tools=agent_tools.schemas(),
             temperature=0,
             max_tokens=MAX_REPLY_TOKENS,
-            extra_body={"models": AGENT_FALLBACKS, "route": "fallback"},
+            # Only OpenRouter understands a list of models to try; the others reject
+            # the extra field outright.
+            **(
+                {"extra_body": {"models": AGENT_FALLBACKS, "route": "fallback"}}
+                if SUPPORTS_MODEL_FALLBACK
+                else {}
+            ),
         )
         choice = completion.choices[0].message
         history.append(choice.model_dump(exclude_none=True))

@@ -1761,6 +1761,34 @@ through tools — extended to cover talking.
 **Still to be confirmed:** the daily allowance was exhausted during testing, so the improvements
 above are reasoned but not yet proven end to end. They need one more run once the allowance resets.
 
+### The better answer: change where the AI comes from
+
+Having established that the obstacle was a daily allowance rather than model quality, John Peter
+asked the obvious next question — could we simply use a different supplier? **Yes, and it is the
+better answer.**
+
+Free allowances differ enormously:
+
+| Supplier | Free requests per day | Conversations per day |
+|----------|----------------------|----------------------|
+| Google (Gemini) | ~1,500 | ~100 |
+| Groq | ~1,000 | ~66 |
+| OpenRouter free tier | **50** | **~3** |
+
+Twenty to thirty times more, still free, still no card required.
+
+Because these suppliers all speak the same protocol, **moving between them is a web address and a
+key, not a rewrite.** The supplier is now a setting: Google, Groq, Cerebras and OpenRouter are
+built in, and anything else compatible can be pointed at directly. It still defaults to OpenRouter,
+so nothing changes for anyone who has not chosen.
+
+**What this means for cost:** the earlier conclusion — that Lifewood must pay per report — was
+wrong twice over. The obstacle was an allowance, and the allowance can be raised to a hundred
+conversations a day by changing supplier, for nothing.
+
+**Still needed from Lifewood:** a free API key from Google or Groq. Both are free to obtain and
+neither asks for a card.
+
 ---
 
 ## 27. Still to be decided
@@ -1811,3 +1839,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added **Decision 9** (Section 25): the six tools will be exposed alongside the existing one, which is left untouched — **nobody's experience changes on the day this ships**, and the proven path keeps serving both the website and WhatsApp. Clarified that both surfaces currently use the old software; the new tools are used by nothing. Decided that the server holds the figures between steps rather than the AI carrying them, because a daily summary of the official workbook would flood the AI on every step and it needs to make decisions about the figures, not read them. The website gets the conversation first, since Decisions 1 and 2 put the conversation and the preview together; WhatsApp keeps the conveyor belt as a transitional state. |
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
+| 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
