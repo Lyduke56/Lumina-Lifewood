@@ -1673,7 +1673,70 @@ show one usefully.
 
 ---
 
-## 26. Still to be decided
+## 26. The conversation works — and the model is now the constraint
+
+**Date:** 29 July 2026 · **Status:** Built and tested; one decision needed from Lifewood
+
+The agent described in Decision 1 exists and works. A customer can now hold a conversation and get
+a Power BI file out of it.
+
+### A real conversation, on the real workbook
+
+> **Customer:** I have a production plan I need turned into a dashboard. It is at …
+>
+> **Lumina:** I see several sheets in your workbook: Production Plan, DATASETS, Categories,
+> Named_Ranges, Lookup_Values, and Thailand. Which one contains the production plan?
+>
+> **Customer:** The Production Plan sheet. Summarise by month, and give me a completion rate
+> headline plus a target versus actual chart.
+>
+> *(examines the sheet, works out what the columns mean, summarises, adds the figures)*
+>
+> **Customer:** Build the file.
+>
+> **Lumina:** Your Power BI dashboard is ready.
+
+The file it produced is real: six monthly rows, a headline completion rate, and a target-versus-
+actual chart, built from the untouched workbook the old software rejected outright.
+
+### The guardrails earned their place
+
+Something worth recording happened during that conversation. The AI tried to record the column
+meanings **three times**. The first two attempts were refused — it had left columns unassigned —
+and it read the refusal, corrected itself, and tried again.
+
+Nobody had to catch that. **The tools refused work that would have produced a wrong dashboard, and
+explained clearly enough that the AI could fix its own mistake.** That is precisely what Decisions 6
+and 7 were for, and it is the first time we have seen it work unprompted.
+
+### The problem: the AI model is not good enough
+
+Two obstacles, both about the model rather than our software.
+
+**The account has no credits.** The first attempt with a capable model was refused outright:
+*"You requested up to 64,000 tokens, but can only afford 2,666."* Part of that was our fault — we
+were reserving far more room than a short reply needs, now corrected — but the balance is close to
+empty regardless.
+
+**The free model is not presentable.** A free model does work, and does call the tools correctly.
+But it spills its own thinking into what the customer sees:
+
+> *"We need to interpret columns. Let's list columns with positions: 1: (unnamed) number - likely
+> row index or something, not needed. Probably ignore…"*
+
+That is the AI reasoning out loud, shown to a production manager. The software is behaving
+correctly and the result is still unusable.
+
+**Why this matters to the business:** the machinery is finished and works. Whether customers get
+something professional now rests on which AI model we pay for — a running cost, not a development
+task. A capable model is a few US cents per report; a free one produces the text above.
+
+**This is a decision for Lifewood, not one we should quietly make.** The model is a single setting
+and can be changed in seconds once decided.
+
+---
+
+## 27. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -1693,7 +1756,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 27. Change history
+## 28. Change history
 
 | Date | Change |
 |------|--------|
@@ -1719,3 +1782,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 23: **built the third of the six tools** — summarising, which is Decision 5 in practice. Tested against the official workbook, it reproduces the project's real monthly history to the figure, correctly leaving out the grand total, the padding rows and the date-only rows. It declines to produce breakdowns no chart could show, offering a top ten instead. **It also corrected an earlier finding of ours:** the workbook's running totals were recorded as "7,137 short", but measured precisely the target running total is *incomplete* (filled in on 154 of 180 rows) rather than wrong, and the actual running total agrees with our arithmetic everywhere. Decision 4 stands, better supported — the software now reports agreement and completeness separately. |
 | 29 July 2026 | Added Section 24: **the last three tools, and the rebuild running end to end.** The Power BI model is now generated from whatever a workbook actually contains, rather than a fixed table of six known columns — which was the last place Decision 3's limitation survived. From the official workbook it produces a model describing *images*, taken from the customer's own spreadsheet. The full six-tool sequence now runs against the original untouched file that the previous software rejected outright, ending in a 48 KB Power BI file. The completion rate is recalculated rather than averaged and running totals take the largest value rather than being added up, so neither of the arithmetic traps found earlier can recur. |
 | 29 July 2026 | Added **Decision 9** (Section 25): the six tools will be exposed alongside the existing one, which is left untouched — **nobody's experience changes on the day this ships**, and the proven path keeps serving both the website and WhatsApp. Clarified that both surfaces currently use the old software; the new tools are used by nothing. Decided that the server holds the figures between steps rather than the AI carrying them, because a daily summary of the official workbook would flood the AI on every step and it needs to make decisions about the figures, not read them. The website gets the conversation first, since Decisions 1 and 2 put the conversation and the preview together; WhatsApp keeps the conveyor belt as a transitional state. |
+| 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
