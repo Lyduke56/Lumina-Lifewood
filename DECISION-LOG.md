@@ -1421,7 +1421,71 @@ in testing and failed on real files.
 
 ---
 
-## 22. Still to be decided
+## 22. The second tool — agreeing what the columns mean
+
+**Date:** 29 July 2026 · **Status:** Built and tested
+
+The second of the six tools is built. It is where Decision 3 becomes real: the software no longer
+hunts for particular figures it expects to find, but records **what job each column in this
+particular workbook is doing** — the timeline, something to group by, a planned figure, an achieved
+figure, something calculated, or something to ignore.
+
+**What is being counted becomes information rather than something built into the code.** "Images"
+is simply a label carried through to the chart headings. When the next project counts videos, or a
+different customer counts revenue, nothing in the software changes. This is the single thing that
+makes the product sellable beyond one customer.
+
+### It is a gate, not a form
+
+The AI proposes the assignment; this tool refuses anything that would produce a wrong or misleading
+report. Both conditions attached to Decision 3 are enforced mechanically rather than left to
+discipline:
+
+- **Nothing may be silently discarded.** Leave a column out and it refuses, naming the column.
+  Anything genuinely not needed must be marked "ignore" — and what was ignored is then listed back
+  to the customer.
+- **Every achieved figure must name the planned figure it belongs to.** Getting this wrong is what
+  produced a nonsensical "265% complete" during earlier testing.
+
+Eight kinds of mistake are refused, each with a message written for the AI to act on rather than
+for a developer to read in a log:
+
+| Mistake | Why it is refused |
+|---------|-------------------|
+| A column left unassigned | Data would vanish without the customer knowing |
+| An achieved figure not saying what it belongs to | Progress cannot be worked out |
+| Pairing to something that is not a planned figure | Meaningless comparison |
+| Planned counts images, achieved counts videos | Meaningless comparison |
+| Grouping by a column different on every row | A chart with one bar per row |
+| A figure that holds text, not numbers | Nothing can be added up |
+| No timeline, or more than one | A production plan is a record over time |
+| No planned figure with anything achieved against it | Nothing to report progress on |
+
+### It explains itself in plain language
+
+The tool also produces a summary for the customer to confirm or correct, as Decisions 1 and 3
+require — for the official workbook:
+
+> Timeline: column 2
+> Planned: Target no. of Images (Images) — achieved: Actual Number of Images
+> Can break down by: Month
+> Worked out from the above, so recalculated rather than read: Completion Rate, Balance,
+> Target (Accumulative), Actual (Accumulative), Remarks
+> Ignored: column 1
+>
+> Worth knowing: 'Target no. of Images' contains '-' among its numbers; these will be read as
+> missing rather than zero.
+
+Note what that last line does. The `-` placeholders were **found by the software and reported to
+the customer**, rather than silently turning into zeros and quietly depressing every total.
+
+Note also that the five calculated columns are recognised as calculated and will be **recalculated
+rather than read**, per Decision 4 — which matters, because the workbook's own running totals are
+a month out of date.
+
+---
+
+## 23. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -1441,7 +1505,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 23. Change history
+## 24. Change history
 
 | Date | Change |
 |------|--------|
@@ -1463,3 +1527,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 19: **switched to Manrope, the actual Lifewood brand typeface** — the software had been using Fraunces and DM Sans, which appear nowhere in the brand guidelines and were the previous developer's own choice. Recorded that Power BI cannot embed fonts and relies on each viewing machine having them installed. **Caught the Section 18 trap a second time:** the earlier theme fix had moved only the colours into the report definition and left the fonts behind, so the typeface still vanished whenever a customer saved. Fonts are now written into each visual and confirmed to survive saving. The last remaining element — a small caption — was settled by setting the font by hand in Power BI Desktop and reading back the property name Power BI wrote, rather than by guessing; every element of the report now survives a customer saving the file. Also confirmed that Power BI accepts a font fallback chain, closing that open question. |
 | 29 July 2026 | Added **Decision 8** (Section 20): the rebuild starts with **six tools rather than seventeen** — examine a sheet, record column meanings, summarise, add a chart, add a headline figure, produce the file. Enough for one complete journey from spreadsheet to finished report. The reasoning is economy rather than caution: Decision 7 already expects the tool set to be redesigned once we can watch the agent use it, and redesigning six is cheap where redesigning seventeen is a wasted week. Also recorded that **Manrope has been deployed** to the machines that open reports, closing the last open item on the current software, which is now finished. |
 | 29 July 2026 | Added Section 21: **built the first of the six tools** — the one that examines a sheet and describes what is in it. Tested against the official workbook, where it found the grand-total row, the `-` placeholders, 21 empty padding rows, 4 further date-only rows and 7 empty columns without being told to look for any of them. **Testing also caught a serious mistake:** the first version examined only the opening 2,000 rows, which judged four columns wrongly — Participant ID and Location would have been offered as breakdowns on the strength of 9 to 16 values when they hold hundreds, because real workbooks are sorted and the opening rows understate their variety. It now examines every row, capping the count once a column is clearly too varied to chart. |
+| 29 July 2026 | Added Section 22: **built the second of the six tools** — the one that records what job each column does, which is where Decision 3 becomes real. What is being counted is now information carried through to the labels rather than something built into the code, so a customer counting videos or revenue needs no new development. The tool acts as a gate: it refuses eight kinds of mistake, including the two conditions Decision 3 attached — no column may be left unassigned, and every achieved figure must name the planned figure it belongs to. It also explains its reading back in plain language for the customer to confirm, including warning that the `-` placeholders will be read as missing rather than silently becoming zero. |
