@@ -202,6 +202,31 @@ def _literal(value: str) -> dict:
     return {"expr": {"Literal": {"Value": "'" + value.replace("'", "''") + "'"}}}
 
 
+def _text_style(font: str, color: str | None = None) -> dict:
+    """Font (and optionally colour) properties written into a visual.
+
+    Power BI stops applying a hand-registered theme once Desktop re-saves the project,
+    so anything specified only there reverts to Microsoft's defaults the moment a
+    customer saves — and we require every recipient to press Refresh, so they do.
+    Colours already survive because they are written into the visual; the typeface has
+    to be written here too or it is lost on that same save.
+    """
+    props: dict = {"fontFamily": _literal(_font_stack(font))}
+    if color:
+        props["fontColor"] = {"solid": {"color": _literal(color)}}
+    return props
+
+
+def _styled_axes(visual: dict) -> dict:
+    """Apply the brand typeface to a chart's axes and legend."""
+    objects = visual.setdefault("objects", {})
+    for part in ("categoryAxis", "valueAxis", "legend"):
+        objects.setdefault(part, [{"properties": {}}])[0]["properties"].update(
+            _text_style(BODY_FONT, DARK_SERPENT)
+        )
+    return visual
+
+
 def _titled(visual: dict, title: str) -> dict:
     """Give a visual an explicit title, replacing Power BI's auto-generated one."""
     visual["visualContainerObjects"] = {
@@ -210,6 +235,7 @@ def _titled(visual: dict, title: str) -> dict:
                 "properties": {
                     "show": {"expr": {"Literal": {"Value": "true"}}},
                     "text": _literal(title),
+                    **_text_style(HEADING_FONT, DARK_SERPENT),
                 }
             }
         ]
@@ -332,30 +358,32 @@ def _card_visual_json(
         "drillFilterOtherVisuals": True,
     }
 
+    # The big number carries the heading face; its caption the body face. Both are set
+    # here rather than in the theme so they survive the customer saving the file.
+    value_props = _text_style(HEADING_FONT)
     if conditional_measure:
-        visual["objects"] = {
-            "value": [
-                {
-                    "properties": {
-                        "fontColor": {
-                            "solid": {
-                                "color": {
-                                    "expr": {
-                                        "Measure": {
-                                            "Expression": {
-                                                "SourceRef": {"Entity": ENTITY}
-                                            },
-                                            "Property": conditional_measure,
-                                        }
-                                    }
-                                }
-                            }
+        value_props["fontColor"] = {
+            "solid": {
+                "color": {
+                    "expr": {
+                        "Measure": {
+                            "Expression": {"SourceRef": {"Entity": ENTITY}},
+                            "Property": conditional_measure,
                         }
-                    },
-                    "selector": {"id": "default"},
+                    }
                 }
-            ]
+            }
         }
+    else:
+        value_props["fontColor"] = {"solid": {"color": _literal(CASTLETON_GREEN)}}
+
+    # Only the number is styled here. A "labels" object was tried for the caption
+    # beneath it, but Power BI strips it on save — not a property cardVisual accepts —
+    # so that one caption still falls back to the theme, and to a default font once the
+    # customer saves. The correct object name has not been identified yet.
+    visual["objects"] = {
+        "value": [{"properties": value_props, "selector": {"id": "default"}}],
+    }
 
     return {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
@@ -511,6 +539,7 @@ def apply_visuals(
             content["visual"]["objects"] = {
                 "dataPoint": _series_colors(y_fields, palette)
             }
+            _styled_axes(content["visual"])
 
         visual_dir = visuals_dir / name
         visual_dir.mkdir()
