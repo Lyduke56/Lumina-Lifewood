@@ -1548,7 +1548,71 @@ data"* — rather than quietly using whichever figure it happened to find.
 
 ---
 
-## 24. Still to be decided
+## 24. The last three tools — and the rebuild works end to end
+
+**Date:** 29 July 2026 · **Status:** All six tools built and tested together
+
+The final three tools are built: **add a chart**, **add a headline figure**, and **produce the Power
+BI file**. The six-tool set of Decision 8 is complete.
+
+### The change that matters
+
+The previous software wrote a Power BI model containing a **fixed table of six known columns** —
+target quantity, actual hours, and so on. That is precisely the limitation Decision 3 exists to
+remove, and it survived every improvement made so far because it was buried in the file format
+rather than the logic.
+
+**The model is now generated from whatever the summary actually contains.** A workbook counting
+images produces a model describing images; one counting videos produces a model describing videos.
+Nothing is written into the software.
+
+You can see it in the generated file. From the official workbook it wrote a table called
+`report_data` with columns `target_Images`, `actual_Images`, `completion_rate_Images` and so on —
+where "Images" came from the customer's own spreadsheet, not from us.
+
+### The whole journey, on the untouched workbook
+
+The complete six-tool sequence now runs against the original Lifewood file — the one the previous
+software rejected outright:
+
+1. **Six sheets found**, and the right one chosen.
+2. **Examined**: 185 data rows, seven empty columns ignored, and six hazards reported including the
+   grand-total row and the `-` placeholders.
+3. **Meanings agreed**: planned and achieved figures paired, "Images" recorded as the unit, five
+   columns marked as calculated and therefore to be recalculated.
+4. **Summarised** by month into six rows.
+5. **Report assembled**: two headline figures and three charts.
+6. **Power BI file written**: 48 KB.
+
+### The old traps cannot recur
+
+The generated model puts the arithmetic beyond reach of the mistakes made earlier:
+
+| Figure | How it is totalled | Why |
+|--------|--------------------|-----|
+| Planned, achieved, shortfall | Added up | Straightforward totals |
+| **Completion rate** | Recalculated as achieved ÷ planned | Averaging daily percentages is what once reported 1.29 for a plan that delivered exactly 100% |
+| **Running totals** | Largest value in range | Adding up running totals would count everything repeatedly |
+
+Every column is also marked so that Power BI cannot offer its own automatic totalling alongside
+ours — closing the door on the whole class of problem rather than fixing one instance of it.
+
+### It refuses what would not work
+
+Six kinds of request are declined with an explanation: a figure that does not exist in the summary,
+a chart type we cannot draw, grouping by something the summary is not grouped by, traffic-light
+thresholds on a figure that is not a rate, a "good" threshold set below the "neutral" one, and
+producing a file from an empty report.
+
+### What is left
+
+The rebuild is not finished — it is *connected*. What exists is the machinery; what does not yet
+exist is the conversation described in Decision 1, the website preview described in Decision 2, and
+the wiring that lets a customer reach any of it. Those come next.
+
+---
+
+## 25. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -1568,7 +1632,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 25. Change history
+## 26. Change history
 
 | Date | Change |
 |------|--------|
@@ -1592,3 +1656,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 21: **built the first of the six tools** — the one that examines a sheet and describes what is in it. Tested against the official workbook, where it found the grand-total row, the `-` placeholders, 21 empty padding rows, 4 further date-only rows and 7 empty columns without being told to look for any of them. **Testing also caught a serious mistake:** the first version examined only the opening 2,000 rows, which judged four columns wrongly — Participant ID and Location would have been offered as breakdowns on the strength of 9 to 16 values when they hold hundreds, because real workbooks are sorted and the opening rows understate their variety. It now examines every row, capping the count once a column is clearly too varied to chart. |
 | 29 July 2026 | Added Section 22: **built the second of the six tools** — the one that records what job each column does, which is where Decision 3 becomes real. What is being counted is now information carried through to the labels rather than something built into the code, so a customer counting videos or revenue needs no new development. The tool acts as a gate: it refuses eight kinds of mistake, including the two conditions Decision 3 attached — no column may be left unassigned, and every achieved figure must name the planned figure it belongs to. It also explains its reading back in plain language for the customer to confirm, including warning that the `-` placeholders will be read as missing rather than silently becoming zero. |
 | 29 July 2026 | Added Section 23: **built the third of the six tools** — summarising, which is Decision 5 in practice. Tested against the official workbook, it reproduces the project's real monthly history to the figure, correctly leaving out the grand total, the padding rows and the date-only rows. It declines to produce breakdowns no chart could show, offering a top ten instead. **It also corrected an earlier finding of ours:** the workbook's running totals were recorded as "7,137 short", but measured precisely the target running total is *incomplete* (filled in on 154 of 180 rows) rather than wrong, and the actual running total agrees with our arithmetic everywhere. Decision 4 stands, better supported — the software now reports agreement and completeness separately. |
+| 29 July 2026 | Added Section 24: **the last three tools, and the rebuild running end to end.** The Power BI model is now generated from whatever a workbook actually contains, rather than a fixed table of six known columns — which was the last place Decision 3's limitation survived. From the official workbook it produces a model describing *images*, taken from the customer's own spreadsheet. The full six-tool sequence now runs against the original untouched file that the previous software rejected outright, ending in a 48 KB Power BI file. The completion rate is recalculated rather than averaged and running totals take the largest value rather than being added up, so neither of the arithmetic traps found earlier can recur. |
