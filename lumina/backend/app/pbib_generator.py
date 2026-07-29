@@ -128,6 +128,131 @@ def _agg_ref(field: str) -> dict:
     }
 
 
+COMPLETION_RATE_MEASURE = "Completion Rate"
+COMPLETION_STATUS_MEASURE = "Completion Status"
+
+# Total delivered over total planned — deliberately NOT the average of each day's
+# percentage. Averaging ratios lets one exceptional day cancel several bad ones: on a
+# real 184-day plan that had delivered exactly 100%, the daily average read 129%,
+# because a single 445% day offset four days at zero.
+_COMPLETION_RATE_DAX = (
+    f"DIVIDE(SUM({ENTITY}[actual_quantity]), SUM({ENTITY}[target_quantity]))"
+)
+
+# Every field is exposed as a named measure rather than being aggregated straight off
+# the column. Two reasons. A ratio cannot be summed or averaged across rows and stay
+# meaningful. And Power BI names a column aggregation after the column — "Sum of
+# target_quantity", or just "target_quantity" once the "Sum of" prefix is switched off —
+# ignoring any display name we supply. A measure is shown under its own name, so this is
+# the only reliable way to get "Target" into a legend, and it carries a format string too.
+#
+# field -> (measure name, DAX, format string)
+MEASURE_DEFINITIONS: dict[str, tuple[str, str, str]] = {
+    "target_quantity": ("Target", f"SUM({ENTITY}[target_quantity])", "#,0"),
+    "actual_quantity": ("Actual", f"SUM({ENTITY}[actual_quantity])", "#,0"),
+    "target_hours": ("Target Hours", f"SUM({ENTITY}[target_hours])", "#,0.0"),
+    "actual_hours": ("Actual Hours", f"SUM({ENTITY}[actual_hours])", "#,0.0"),
+    "completion_rate": (COMPLETION_RATE_MEASURE, _COMPLETION_RATE_DAX, "0.0%"),
+}
+
+MEASURE_FOR_FIELD = {f: spec[0] for f, spec in MEASURE_DEFINITIONS.items()}
+
+
+def _value_ref(field: str) -> tuple[dict, str, str]:
+    """Return (field expression, queryRef, display name) for a numeric field."""
+    measure = MEASURE_FOR_FIELD.get(field)
+    if measure:
+        return _measure_ref(measure), f"{ENTITY}.{measure}", measure
+    return (
+        _agg_ref(field),
+        f"{_aggregation_label(field)}({ENTITY}.{field})",
+        f"{_aggregation_label(field)} of {field}",
+    )
+
+
+def _measure_ref(measure: str) -> dict:
+    return {
+        "Measure": {
+            "Expression": {"SourceRef": {"Entity": ENTITY}},
+            "Property": measure,
+        }
+    }
+
+
+# Left to itself Power BI titles a visual from the raw column names it was given, e.g.
+# "Sum of target_quantity and Sum of actual_quantity by date". These are the names a
+# reader should see instead.
+FIELD_LABELS = {
+    "date": "Date",
+    "target_quantity": "Target",
+    "actual_quantity": "Actual",
+    "target_hours": "Target Hours",
+    "actual_hours": "Actual Hours",
+    "completion_rate": "Completion Rate",
+}
+
+
+def _label(field: str) -> str:
+    return FIELD_LABELS.get(field, field.replace("_", " ").title())
+
+
+def _literal(value: str) -> dict:
+    """Wrap a string as a PBIR literal expression. Power BI expects the value itself to
+    be single-quoted inside the JSON string, so any apostrophe has to be doubled."""
+    return {"expr": {"Literal": {"Value": "'" + value.replace("'", "''") + "'"}}}
+
+
+def _titled(visual: dict, title: str) -> dict:
+    """Give a visual an explicit title, replacing Power BI's auto-generated one."""
+    visual["visualContainerObjects"] = {
+        "title": [
+            {
+                "properties": {
+                    "show": {"expr": {"Literal": {"Value": "true"}}},
+                    "text": _literal(title),
+                }
+            }
+        ]
+    }
+    return visual
+
+
+def _visual_title(spec: dict) -> str:
+    """A human title for a visual, derived from the fields it displays."""
+    fields = spec["fields"]
+    if spec["type"] == "card":
+        field = fields[0]
+        return _label(field) if field in RATE_FIELDS else f"Total {_label(field)}"
+    if spec["type"] == "table":
+        return "Detailed Data"
+    category, *series = fields
+    return f"{' vs '.join(_label(f) for f in series)} by {_label(category)}"
+
+
+def _series_colors(y_fields: list[str], palette: list[str]) -> list[dict]:
+    """Pin each series to an explicit color instead of letting the theme supply it.
+
+    Power BI applies a custom theme on first open, but drops it once Power BI Desktop
+    saves the project — a registered resource we wrote by hand is not re-registered on
+    save, so the report silently reverts to Microsoft's default blue palette. Colors
+    written into the visual itself are part of the report definition and survive.
+    Power BI restarts at the first theme color for each visual, so series indexes are
+    per-visual, matching what the theme would have done.
+    """
+    colors = []
+    for index, field in enumerate(y_fields):
+        _, query_ref, _ = _value_ref(field)
+        colors.append(
+            {
+                "properties": {
+                    "fill": {"solid": {"color": _literal(palette[index % len(palette)])}}
+                },
+                "selector": {"metadata": query_ref},
+            }
+        )
+    return colors
+
+
 def _categorical_visual_json(
     visual_type: str,
     name: str,
@@ -148,19 +273,21 @@ def _categorical_visual_json(
                             {
                                 "field": _column_ref(category_field),
                                 "queryRef": f"{ENTITY}.{category_field}",
-                                "nativeQueryRef": category_field,
+                                "nativeQueryRef": _label(category_field),
                                 "active": True,
                             }
                         ]
                     },
                     "Y": {
                         "projections": [
+                            # Measures, so the legend reads "Target" rather than the
+                            # underlying column name.
                             {
-                                "field": _agg_ref(f),
-                                "queryRef": f"{_aggregation_label(f)}({ENTITY}.{f})",
-                                "nativeQueryRef": f"{_aggregation_label(f)} of {f}",
+                                "field": ref,
+                                "queryRef": query_ref,
+                                "nativeQueryRef": display,
                             }
-                            for f in y_fields
+                            for ref, query_ref, display in map(_value_ref, y_fields)
                         ]
                     },
                 },
@@ -179,6 +306,10 @@ def _categorical_visual_json(
 def _card_visual_json(
     name: str, field: str, position: dict, conditional_measure: str | None = None
 ) -> dict:
+    # A card prints this name beneath the number, which is why cards get no container
+    # title — a title as well would give the same tile two captions.
+    data_ref, query_ref, native_ref = _value_ref(field)
+
     visual: dict = {
         "visualType": "cardVisual",
         "query": {
@@ -186,15 +317,15 @@ def _card_visual_json(
                 "Data": {
                     "projections": [
                         {
-                            "field": _agg_ref(field),
-                            "queryRef": f"{_aggregation_label(field)}({ENTITY}.{field})",
-                            "nativeQueryRef": f"{_aggregation_label(field)} of {field}",
+                            "field": data_ref,
+                            "queryRef": query_ref,
+                            "nativeQueryRef": native_ref,
                         }
                     ]
                 }
             },
             "sortDefinition": {
-                "sort": [{"field": _agg_ref(field), "direction": "Descending"}],
+                "sort": [{"field": data_ref, "direction": "Descending"}],
                 "isDefaultSort": True,
             },
         },
@@ -242,16 +373,14 @@ def _table_visual_json(name: str, fields: list[str], position: dict) -> dict:
                 {
                     "field": _column_ref(f),
                     "queryRef": f"{ENTITY}.{f}",
-                    "nativeQueryRef": f,
+                    "nativeQueryRef": _label(f),
                 }
             )
         else:
+            # A measure, so the column heading reads "Target" not "Sum of target_quantity".
+            ref, query_ref, display = _value_ref(f)
             projections.append(
-                {
-                    "field": _agg_ref(f),
-                    "queryRef": f"{_aggregation_label(f)}({ENTITY}.{f})",
-                    "nativeQueryRef": f"{_aggregation_label(f)} of {f}",
-                }
+                {"field": ref, "queryRef": query_ref, "nativeQueryRef": display}
             )
     return {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
@@ -265,21 +394,63 @@ def _table_visual_json(name: str, fields: list[str], position: dict) -> dict:
     }
 
 
-def _visual_position(index: int, total: int, page_width=1280, page_height=720) -> dict:
-    """Simple placeholder layout: stack visuals full-width, evenly split vertically."""
-    height = page_height / total
-    return {
-        "x": 0,
-        "y": index * height,
-        "z": index,
-        "height": height,
-        "width": page_width,
-        "tabOrder": index,
-    }
+PAGE_WIDTH = 1280
+PAGE_HEIGHT = 720
+MARGIN = 24  # gutter around the canvas, so the page's own background is visible
+GAP = 16  # space between visuals
+CARD_HEIGHT = 140  # a headline number needs far less room than a chart
+
+
+def _layout_positions(specs: list[dict]) -> list[dict]:
+    """Place KPI cards in a row across the top, then the charts beneath them.
+
+    Replaces an earlier layout that stacked every visual full-width at equal height.
+    That tiled the canvas exactly — 3 visuals of 1280x240 on a 1280x720 page — so the
+    themed page background was completely hidden behind the visuals, and a one-number
+    KPI card was given as much room as a 184-point trend line. It also left the
+    headline figure wherever the AI happened to list it, often last.
+    """
+    cards = [i for i, s in enumerate(specs) if s["type"] == "card"]
+    charts = [i for i, s in enumerate(specs) if s["type"] != "card"]
+
+    positions: list[dict] = [{} for _ in specs]
+    inner_width = PAGE_WIDTH - 2 * MARGIN
+    y = MARGIN
+
+    if cards:
+        width = (inner_width - GAP * (len(cards) - 1)) / len(cards)
+        for slot, i in enumerate(cards):
+            positions[i] = {
+                "x": MARGIN + slot * (width + GAP),
+                "y": y,
+                "z": i,
+                "width": width,
+                "height": CARD_HEIGHT,
+                "tabOrder": i,
+            }
+        y += CARD_HEIGHT + GAP
+
+    if charts:
+        available = PAGE_HEIGHT - MARGIN - y
+        height = (available - GAP * (len(charts) - 1)) / len(charts)
+        for slot, i in enumerate(charts):
+            positions[i] = {
+                "x": MARGIN,
+                "y": y + slot * (height + GAP),
+                "z": i,
+                "width": inner_width,
+                "height": height,
+                "tabOrder": i,
+            }
+
+    return positions
 
 
 def apply_visuals(
-    page_dir: Path, specs: list[dict], completion_thresholds: bool = False
+    page_dir: Path,
+    specs: list[dict],
+    completion_thresholds: bool = False,
+    data_colors: list[str] | None = None,
 ) -> None:
     """Replace a page's visuals with ones generated from `specs`.
 
@@ -312,16 +483,17 @@ def apply_visuals(
         shutil.rmtree(visuals_dir)
     visuals_dir.mkdir(parents=True)
 
-    total = len(valid_specs)
+    palette = _valid_data_colors(data_colors)
+    layout = _layout_positions(valid_specs)
     for i, spec in enumerate(valid_specs):
         name = uuid.uuid4().hex[:20]
-        position = _visual_position(i, total)
+        position = layout[i]
         visual_type = VISUAL_TYPE_MAP[spec["type"]]
 
         if spec["type"] == "card":
             field = spec["fields"][0]
             conditional_measure = (
-                "Completion Status"
+                COMPLETION_STATUS_MEASURE
                 if completion_thresholds and field == "completion_rate"
                 else None
             )
@@ -329,11 +501,16 @@ def apply_visuals(
 
         elif spec["type"] == "table":
             content = _table_visual_json(name, spec["fields"], position)
+            _titled(content["visual"], _visual_title(spec))
         else:
             category_field, *y_fields = spec["fields"]
             content = _categorical_visual_json(
                 visual_type, name, category_field, y_fields, position
             )
+            _titled(content["visual"], _visual_title(spec))
+            content["visual"]["objects"] = {
+                "dataPoint": _series_colors(y_fields, palette)
+            }
 
         visual_dir = visuals_dir / name
         visual_dir.mkdir()
@@ -369,6 +546,7 @@ def add_page(
     )
 
     apply_visuals(page_dir, specs, completion_thresholds)
+    apply_page_background(page_dir)
 
     pages_json_path = pages_root / "pages.json"
     pages_meta = json.loads(pages_json_path.read_text(encoding="utf-8"))
@@ -390,11 +568,72 @@ DEFAULT_DATA_COLORS = [
 ]
 
 
+HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+# Named colors from the Lifewood brand guidelines, used for the parts of a report that
+# are not chart series — text, the canvas, the surround.
+DARK_SERPENT = "#133020"
+CASTLETON_GREEN = "#046241"
+PAPER = "#F5EEDB"
+SEA_SALT = "#F9F7F7"
+WHITE = "#FFFFFF"
+
+# Lifewood's brand typeface. Power BI cannot embed a font — it names one, and each
+# machine renders with whatever it has installed — so every font is emitted as a
+# fallback chain. Where Manrope is installed the report is properly branded; where it
+# isn't, it lands on a font we picked rather than whatever Power BI reaches for.
+HEADING_FONT = "Manrope SemiBold"
+BODY_FONT = "Manrope"
+FONT_FALLBACK = "Segoe UI"
+
+# Weight suffixes install as separate font faces, and a machine may have the family but
+# not that particular weight — so the plain family is inserted as an intermediate step.
+_WEIGHT_SUFFIXES = {"thin", "light", "regular", "medium", "semibold", "bold", "black"}
+
+
+def _quote_font(name: str) -> str:
+    return f"'{name}'" if " " in name else name
+
+
+def _font_stack(font: str) -> str:
+    """Build a Power BI fontFace chain: the requested font, then sensible fallbacks."""
+    font = (font or "").strip()
+    chain = []
+    if font:
+        chain.append(_quote_font(font))
+        head, _, last = font.rpartition(" ")
+        if head and last.lower() in _WEIGHT_SUFFIXES:
+            chain.append(_quote_font(head))
+    chain.append(_quote_font(FONT_FALLBACK))
+    # dict.fromkeys keeps order while removing duplicates
+    return ",".join(dict.fromkeys(chain))
+
+
+def _valid_data_colors(data_colors: list[str] | None) -> list[str]:
+    """Keep only well-formed #RRGGBB values, falling back to the Lifewood default.
+
+    Power BI rejects the *entire* theme file if any one color is malformed — it does
+    not skip the bad entry — so a single stray character silently reverts every color
+    and font in the report to Power BI's defaults, with no error anywhere. Filtering
+    here means a bad value costs one series color instead of the whole theme.
+    """
+    if not data_colors:
+        return DEFAULT_DATA_COLORS
+
+    good = [c for c in data_colors if isinstance(c, str) and HEX_COLOR.match(c)]
+    rejected = [c for c in data_colors if c not in good]
+    if rejected:
+        print(f"Ignoring malformed theme color(s): {rejected}")
+
+    # Below two colors a chart cannot distinguish its series, so prefer the default.
+    return good if len(good) >= 2 else DEFAULT_DATA_COLORS
+
+
 def apply_theme(
     output_dir: Path,
     data_colors: list[str] | None = None,
-    heading_font: str = "Fraunces",
-    body_font: str = "DM Sans",
+    heading_font: str = HEADING_FONT,
+    body_font: str = BODY_FONT,
 ) -> None:
     """Update the report's theme file with the user's chosen color palette and fonts.
 
@@ -418,24 +657,69 @@ def apply_theme(
 
     theme = json.loads(theme_path.read_text(encoding="utf-8"))
 
-    theme["dataColors"] = data_colors or DEFAULT_DATA_COLORS
+    theme["dataColors"] = _valid_data_colors(data_colors)
+
+    # Brand guidelines: text is Dark Serpent or white, never a neutral grey; White and
+    # Paper are the background colors. The template shipped Power BI's default #252423
+    # text on a default white page, so the palette was reaching the bars and nothing else.
+    theme["foreground"] = DARK_SERPENT
+    theme["background"] = WHITE
+    theme["tableAccent"] = CASTLETON_GREEN
+    theme["visualStyles"] = {
+        "page": {
+            "*": {
+                # "background" is the canvas; "outspace" is the border around it.
+                "background": [
+                    {"color": {"solid": {"color": PAPER}}, "transparency": 0}
+                ],
+                "outspace": [{"color": {"solid": {"color": SEA_SALT}}}],
+            }
+        }
+    }
 
     text_classes = theme.get("textClasses", {})
     for cls in ("title", "header", "callout"):
         if cls in text_classes:
-            text_classes[cls]["fontFace"] = heading_font
+            text_classes[cls]["fontFace"] = _font_stack(heading_font)
+            text_classes[cls]["color"] = DARK_SERPENT
     if "label" in text_classes:
-        text_classes["label"]["fontFace"] = body_font
+        text_classes["label"]["fontFace"] = _font_stack(body_font)
+        text_classes["label"]["color"] = DARK_SERPENT
 
     theme_path.write_text(json.dumps(theme, indent=2), encoding="utf-8")
 
 
-def apply_completion_thresholds(
-    output_dir: Path, good_threshold: float = 0.9, neutral_threshold: float = 0.7
+def apply_page_background(page_dir: Path, color: str = PAPER) -> None:
+    """Set the page's canvas colour in the page definition itself.
+
+    Same reasoning as _series_colors: a theme-supplied background disappears once
+    Power BI Desktop saves the project, whereas the page definition survives.
+    """
+    page_json_path = page_dir / "page.json"
+    page = json.loads(page_json_path.read_text(encoding="utf-8"))
+    page.setdefault("objects", {})["background"] = [
+        {
+            "properties": {
+                "color": {"solid": {"color": _literal(color)}},
+                "transparency": {"expr": {"Literal": {"Value": "0D"}}},
+            }
+        }
+    ]
+    page_json_path.write_text(json.dumps(page, indent=2), encoding="utf-8")
+
+
+def add_completion_measures(
+    output_dir: Path,
+    good_threshold: float | None = None,
+    neutral_threshold: float | None = None,
 ) -> None:
-    """Add a 'Completion Status' DAX measure (good/neutral/bad based on the given
-    thresholds against average completion_rate) to the semantic model, so a
-    completion_rate card can reference it for field-value conditional formatting.
+    """Add the 'Completion Rate' measure to the semantic model, plus a 'Completion
+    Status' measure when both thresholds are supplied.
+
+    'Completion Rate' is always added so a card never has to aggregate the ratio column
+    directly (see _COMPLETION_RATE_DAX for why that is wrong). 'Completion Status'
+    returns good/neutral/bad off the same expression, which a card references for
+    conditional formatting — so the colour and the number always agree.
     """
     tmdl_path = (
         output_dir
@@ -446,27 +730,36 @@ def apply_completion_thresholds(
     )
     text = tmdl_path.read_text(encoding="utf-8")
 
-    measure_block = (
-        "\n\tmeasure 'Completion Status' = ```\n"
-        "\t\t\t\n"
-        "\t\t\tVAR CurrentRate = AVERAGE(clean_export[completion_rate])\n"
-        "\t\t\tRETURN\n"
-        "\t\t\t    SWITCH(\n"
-        "\t\t\t        TRUE(),\n"
-        f'\t\t\t        CurrentRate >= {good_threshold}, "good",\n'
-        f'\t\t\t        CurrentRate >= {neutral_threshold}, "neutral",\n'
-        '\t\t\t        "bad"\n'
-        "\t\t\t    )\n"
-        "\t\t\t\n"
-        "\t\t\t```\n"
-        f"\t\tlineageTag: {uuid.uuid4()}\n"
-    )
+    blocks = ""
+    for measure, dax, format_string in MEASURE_DEFINITIONS.values():
+        blocks += (
+            f"\n\tmeasure '{measure}' = {dax}\n"
+            f"\t\tformatString: {format_string}\n"
+            f"\t\tlineageTag: {uuid.uuid4()}\n"
+        )
+
+    if good_threshold is not None and neutral_threshold is not None:
+        blocks += (
+            f"\n\tmeasure '{COMPLETION_STATUS_MEASURE}' = ```\n"
+            "\t\t\t\n"
+            f"\t\t\tVAR CurrentRate = {_COMPLETION_RATE_DAX}\n"
+            "\t\t\tRETURN\n"
+            "\t\t\t    SWITCH(\n"
+            "\t\t\t        TRUE(),\n"
+            f'\t\t\t        CurrentRate >= {good_threshold}, "good",\n'
+            f'\t\t\t        CurrentRate >= {neutral_threshold}, "neutral",\n'
+            '\t\t\t        "bad"\n'
+            "\t\t\t    )\n"
+            "\t\t\t\n"
+            "\t\t\t```\n"
+            f"\t\tlineageTag: {uuid.uuid4()}\n"
+        )
 
     pattern = re.compile(r"(table clean_export\n\tlineageTag: [^\n]+\n)")
-    new_text, n = pattern.subn(lambda m: m.group(1) + measure_block, text, count=1)
+    new_text, n = pattern.subn(lambda m: m.group(1) + blocks, text, count=1)
     if n != 1:
         raise RuntimeError(
-            f"Could not find table header to insert measure after in {tmdl_path}"
+            f"Could not find table header to insert measures after in {tmdl_path}"
         )
 
     tmdl_path.write_text(new_text, encoding="utf-8")
@@ -477,8 +770,8 @@ def generate_pbip(
     dataset_id: str,
     visuals: list[dict] | None = None,
     data_colors: list[str] | None = None,
-    heading_font: str = "Fraunces",
-    body_font: str = "DM Sans",
+    heading_font: str = HEADING_FONT,
+    body_font: str = BODY_FONT,
     good_threshold: float | None = None,
     neutral_threshold: float | None = None,
 ) -> Path:
@@ -528,8 +821,9 @@ def generate_pbip(
     tmdl_path.write_text(new_text, encoding="utf-8")
 
     use_thresholds = good_threshold is not None and neutral_threshold is not None
-    if use_thresholds:
-        apply_completion_thresholds(output_dir, good_threshold, neutral_threshold)
+    # Always added: a completion_rate card reads the measure whether or not the user
+    # asked for threshold colouring.
+    add_completion_measures(output_dir, good_threshold, neutral_threshold)
 
     page_dir = (
         output_dir
@@ -539,8 +833,14 @@ def generate_pbip(
         / "2bb6229a2baa33c2479a"
     )
     apply_visuals(
-        page_dir, visuals or DEFAULT_VISUALS, completion_thresholds=use_thresholds
+        page_dir,
+        visuals or DEFAULT_VISUALS,
+        completion_thresholds=use_thresholds,
+        data_colors=data_colors,
     )
+    apply_page_background(page_dir)
+    # Still applied: the theme handles text colour and fonts, and is what Power BI uses
+    # on a first open. The visual- and page-level colours above are what survive a save.
     apply_theme(output_dir, data_colors, heading_font, body_font)
 
     return output_dir
