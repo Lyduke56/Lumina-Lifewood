@@ -38,6 +38,17 @@ class RoleError(ValueError):
     to be shown to the agent, which has to correct it and try again."""
 
 
+# Figures Decision 4 says to work out ourselves rather than read from the sheet. A
+# calculated column may name the one it holds, which lets us compare the customer's
+# arithmetic against our own and tell them when the two disagree.
+DERIVABLE = (
+    "completion_rate",
+    "shortfall",
+    "cumulative_target",
+    "cumulative_actual",
+)
+
+
 @dataclass
 class Assignment:
     """One column, and the job the agent says it is doing."""
@@ -46,6 +57,7 @@ class Assignment:
     role: Role
     unit: str | None = None  # what a figure counts: "Images", "Videos", "Hours"
     pairs_with: int | None = None  # for an actual: the position of its target
+    derives: str | None = None  # for a calculated column: which figure it holds
 
 
 @dataclass
@@ -63,7 +75,7 @@ class MeasurePair:
     @property
     def can_derive(self) -> list[str]:
         """Figures Decision 4 says to calculate rather than read from the sheet."""
-        return ["completion_rate", "shortfall", "cumulative_target", "cumulative_actual"]
+        return list(DERIVABLE)
 
 
 @dataclass
@@ -77,6 +89,9 @@ class Schema:
     calculated: list[int] = field(default_factory=list)
     ignored: list[int] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    # column position -> (figure it holds, the target it belongs to). Lets summarising
+    # compare the customer's own arithmetic against ours, per Decision 4.
+    cross_checks: dict[int, tuple[str, int]] = field(default_factory=dict)
 
     @property
     def units(self) -> list[str]:
@@ -200,6 +215,26 @@ def set_column_roles(
         )
         pair.actuals.append(a.position)
 
+    # A calculated column may say which figure it holds, so its arithmetic can be
+    # compared against ours later. Optional: many are unlabelled or idiosyncratic.
+    cross_checks: dict[int, tuple[str, int]] = {}
+    for a in assignments:
+        if a.role is not Role.CALCULATED or not a.derives:
+            continue
+        column = by_position[a.position]
+        if a.derives not in DERIVABLE:
+            raise RoleError(
+                f"'{_heading(column)}' says it holds {a.derives!r}, which is not "
+                f"something we can work out. Expected one of: {', '.join(DERIVABLE)}."
+            )
+        if a.pairs_with not in targets:
+            raise RoleError(
+                f"'{_heading(column)}' holds {a.derives!r} but does not say which "
+                f"planned figure it relates to. Set pairs_with. Available targets: "
+                f"{sorted(targets) or 'none'}."
+            )
+        cross_checks[a.position] = (a.derives, a.pairs_with)
+
     for position in sorted(targets - set(pairs)):
         notes.append(
             f"'{_heading(by_position[position])}' is a planned figure with nothing "
@@ -220,6 +255,7 @@ def set_column_roles(
         calculated=sorted(a.position for a in assignments if a.role is Role.CALCULATED),
         ignored=sorted(a.position for a in assignments if a.role is Role.IGNORE),
         notes=notes,
+        cross_checks=cross_checks,
     )
 
     # Decision 3's other condition: what was set aside must be visible, not silent.

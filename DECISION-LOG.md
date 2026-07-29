@@ -418,7 +418,8 @@ all five of the following:
 2. **An unmarked grand-total row** sits directly beneath the column headings.
 3. **Six trailing empty rows** — dates with no figures against them.
 4. **The workbook's own running totals are out of date.** They stop a month early and disagree
-   with the daily figures by 7,137 images.
+   with the daily figures. Measured precisely later, the target running total stops 26 rows
+   short of the data rather than being arithmetically wrong — see Section 23.
 5. **The dates are in the second column**, with row numbers in the first.
 
 A reader that is not built for this would either stop with an error or, far worse, quietly
@@ -530,7 +531,7 @@ sentence.
 from the planned and achieved figures. Never treat the spreadsheet's own versions as correct.
 
 **Why:** the official workbook proves the point. Its running totals stop a month early and are
-short by 7,137 images. Its completion-rate column is a mixture of decimals, blank cells and
+incomplete, stopping short of the data. Its completion-rate column is a mixture of decimals, blank cells and
 dashes. Figures we calculate are always consistent with each other; figures we copy inherit
 every error already present in the source file.
 
@@ -885,7 +886,8 @@ detailed records, assembled manually with spreadsheet formulas. That is precisel
 says our software should produce automatically.
 
 **And the evidence that doing it by hand is unreliable is in the file itself:** the running
-totals stop a month early and are 7,137 short. Someone is maintaining this by hand, every day,
+totals are incomplete — the target running total stops 26 rows short of the data (see Section 23
+for the precise position). Someone is maintaining this by hand, every day,
 and it has quietly drifted out of step.
 
 **Why this matters to the business:** this is a clearer statement of what we are actually selling
@@ -1485,7 +1487,68 @@ a month out of date.
 
 ---
 
-## 23. Still to be decided
+## 23. The third tool — adding the figures up
+
+**Date:** 29 July 2026 · **Status:** Built and tested
+
+The third of the six tools is built: **summarise**. This is Decision 5 in practice — a dashboard
+needs totals by month or by language, not 352,626 individual records, and embedding those raw would
+produce roughly 29 MB of text inside a single file.
+
+It totals the figures by day, week, month or quarter, optionally split by one or more labels, and
+works out the derived figures itself rather than reading them (Decision 4).
+
+### Tested against the official workbook
+
+Summarising the real Production Plan by month reproduces the project's history exactly:
+
+| Month | Planned | Achieved | Achieved % |
+|-------|---------|----------|------------|
+| April | 20,196 | 21,717 | 108% |
+| May | 44,154 | 86,487 | 196% |
+| June | 50,040 | 95,880 | 192% |
+| July | 84,759 | 120,450 | 142% |
+| **August** | **135,174** | **20,613** | **15%** |
+| September | 18,303 | 7,479 | 41% |
+
+These match an independent analysis done by hand earlier, to the figure, with the running total
+landing exactly on 352,626. **26 rows were correctly left out** — the grand total, the empty padding,
+and rows carrying a date but no figures — none of which the previous software would have noticed.
+
+### It declines rather than producing something useless
+
+Asked for a breakdown that would yield more groups than any chart can show, it refuses and suggests
+a top ten instead. Asked to group by a column never agreed as a label, it refuses and lists what is
+available. A top-ten request gathers everything else into "Other" rather than discarding it.
+
+### Correcting something recorded earlier
+
+This work produced a more careful measurement than the hand analysis in Section 8, and it corrects
+part of it.
+
+Earlier we recorded that the workbook's running totals "stop a month early and are 7,137 short".
+The more precise position is:
+
+- The **Target (Accumulative)** column stops short — it is filled in on 154 of 180 rows.
+- The **Actual (Accumulative)** column is complete, and **agrees with our own arithmetic on every
+  row**.
+
+The earlier "7,137 short" came from comparing the last row that had a *target* running total against
+the total of all the daily figures. The shortfall was really the rows that came after that point,
+not an arithmetic error.
+
+**The substance of Decision 4 is unchanged, and if anything better supported:** the customer's own
+calculated columns are not wrong, they are *incomplete* — and a dashboard built on them would have
+silently understated the project. The tool now reports both things separately: whether the figures
+agree, and whether they are filled in all the way to the end.
+
+**Why this matters to the business:** the software now tells a customer something genuinely useful
+about their own spreadsheet — *"your running total agrees with ours, but stops 26 rows short of your
+data"* — rather than quietly using whichever figure it happened to find.
+
+---
+
+## 24. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -1505,7 +1568,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 24. Change history
+## 25. Change history
 
 | Date | Change |
 |------|--------|
@@ -1528,3 +1591,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added **Decision 8** (Section 20): the rebuild starts with **six tools rather than seventeen** — examine a sheet, record column meanings, summarise, add a chart, add a headline figure, produce the file. Enough for one complete journey from spreadsheet to finished report. The reasoning is economy rather than caution: Decision 7 already expects the tool set to be redesigned once we can watch the agent use it, and redesigning six is cheap where redesigning seventeen is a wasted week. Also recorded that **Manrope has been deployed** to the machines that open reports, closing the last open item on the current software, which is now finished. |
 | 29 July 2026 | Added Section 21: **built the first of the six tools** — the one that examines a sheet and describes what is in it. Tested against the official workbook, where it found the grand-total row, the `-` placeholders, 21 empty padding rows, 4 further date-only rows and 7 empty columns without being told to look for any of them. **Testing also caught a serious mistake:** the first version examined only the opening 2,000 rows, which judged four columns wrongly — Participant ID and Location would have been offered as breakdowns on the strength of 9 to 16 values when they hold hundreds, because real workbooks are sorted and the opening rows understate their variety. It now examines every row, capping the count once a column is clearly too varied to chart. |
 | 29 July 2026 | Added Section 22: **built the second of the six tools** — the one that records what job each column does, which is where Decision 3 becomes real. What is being counted is now information carried through to the labels rather than something built into the code, so a customer counting videos or revenue needs no new development. The tool acts as a gate: it refuses eight kinds of mistake, including the two conditions Decision 3 attached — no column may be left unassigned, and every achieved figure must name the planned figure it belongs to. It also explains its reading back in plain language for the customer to confirm, including warning that the `-` placeholders will be read as missing rather than silently becoming zero. |
+| 29 July 2026 | Added Section 23: **built the third of the six tools** — summarising, which is Decision 5 in practice. Tested against the official workbook, it reproduces the project's real monthly history to the figure, correctly leaving out the grand total, the padding rows and the date-only rows. It declines to produce breakdowns no chart could show, offering a top ten instead. **It also corrected an earlier finding of ours:** the workbook's running totals were recorded as "7,137 short", but measured precisely the target running total is *incomplete* (filled in on 154 of 180 rows) rather than wrong, and the actual running total agrees with our arithmetic everywhere. Decision 4 stands, better supported — the software now reports agreement and completeness separately. |

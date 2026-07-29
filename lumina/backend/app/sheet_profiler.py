@@ -85,6 +85,9 @@ class SheetProfile:
     data_starts_at: int | None
     data_row_count: int
     blank_rows_at_end: int = 0
+    # Set when a grand total is found sitting among the ordinary rows. Reported as a
+    # row number rather than only as prose, so that summarising can actually skip it.
+    suspected_total_row: int | None = None
     columns: list[ColumnProfile] = field(default_factory=list)
     empty_columns: list[int] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -318,6 +321,7 @@ def _hazards(
                 and isinstance(r[i], (int, float))
             ]
             if isinstance(top, (int, float)) and others and top > 5 * max(others):
+                profile.suspected_total_row = data_start
                 warnings.append(
                     f"Row {data_start} looks like a grand total rather than an ordinary "
                     f'row — under "{c.heading or f"column {c.position}"}" it is far '
