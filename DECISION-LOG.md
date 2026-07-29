@@ -23,7 +23,7 @@ We are still in the **understanding and design** stage for the larger rebuild, b
 amount of polishing work has been completed on the existing software.
 
 **The baseline is established.** The Power BI file the software produced had **ten specific quality
-defects**, listed in Section 15. **Eight are now fixed**, along with three further problems found
+defects**, listed in Section 15. **Nine are now fixed**, along with three further problems found
 along the way.
 
 **Fixed so far:**
@@ -1333,26 +1333,22 @@ file we produced.
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
-1. **How to get Manrope onto customers' machines.** The typeface is now correct and survives
-   saving, but Power BI cannot embed a font — every machine that opens a report needs Manrope
-   installed or it substitutes a default. Manrope is free to distribute. Either have IT deploy it
-   across the company, ship the font file alongside the report, or accept that reports look
-   different on machines without it. **This is the most immediate open question.**
-2. **Whether to begin the rebuild with all seventeen tools, or the reduced set of six** described
-   at the end of Section 13.
-3. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
+1. **Whether to begin the rebuild with all seventeen tools, or the reduced set of six** described
+   at the end of Section 13. **This is now the most immediate open question**, since everything
+   else on the current software is finished.
+2. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
    warns about them — but building detection that works across many different spreadsheets is a
    genuine problem still to be solved.
-4. **Whether the unfinished Microsoft-publishing work should be revived or removed.**
-5. **How much further to polish before starting the rebuild.** Eight of the ten baseline defects
-   are fixed. The remaining two both require the redesign, so this is a natural stopping point for
-   improvements to the current software.
+3. **Whether the unfinished Microsoft-publishing work should be revived or removed.**
+4. **How much further to polish before starting the rebuild.** Nine of the ten baseline defects
+   are fixed, and the tenth requires the redesign. The current software is therefore finished as
+   far as polishing can take it.
 
 *Settled since first draft:* the four-figure limitation (Decision 3), whether calculated columns
 should be read or recalculated (Decision 4), how the Power BI file obtains its data (Decision 5),
 which breakdowns to offer (Decision 6), the tool set itself (Decision 7, as a first draft), how
 multi-sheet workbooks are handled (Decision 7), how the page should be arranged (rebuilt — see
-Section 18), branding the report page itself (done — see Section 18), and which typeface to use (Manrope — see Section 19).
+Section 18), branding the report page itself (done — see Section 18), which typeface to use (Manrope — see Section 19), and getting that typeface onto the machines that open reports (deployed 29 July 2026, so reports now render in Manrope rather than falling back to a substitute).
 
 ---
 
