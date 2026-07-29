@@ -227,13 +227,40 @@ def set_column_roles(
                 f"'{_heading(column)}' says it holds {a.derives!r}, which is not "
                 f"something we can work out. Expected one of: {', '.join(DERIVABLE)}."
             )
-        if a.pairs_with not in targets:
-            raise RoleError(
-                f"'{_heading(column)}' holds {a.derives!r} but does not say which "
-                f"planned figure it relates to. Set pairs_with. Available targets: "
-                f"{sorted(targets) or 'none'}."
+        # With a single planned figure there is nothing to be ambiguous about, so not
+        # saying which one a calculated column belongs to is not an error. Demanding it
+        # anyway sent the AI round the loop several times per conversation, and requests
+        # are the scarce resource here.
+        belongs_to = a.pairs_with
+        if belongs_to is None and len(targets) == 1:
+            belongs_to = next(iter(targets))
+
+        # A cumulative-actual column naturally points at the achieved figure it is the
+        # running total of, not at the planned one. Insisting on the target made the tool
+        # refuse a perfectly sensible answer, so an achieved figure is accepted and
+        # resolved to the pair it belongs to.
+        if belongs_to is not None and belongs_to not in targets:
+            belongs_to = next(
+                (
+                    other.pairs_with
+                    for other in assignments
+                    if other.role is Role.ACTUAL and other.position == a.pairs_with
+                ),
+                None,
             )
-        cross_checks[a.position] = (a.derives, a.pairs_with)
+        if belongs_to not in targets:
+            named = (
+                f"it points at column {a.pairs_with}, which is neither a planned nor an "
+                f"achieved figure"
+                if a.pairs_with is not None
+                else "it does not say which figure it relates to"
+            )
+            raise RoleError(
+                f"'{_heading(column)}' holds {a.derives!r} but {named}. Set pairs_with to "
+                f"the planned figure it belongs to, or to the achieved figure it totals. "
+                f"Planned figures: {sorted(targets) or 'none'}."
+            )
+        cross_checks[a.position] = (a.derives, belongs_to)
 
     for position in sorted(targets - set(pairs)):
         notes.append(

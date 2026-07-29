@@ -1673,7 +1673,183 @@ show one usefully.
 
 ---
 
-## 26. Still to be decided
+## 26. The conversation works — and the model is now the constraint
+
+**Date:** 29 July 2026 · **Status:** Built and tested; one decision needed from Lifewood
+
+The agent described in Decision 1 exists and works. A customer can now hold a conversation and get
+a Power BI file out of it.
+
+### A real conversation, on the real workbook
+
+> **Customer:** I have a production plan I need turned into a dashboard. It is at …
+>
+> **Lumina:** I see several sheets in your workbook: Production Plan, DATASETS, Categories,
+> Named_Ranges, Lookup_Values, and Thailand. Which one contains the production plan?
+>
+> **Customer:** The Production Plan sheet. Summarise by month, and give me a completion rate
+> headline plus a target versus actual chart.
+>
+> *(examines the sheet, works out what the columns mean, summarises, adds the figures)*
+>
+> **Customer:** Build the file.
+>
+> **Lumina:** Your Power BI dashboard is ready.
+
+The file it produced is real: six monthly rows, a headline completion rate, and a target-versus-
+actual chart, built from the untouched workbook the old software rejected outright.
+
+### The guardrails earned their place
+
+Something worth recording happened during that conversation. The AI tried to record the column
+meanings **three times**. The first two attempts were refused — it had left columns unassigned —
+and it read the refusal, corrected itself, and tried again.
+
+Nobody had to catch that. **The tools refused work that would have produced a wrong dashboard, and
+explained clearly enough that the AI could fix its own mistake.** That is precisely what Decisions 6
+and 7 were for, and it is the first time we have seen it work unprompted.
+
+### The AI model: what we first concluded, and what turned out to be true
+
+Our first conclusion was that free models were not good enough and Lifewood would have to pay per
+report. **John Peter pushed back, and was right to.** Investigating properly changed the answer.
+
+**What we got wrong.** The project already had an arrangement where OpenRouter tries several models
+in turn if one fails, and the agent was not using it — an omission on our part, now corrected.
+
+**What the free models can actually do.** Fourteen free models support the kind of tool use this
+needs. Tested on the exact step that had gone wrong, several produced clean, professional replies.
+The earlier bad output was not a hard limit of free models.
+
+**The real obstacle was never quality — it was a daily allowance.** The true error, once we read it
+properly:
+
+> *Rate limit exceeded: free models per day. Add 10 credits to unlock 1000 free model requests per
+> day.* — with a limit of **50 requests per day**.
+
+One conversation uses roughly fifteen requests. **The free allowance is about three conversations a
+day.** Nothing was too weak; we had simply run out.
+
+**What this means for cost:** roughly **$10, once**, raises the allowance from 50 to 1000 free
+requests a day — around sixty conversations daily, at no per-report cost. That is a very different
+proposition from paying for every dashboard.
+
+### Two changes to use the allowance well
+
+Since every request counts, two wasteful habits were fixed:
+
+1. **The AI is given a ready-made starting list.** It was building the column meanings from scratch,
+   omitting one, being refused, and trying again — **six attempts in one conversation, each costing
+   a request**. It now receives a complete list with every column already present, and only has to
+   change the entries that matter.
+2. **Replies are no longer cut off.** One message to a customer stopped mid-sentence because the
+   allowance for a single reply was too small.
+
+### The customer only hears from us through a tool
+
+A structural change worth recording. The AI's ordinary writing is now **discarded entirely**. The
+only words a customer ever sees are those passed to a "reply to customer" tool.
+
+**Why:** one free model spilled its own thinking into what the customer would read — *"We need to
+interpret columns. Let's list columns with positions…"*. It did this intermittently, deeper into
+longer conversations, which is worse than doing it consistently.
+
+Rather than hope each model behaves, **the leak is now impossible**: prose that is not passed to a
+tool never reaches anybody. This is the same principle as Decisions 6 and 7 — the agent may only act
+through tools — extended to cover talking.
+
+**Still to be confirmed:** the daily allowance was exhausted during testing, so the improvements
+above are reasoned but not yet proven end to end. They need one more run once the allowance resets.
+
+### The better answer: change where the AI comes from
+
+Having established that the obstacle was a daily allowance rather than model quality, John Peter
+asked the obvious next question — could we simply use a different supplier? **Yes, and it is the
+better answer.**
+
+Free allowances differ enormously:
+
+| Supplier | Free requests per day | Conversations per day |
+|----------|----------------------|----------------------|
+| Google (Gemini) | ~1,500 | ~100 |
+| Groq | ~1,000 | ~66 |
+| OpenRouter free tier | **50** | **~3** |
+
+Twenty to thirty times more, still free, still no card required.
+
+Because these suppliers all speak the same protocol, **moving between them is a web address and a
+key, not a rewrite.** The supplier is now a setting: Google, Groq, Cerebras and OpenRouter are
+built in, and anything else compatible can be pointed at directly. It still defaults to OpenRouter,
+so nothing changes for anyone who has not chosen.
+
+**What this means for cost:** the earlier conclusion — that Lifewood must pay per report — was
+wrong twice over. The obstacle was an allowance, and the allowance can be raised to a hundred
+conversations a day by changing supplier, for nothing.
+
+**Now confirmed working on Groq's free tier.** A full conversation produced a real Power BI file
+from the official workbook: the AI asked which sheet, read it, explained in plain words what each
+column appeared to be, asked for confirmation, summarised by month, and built a dashboard with a
+completion-rate headline and a target-versus-actual chart.
+
+Google's key was already at its quota when tested, so **Groq is what the project now uses**.
+
+### Two problems found by watching it work
+
+**The first model was not good enough — but a better free one was available.** Llama 3.3 described
+columns to the customer *by number*, despite being told not to, and asked for the file to be built
+before anything had been summarised. A stronger model on the same free tier, GPT-OSS 120B, does
+neither. **No change in cost; only in which free model is named.**
+
+**We were making the AI repeat itself, and it was our fault.** Recording the column meanings was
+taking five or six attempts per conversation — each one a request against a limited daily
+allowance. Watching the actual refusals showed both causes were ours:
+
+- A running-total column naturally points at the figure it is a running total *of*. Our check
+  insisted it point at the planned figure instead, and **refused a perfectly sensible answer** —
+  while reporting that the AI "did not say which figure it relates to" when it plainly had.
+- Where a sheet has only one planned figure there is nothing to be ambiguous about, yet we
+  demanded the AI say so explicitly anyway.
+
+Both fixed. **Recording the column meanings now succeeds first time**, cutting a conversation from
+roughly fifteen requests to eight — which nearly doubles how many conversations a day's allowance
+buys.
+
+**Worth noting how these were found.** Not by reasoning about the model, but by printing what the
+tools said back to it. The AI was behaving sensibly throughout; our rules were wrong.
+
+### Both suppliers now work, and the earlier figures need correcting
+
+Google's key was tested again and works — the earlier refusal was not an exhausted key. Two
+things had to be understood first, and they correct what we recorded above.
+
+**A model with no free allowance looks exactly like an exhausted one.** Google reports
+`limit: 0` for `gemini-2.0-flash`, which reads as "you have run out" but means "this model was
+never free here". Naming a current model fixed it.
+
+**The binding limit is per minute, not per day.** We recorded Google as allowing ~1,500 requests a
+day, which is true but not the constraint that matters. Its free models allow **five requests per
+minute**, and a single conversation makes about eight. So a conversation trips the limit halfway
+through regardless of how much daily allowance remains.
+
+**Being asked to wait is normal operation on a free tier, not a failure.** The software now waits
+the requested time and carries on. With that, a full conversation completes on Google as well as
+Groq.
+
+### Which supplier to use
+
+| Supplier | Per minute | Suits this work? |
+|----------|-----------|------------------|
+| **Groq** | 30 | **Yes — a conversation runs straight through** |
+| Google | 5 | Yes, but pauses about a minute partway through |
+| OpenRouter free | — | 50 a day, roughly three conversations |
+
+**Groq is the default.** Google's larger daily allowance is worth less here than Groq's higher
+per-minute one, because the work arrives in bursts of eight or so requests rather than spread
+evenly. Both are configured, so switching is one line if Groq ever becomes the constraint.
+
+---
+
+## 27. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -1693,7 +1869,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 27. Change history
+## 28. Change history
 
 | Date | Change |
 |------|--------|
@@ -1719,3 +1895,8 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 23: **built the third of the six tools** — summarising, which is Decision 5 in practice. Tested against the official workbook, it reproduces the project's real monthly history to the figure, correctly leaving out the grand total, the padding rows and the date-only rows. It declines to produce breakdowns no chart could show, offering a top ten instead. **It also corrected an earlier finding of ours:** the workbook's running totals were recorded as "7,137 short", but measured precisely the target running total is *incomplete* (filled in on 154 of 180 rows) rather than wrong, and the actual running total agrees with our arithmetic everywhere. Decision 4 stands, better supported — the software now reports agreement and completeness separately. |
 | 29 July 2026 | Added Section 24: **the last three tools, and the rebuild running end to end.** The Power BI model is now generated from whatever a workbook actually contains, rather than a fixed table of six known columns — which was the last place Decision 3's limitation survived. From the official workbook it produces a model describing *images*, taken from the customer's own spreadsheet. The full six-tool sequence now runs against the original untouched file that the previous software rejected outright, ending in a 48 KB Power BI file. The completion rate is recalculated rather than averaged and running totals take the largest value rather than being added up, so neither of the arithmetic traps found earlier can recur. |
 | 29 July 2026 | Added **Decision 9** (Section 25): the six tools will be exposed alongside the existing one, which is left untouched — **nobody's experience changes on the day this ships**, and the proven path keeps serving both the website and WhatsApp. Clarified that both surfaces currently use the old software; the new tools are used by nothing. Decided that the server holds the figures between steps rather than the AI carrying them, because a daily summary of the official workbook would flood the AI on every step and it needs to make decisions about the figures, not read them. The website gets the conversation first, since Decisions 1 and 2 put the conversation and the preview together; WhatsApp keeps the conveyor belt as a transitional state. |
+| 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
+| 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
+| 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 29 July 2026 | **The conversation now works end to end on a free tier.** Groq supplies the AI; Google's key was already at quota. A full exchange produced a real Power BI file from the official workbook — asking which sheet, explaining the columns in plain words, seeking confirmation, then summarising and building. Two problems found by watching it work: the first free model described columns by number and tried to build before summarising, fixed by naming a better free model on the same tier; and **we were making the AI repeat itself five or six times per conversation through two mistakes of our own** — refusing a sensible answer about running totals, and demanding a clarification where nothing was ambiguous. Both corrected, cutting a conversation from about fifteen requests to eight. |
+| 29 July 2026 | Got Google working as a second supplier, and corrected two things we had recorded. A model with **no** free allowance reports `limit: 0`, which reads as an exhausted key but is not — naming a current model fixed it. And the binding limit is **per minute, not per day**: Google allows five requests a minute where a conversation makes about eight, so it trips halfway through however much daily allowance remains. Being asked to wait is normal on a free tier, so the software now waits and carries on. **Groq stays the default** — its higher per-minute allowance matters more here than Google's larger daily one, because the work arrives in bursts. |
