@@ -23,7 +23,7 @@ We are still in the **understanding and design** stage for the larger rebuild, b
 amount of polishing work has been completed on the existing software.
 
 **The baseline is established.** The Power BI file the software produced had **ten specific quality
-defects**, listed in Section 15. **Eight are now fixed**, along with three further problems found
+defects**, listed in Section 15. **Nine are now fixed**, along with three further problems found
 along the way.
 
 **Fixed so far:**
@@ -1329,34 +1329,119 @@ file we produced.
 
 ---
 
-## 20. Still to be decided
+## 20. Decision 8 — start the rebuild with six tools, not seventeen
+
+**Date:** 29 July 2026 · **Status:** Agreed
+
+Decision 7 proposed seventeen tools for the agent and offered a reduced set of six as an
+alternative starting point. **The six-tool set is chosen.**
+
+Those six are: examine a sheet, record what its columns mean, summarise, add a chart, add a
+headline figure, and produce the Power BI file. Enough to take one spreadsheet through the entire
+journey and get a finished report out of the other end.
+
+Deferred until that works: the look and colours, page arrangement, undo, the on-screen preview,
+and the self-check before export.
+
+**Why:** not caution, but economy. Decision 7 already records the expectation that the tool set
+will need redesigning once we can watch the agent actually using it. **Redesigning six tools is
+cheap; redesigning seventeen is a week spent building things that then change.** Getting one
+complete journey working end to end will teach us more about the right shape for these tools than
+any amount of further design discussion.
+
+**What we rejected:** building all seventeen first. It front-loads work on tools whose design we
+expect to revise, and it delays the moment we learn anything real.
+
+### Where this leaves the current software
+
+**Finished.** Nine of the ten quality defects are fixed and every open question about it is now
+closed — the correct headline figure, brand colours and typeface that survive a customer saving
+the file, readable labels, a sensible layout, proper filenames, and Manrope deployed to the
+machines that open reports.
+
+The tenth defect — a chart produced for figures the spreadsheet does not contain — is the first
+thing the rebuild will fix, because it is caused by the AI choosing charts **without ever being
+shown what the spreadsheet holds.** The first of the six tools addresses exactly that.
+
+---
+
+## 21. The first tool — and why sampling would have been wrong
+
+**Date:** 29 July 2026 · **Status:** Built and tested against the official workbook
+
+The first of the six tools from Decision 8 is built: **examine a sheet**. Everything else depends
+on it, and the last unfixed defect exists precisely because nothing currently looks at a
+spreadsheet before choosing charts.
+
+It reports, for every column: what kind of information it holds, how many different values, some
+examples, and whether grouping by it would make a readable chart. It interprets nothing — judgement
+stays with the agent, and confirmation with the customer.
+
+### What it found in the official workbook, unprompted
+
+- **The grand-total row.** Correctly identified as far larger than the rows beneath it, with a
+  warning that including it would distort every chart.
+- **The `-` placeholders** in the target and completion-rate columns, which cannot be added up.
+- **21 completely empty padding rows** at the foot, now excluded from the row count rather than
+  inflating it.
+- **A further 4 rows** carrying a date but no figures.
+- **7 entirely empty columns**, ignored.
+- On the detailed sheet, it correctly **refused File Name and Image ID** as breakdowns — those hold
+  a different value on nearly every row, and grouping by them would produce one bucket per record.
+
+### The mistake caught by testing
+
+The first version examined only the **first 2,000 rows** of a sheet, for speed. Testing against the
+352,626-row detailed sheet showed this was **wrong on four columns**, two of them badly:
+
+| Column | Judged from 2,000 rows | Judged from every row |
+|--------|------------------------|------------------------|
+| Participant ID | 16 values — offer it | **hundreds** — refuse it |
+| Location | 9 values — offer it | **hundreds** — refuse it |
+| Sub-Category | 23 values — offer it | 40 — offer top ten only |
+| Device | 5 values — offer it | 31 — offer top ten only |
+
+The reason is simple: **real workbooks are sorted.** The opening rows of this one are early uploads
+from a handful of people, so they badly understate the variety that follows.
+
+Participant ID and Location would have been presented to a customer as sensible breakdowns and
+produced charts with hundreds of unreadable bars — the exact failure Decision 6's guardrail exists
+to prevent.
+
+**It now examines every row**, but stops counting a column once it passes 200 distinct values,
+since the only question is "few enough to chart?" and the exact figure beyond that changes nothing.
+
+**The cost:** 97 seconds for the 352,626-row sheet, against 8 seconds for the 207-row summary sheet.
+This shapes how the product should behave — profile the summary sheet immediately, and only pay for
+the detailed one when a customer actually asks for breakdowns.
+
+**Why this matters to the business:** the guardrail is one of the few things standing between a
+customer and an embarrassing dashboard. Had it been built on a sample, it would have looked correct
+in testing and failed on real files.
+
+---
+
+## 22. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
-1. **How to get Manrope onto customers' machines.** The typeface is now correct and survives
-   saving, but Power BI cannot embed a font — every machine that opens a report needs Manrope
-   installed or it substitutes a default. Manrope is free to distribute. Either have IT deploy it
-   across the company, ship the font file alongside the report, or accept that reports look
-   different on machines without it. **This is the most immediate open question.**
-2. **Whether to begin the rebuild with all seventeen tools, or the reduced set of six** described
-   at the end of Section 13.
-3. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
+1. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
    warns about them — but building detection that works across many different spreadsheets is a
    genuine problem still to be solved.
-4. **Whether the unfinished Microsoft-publishing work should be revived or removed.**
-5. **How much further to polish before starting the rebuild.** Eight of the ten baseline defects
-   are fixed. The remaining two both require the redesign, so this is a natural stopping point for
-   improvements to the current software.
+2. **Whether the unfinished Microsoft-publishing work should be revived or removed.**
+3. **How much further to polish before starting the rebuild.** Nine of the ten baseline defects
+   are fixed, and the tenth requires the redesign. The current software is therefore finished as
+   far as polishing can take it.
 
 *Settled since first draft:* the four-figure limitation (Decision 3), whether calculated columns
 should be read or recalculated (Decision 4), how the Power BI file obtains its data (Decision 5),
 which breakdowns to offer (Decision 6), the tool set itself (Decision 7, as a first draft), how
 multi-sheet workbooks are handled (Decision 7), how the page should be arranged (rebuilt — see
-Section 18), branding the report page itself (done — see Section 18), and which typeface to use (Manrope — see Section 19).
+Section 18), branding the report page itself (done — see Section 18), which typeface to use (Manrope — see Section 19), and getting that typeface onto the machines that open reports (deployed 29 July 2026, so reports now render in Manrope rather than falling back to a substitute).
 
 ---
 
-## 21. Change history
+## 23. Change history
 
 | Date | Change |
 |------|--------|
@@ -1376,3 +1461,5 @@ Section 18), branding the report page itself (done — see Section 18), and whic
 | 28 July 2026 | Added Section 17: **fixed the headline completion figure** — the most serious defect on the baseline list, resolving three of them at once (wrong arithmetic, no formatting, unreadable label). The card was averaging 184 separate daily percentages, which reported 1.29 for a project that had delivered exactly 100%. It now uses a proper calculation — total delivered divided by total planned — which produces the right answer, carries a percentage format, and can be given a readable name. Two further improvements: the calculation is now always present rather than being tied to the optional colour-threshold feature, and the colour and the number are now derived from the same expression so they can no longer disagree. Verified: the figure reads 100.0% and is correctly green. |
 | 28 July 2026 | Added Section 18: **seven further defects fixed, and one serious new problem found and solved.** Presentation work: readable chart titles and legends, Lifewood text and page colours, proper number formatting, and a rebuilt page layout that puts the headline figure at the top instead of the bottom. Removed Microsoft's automatic date tables, which eliminated the alarming red warning on opening (though the Refresh step itself is inherent to the format and cannot be removed). **Most importantly:** discovered that all Lifewood branding vanished as soon as a customer saved the file — traced to a documented limitation in Power BI's preview support for machine-generated projects. Fixed by writing the colours directly into the charts and page rather than relying on a theme; confirmed to survive saving and reopening. Eight of the ten baseline defects are now resolved. |
 | 29 July 2026 | Added Section 19: **switched to Manrope, the actual Lifewood brand typeface** — the software had been using Fraunces and DM Sans, which appear nowhere in the brand guidelines and were the previous developer's own choice. Recorded that Power BI cannot embed fonts and relies on each viewing machine having them installed. **Caught the Section 18 trap a second time:** the earlier theme fix had moved only the colours into the report definition and left the fonts behind, so the typeface still vanished whenever a customer saved. Fonts are now written into each visual and confirmed to survive saving. The last remaining element — a small caption — was settled by setting the font by hand in Power BI Desktop and reading back the property name Power BI wrote, rather than by guessing; every element of the report now survives a customer saving the file. Also confirmed that Power BI accepts a font fallback chain, closing that open question. |
+| 29 July 2026 | Added **Decision 8** (Section 20): the rebuild starts with **six tools rather than seventeen** — examine a sheet, record column meanings, summarise, add a chart, add a headline figure, produce the file. Enough for one complete journey from spreadsheet to finished report. The reasoning is economy rather than caution: Decision 7 already expects the tool set to be redesigned once we can watch the agent use it, and redesigning six is cheap where redesigning seventeen is a wasted week. Also recorded that **Manrope has been deployed** to the machines that open reports, closing the last open item on the current software, which is now finished. |
+| 29 July 2026 | Added Section 21: **built the first of the six tools** — the one that examines a sheet and describes what is in it. Tested against the official workbook, where it found the grand-total row, the `-` placeholders, 21 empty padding rows, 4 further date-only rows and 7 empty columns without being told to look for any of them. **Testing also caught a serious mistake:** the first version examined only the opening 2,000 rows, which judged four columns wrongly — Participant ID and Location would have been offered as breakdowns on the strength of 9 to 16 values when they hold hundreds, because real workbooks are sorted and the opening rows understate their variety. It now examines every row, capping the count once a column is clearly too varied to chart. |
