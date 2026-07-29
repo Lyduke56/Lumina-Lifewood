@@ -1,73 +1,134 @@
-# Lumina Production Plan Handler (WhatsApp)
+# SKILL.md - Lumina Production Plan Handler (WhatsApp)
 
-Use this skill when a WhatsApp user sends a production plan Excel file (`.xlsx`).
+Activate this skill when a WhatsApp user sends a production plan `.xlsx` file.
+
+---
 
 ## Prerequisites
 
 - The Lumina MCP server (`lumina-backend`) must be connected and reachable.
-- Confirm with `ping` → expect `"pong"`.
+- Health check: `ping` → expect `"pong"`. If the ping fails, report backend unavailability to the user and do not proceed.
 
-## When to activate
+---
 
-- User attaches an `.xlsx` file (production plan).
-- User asks to generate a dashboard, report, or Power BI file from an uploaded plan.
+## When to Activate
 
-## Do NOT
+- User attaches an `.xlsx` file (with or without a caption).
+- User explicitly asks to generate a dashboard, report, or Power BI file from an uploaded plan.
 
-- Do not parse `.xlsx` with generic file-read or spreadsheet tools — the backend uses pandas/openpyxl.
-- Do not use `media://` attachment references — they are unreliable. Always use the **absolute filesystem path** from the inbound media log or attachment metadata.
-- Do not offer CSV/screenshot workarounds.
-- Do not invent a `conversation_id` — always obtain one via `get_or_create_conversation`.
+---
 
-## Workflow
+## Hard Rules (Never Break These)
 
-1. **Identify the sender phone number** from the WhatsApp session metadata (the `from` / sender field OpenClaw provides).
+- **Do NOT** parse `.xlsx` files with generic file-read, shell, or spreadsheet tools. The backend uses openpyxl/pandas — pass the file path directly.
+- **Do NOT** use `media://` attachment references. They are unreliable. Always use the **absolute filesystem path** from the inbound media log or attachment metadata.
+- **Do NOT** offer CSV, PDF, or screenshot workarounds. Only `.xlsx` is supported.
+- **Do NOT** invent a `conversation_id` — always obtain one via `get_or_create_conversation`.
+- **Do NOT** show raw storage paths (e.g. `/media/uuid/...`) in any user-facing reply.
+- **Do NOT** ask the user for confirmation before processing. Act immediately.
+- **Do NOT** output internal health check results, ping responses, memory index messages, or any backend status information into the WhatsApp chat. These are developer-only diagnostics and must never appear in user-facing messages.
 
-2. **Resolve the file path**
-   - Inbound WhatsApp files land under `~/.openclaw/media/inbound/`.
-   - Use the full absolute path shown in logs, e.g. `/home/user/.openclaw/media/inbound/abc123/production_plan.xlsx`.
-   - Verify the file exists before calling the backend.
+---
 
-3. **Get or create a conversation**
-   ```
-   get_or_create_conversation(phone_number="<sender phone>")
-   ```
-   - Save the returned `conversation_id`.
-   - If this fails with "No Lumina account is linked", tell the user to sign up on the Lumina web app using the **same contact number** they message from on WhatsApp.
+## Step-by-Step Workflow
 
-4. **Process the file**
-   ```
-   process_production_plan(
-     file_path="<absolute path to .xlsx>",
-     conversation_id="<from step 3>",
-     report_type="Progress Overview",
-     report_name="<optional title from user message>",
-     instructions="<optional free-text from user>"
-   )
-   ```
+### Step 1 — Acknowledge Immediately
+Before running any tool, send a brief acknowledgement to the user:
+> ✨ Got your file. Processing now — I'll confirm when your dashboard is ready.
 
-5. **Reply on WhatsApp** with a concise summary:
-   - Record count (`record_count`)
-   - Confirmation the dashboard was generated
-   - Mention they can view/download it on the Lumina web dashboard
-   - On failure: explain clearly what went wrong (wrong file format, unregistered phone, backend error)
+This prevents the user from thinking nothing happened while the backend runs.
 
-## Example user-facing success message
+### Step 2 — Identify the Sender
+Extract the sender's phone number from the WhatsApp session metadata (the `from` / sender field OpenClaw provides).
 
-> Your production plan is processed — **42 daily records** parsed and a Power BI dashboard package is ready. Open the Lumina web app → Dashboard to download it.
+### Step 3 — Resolve the File Path
+- Inbound WhatsApp media files land under `~/.openclaw/media/inbound/`
+- Use the full absolute path exactly as provided in the attachment log
+- Do NOT attempt to read, list, or verify the file yourself — pass the path directly to the backend tool
 
-## Example user-facing error (unregistered phone)
+### Step 4 — Get or Create a Conversation
+```
+lumina-backend__get_or_create_conversation(phone_number="<sender phone>")
+```
+- Save the returned `conversation_id`
+- **If this fails with "No Lumina account is linked":**
+  > Your WhatsApp number isn't linked to a Lumina account. Please sign up at https://lumina-lifewood.vercel.app using this same contact number to get started.
 
-> I couldn't find a Lumina account for this WhatsApp number. Please sign up at [your Lumina URL] and use the same contact number you message from here.
+### Step 5 — Extract Report Preferences (if any)
+Check whether the user's message caption includes any of the following:
+- **Report title** (e.g. "call this March Production Summary")
+- **Color preferences** (e.g. "use blue and white")
+- **Font preferences** (e.g. "use Arial")
+- **Report type** (default: "Progress Overview")
+- **Special instructions** (e.g. "highlight rows below 80% completion")
 
-## Optional: gather report preferences
+If no preferences are given, use Lifewood defaults (forest green + amber palette, Fraunces + DM Sans fonts).
 
-If the user specifies report type, title, or styling in their message, pass those into `process_production_plan`. Defaults are fine when they just send the file with no instructions.
+### Step 6 — Process the File
+Execute immediately. Do not ask for confirmation.
+```
+lumina-backend__process_production_plan(
+  file_path="<absolute path to .xlsx>",
+  conversation_id="<from Step 4>",
+  report_type="Progress Overview",
+  report_name="<optional title from user message>",
+  instructions="<optional free-text instructions from user>"
+)
+```
 
-## MCP tools used
+### Step 7 — Reply with the Result
+
+**On success:**
+> ✨ Done! Your production plan has been processed — **{record_count} daily records** parsed and your Progress Overview dashboard is ready.
+>
+> Saved to your Lumina account: **{user_profile.display_name}** ({user_profile.email})
+>
+> Log in to view and download it: https://lumina-lifewood.vercel.app
+
+If `user_profile.email` is null, omit the email and just say:
+> Saved to your Lumina account: **{user_profile.display_name}**
+
+**On failure — invalid file format (no date column, wrong structure):**
+> Your file couldn't be processed. Lumina requires dates in Column A (formatted as actual dates, not text) and quantity/hours data in the following columns. Please correct the file and resend it.
+
+**On failure — backend unreachable:**
+> The Lumina backend is currently unavailable. Please try again in a few minutes. If the issue persists, contact your Lifewood administrator.
+
+**On failure — unregistered phone:**
+> Your WhatsApp number isn't linked to a Lumina account. Please sign up at https://lumina-lifewood.vercel.app using this same contact number to get started.
+
+**On failure — multi-sheet file:**
+> Your file contains multiple data sheets. Lumina requires a single consolidated sheet. Please remove the extra sheets and resend the file.
+
+---
+
+## Optional Customizations
+
+If the user specifies customizations in their message, pass them into `process_production_plan`. Examples:
+
+| User says | What to pass |
+|-----------|-------------|
+| "Title it March Plan" | `report_name="March Plan"` |
+| "Use blue and white colors" | `instructions="Use blue and white color palette"` |
+| "Highlight anything below 80%" | `instructions="Apply red conditional formatting for completion rate below 80%"` |
+
+When in doubt about the intent of an instruction, pass it as free text in the `instructions` field. The backend's AI layer will interpret it.
+
+---
+
+## File Format Reference (for error explanation)
+
+When explaining file errors to users, use plain language:
+- **"Date column missing"** → Column A must contain real Excel date values (not text like "Jan 1" or "01/01")
+- **"Multiple sheets"** → The file must have exactly one data sheet
+- **"No numeric data found"** → The file must have columns containing target and actual quantities or hours
+
+---
+
+## MCP Tools Reference
 
 | Tool | Purpose |
 |------|---------|
-| `ping` | Health check |
-| `get_or_create_conversation` | Map WhatsApp phone → Supabase conversation |
-| `process_production_plan` | Parse Excel, store data, generate PBIP zip |
+| `ping` | Confirm the backend is alive before processing |
+| `lumina-backend__get_or_create_conversation` | Match the sender's phone number to their Supabase account and conversation |
+| `lumina-backend__process_production_plan` | Parse the Excel file, generate the PBIP dashboard, upload to storage |

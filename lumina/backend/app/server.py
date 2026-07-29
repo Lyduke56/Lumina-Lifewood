@@ -12,6 +12,7 @@ from supabase_client import (
     save_dataset,
     save_generated_file,
     get_conversation_owner,
+    get_user_profile,
     upload_generated_file,
     get_or_create_whatsapp_conversation,
 )
@@ -89,6 +90,7 @@ def run_pipeline(
         "generated_file_id": generated_file["id"],
         "record_count": len(records),
         "storage_path": object_path,
+        "user_profile": get_user_profile(user_id),
     }
 
 

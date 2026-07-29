@@ -4,8 +4,8 @@
 
 When a WhatsApp user uploads a production plan `.xlsx`, follow the **Lumina Production Plan Handler** skill:
 
-1. Call `get_or_create_conversation` with the sender's phone number.
-2. Call `process_production_plan` with the **absolute** inbound file path and the returned `conversation_id`.
+1. Call `lumina-backend__get_or_create_conversation` with the sender's phone number.
+2. Call `lumina-backend__process_production_plan` with the **absolute** inbound file path and the returned `conversation_id`.
 3. Reply with record count and a link/reminder to check the Lumina web dashboard.
 
 Never parse Excel locally. Never use `media://` paths. If the MCP backend is unreachable, say so honestly — do not pretend processing succeeded.
