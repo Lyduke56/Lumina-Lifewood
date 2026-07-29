@@ -16,8 +16,12 @@ the work happening instead of a spinner.
 from __future__ import annotations
 
 import json
+import re
+import time
 from collections.abc import Iterator
 from typing import Any
+
+from openai import RateLimitError
 
 import agent_tools
 from llm_client import DEFAULT_MODEL, SUPPORTS_MODEL_FALLBACK, client
@@ -68,6 +72,46 @@ error unless it is something only they can resolve.
 Keep replies short. They are busy."""
 
 
+# Free tiers are rate limited per minute as well as per day — Google allows five
+# requests a minute on its free models, and one conversation makes about eight. Being
+# asked to wait a moment is normal operation here, not a failure, so we wait.
+RATE_LIMIT_ATTEMPTS = 4
+RATE_LIMIT_PAUSE_CAP = 65.0
+
+
+def _retry_after(error: Exception) -> float:
+    """How long the provider asked us to wait, if it said."""
+    match = re.search(r"retry in ([\d.]+)s", str(error), re.I)
+    if match:
+        return min(float(match.group(1)) + 1, RATE_LIMIT_PAUSE_CAP)
+    return 20.0
+
+
+def _complete(history: list[dict]):
+    """One call to the model, waiting out a rate limit rather than giving up on it."""
+    for attempt in range(RATE_LIMIT_ATTEMPTS):
+        try:
+            return client.chat.completions.create(
+                model=AGENT_MODEL,
+                messages=history,
+                tools=agent_tools.schemas(),
+                temperature=0,
+                max_tokens=MAX_REPLY_TOKENS,
+                # Only OpenRouter understands a list of models to try; the others
+                # reject the extra field outright.
+                **(
+                    {"extra_body": {"models": AGENT_FALLBACKS, "route": "fallback"}}
+                    if SUPPORTS_MODEL_FALLBACK
+                    else {}
+                ),
+            )
+        except RateLimitError as e:
+            if attempt == RATE_LIMIT_ATTEMPTS - 1:
+                raise
+            time.sleep(_retry_after(e))
+    raise RuntimeError("unreachable")
+
+
 def _tool_result(name: str, arguments: dict) -> str:
     """Run one tool. A refusal is an answer, not a crash — the model has to see it."""
     try:
@@ -89,20 +133,7 @@ def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
     history.append({"role": "user", "content": message})
 
     for _ in range(MAX_STEPS):
-        completion = client.chat.completions.create(
-            model=AGENT_MODEL,
-            messages=history,
-            tools=agent_tools.schemas(),
-            temperature=0,
-            max_tokens=MAX_REPLY_TOKENS,
-            # Only OpenRouter understands a list of models to try; the others reject
-            # the extra field outright.
-            **(
-                {"extra_body": {"models": AGENT_FALLBACKS, "route": "fallback"}}
-                if SUPPORTS_MODEL_FALLBACK
-                else {}
-            ),
-        )
+        completion = _complete(history)
         choice = completion.choices[0].message
         history.append(choice.model_dump(exclude_none=True))
 

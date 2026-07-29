@@ -40,7 +40,11 @@ PROVIDERS = {
     "gemini": (
         "https://generativelanguage.googleapis.com/v1beta/openai",
         "GEMINI_API_KEY",
-        "gemini-2.0-flash",
+        # Google moves which models carry a free allowance. gemini-2.0-flash now has
+        # none — it answers with "limit: 0" rather than a quota that has run out, which
+        # reads like an exhausted key and is not. Check with models.list() if this
+        # starts refusing.
+        "gemini-3.5-flash",
     ),
     "cerebras": (
         "https://api.cerebras.ai/v1",

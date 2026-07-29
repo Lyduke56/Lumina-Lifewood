@@ -1817,6 +1817,36 @@ buys.
 **Worth noting how these were found.** Not by reasoning about the model, but by printing what the
 tools said back to it. The AI was behaving sensibly throughout; our rules were wrong.
 
+### Both suppliers now work, and the earlier figures need correcting
+
+Google's key was tested again and works — the earlier refusal was not an exhausted key. Two
+things had to be understood first, and they correct what we recorded above.
+
+**A model with no free allowance looks exactly like an exhausted one.** Google reports
+`limit: 0` for `gemini-2.0-flash`, which reads as "you have run out" but means "this model was
+never free here". Naming a current model fixed it.
+
+**The binding limit is per minute, not per day.** We recorded Google as allowing ~1,500 requests a
+day, which is true but not the constraint that matters. Its free models allow **five requests per
+minute**, and a single conversation makes about eight. So a conversation trips the limit halfway
+through regardless of how much daily allowance remains.
+
+**Being asked to wait is normal operation on a free tier, not a failure.** The software now waits
+the requested time and carries on. With that, a full conversation completes on Google as well as
+Groq.
+
+### Which supplier to use
+
+| Supplier | Per minute | Suits this work? |
+|----------|-----------|------------------|
+| **Groq** | 30 | **Yes — a conversation runs straight through** |
+| Google | 5 | Yes, but pauses about a minute partway through |
+| OpenRouter free | — | 50 a day, roughly three conversations |
+
+**Groq is the default.** Google's larger daily allowance is worth less here than Groq's higher
+per-minute one, because the work arrives in bursts of eight or so requests rather than spread
+evenly. Both are configured, so switching is one line if Groq ever becomes the constraint.
+
 ---
 
 ## 27. Still to be decided
@@ -1869,3 +1899,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
 | 29 July 2026 | **The conversation now works end to end on a free tier.** Groq supplies the AI; Google's key was already at quota. A full exchange produced a real Power BI file from the official workbook — asking which sheet, explaining the columns in plain words, seeking confirmation, then summarising and building. Two problems found by watching it work: the first free model described columns by number and tried to build before summarising, fixed by naming a better free model on the same tier; and **we were making the AI repeat itself five or six times per conversation through two mistakes of our own** — refusing a sensible answer about running totals, and demanding a clarification where nothing was ambiguous. Both corrected, cutting a conversation from about fifteen requests to eight. |
+| 29 July 2026 | Got Google working as a second supplier, and corrected two things we had recorded. A model with **no** free allowance reports `limit: 0`, which reads as an exhausted key but is not — naming a current model fixed it. And the binding limit is **per minute, not per day**: Google allows five requests a minute where a conversation makes about eight, so it trips halfway through however much daily allowance remains. Being asked to wait is normal on a free tier, so the software now waits and carries on. **Groq stays the default** — its higher per-minute allowance matters more here than Google's larger daily one, because the work arrives in bursts. |
