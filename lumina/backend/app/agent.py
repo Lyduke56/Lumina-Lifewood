@@ -23,17 +23,24 @@ from typing import Any
 import agent_tools
 from llm_client import client
 
-# Free models are documented in this repo as dropping tool calls; this flow needs
-# several in sequence, so the model is a single setting rather than buried in code.
-AGENT_MODEL = os.getenv("LUMINA_AGENT_MODEL", "anthropic/claude-sonnet-4.5")
+# Free models are rate limited and individually unreliable — a 429 from one provider
+# should not end a customer's conversation. OpenRouter is asked to try these in order,
+# the same arrangement llm_client already uses for its one-shot calls.
+AGENT_MODEL = os.getenv("LUMINA_AGENT_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
+
+# OpenRouter accepts at most three. The last is its own free router, which picks any
+# free model that supports what the request needs — a backstop when the two named ones
+# are both rate limited.
+AGENT_FALLBACKS = [AGENT_MODEL, "openai/gpt-oss-20b:free", "openrouter/free"]
 
 # Decision 7 warns that agents wander. This is the hard stop.
 MAX_STEPS = 24
 
-# Replies here are a couple of sentences plus a tool call, never an essay. Left unset,
-# the client asks the provider to reserve its full context window, which is both wasteful
-# and — on a pay-as-you-go balance — refused outright before a single token is generated.
-MAX_REPLY_TOKENS = 1500
+# Left unset, the client asks the provider to reserve its full context window, which is
+# both wasteful and — on a pay-as-you-go balance — refused before a single token is
+# generated. Generous enough that a full set of column meanings, which is a long tool
+# call, is not cut off half-written; 1500 truncated one mid-sentence.
+MAX_REPLY_TOKENS = 3000
 
 SYSTEM_PROMPT = """You are Lumina, helping a Lifewood production manager turn their \
 spreadsheet into a Power BI dashboard. You talk to them in plain language; they are not \
@@ -42,6 +49,11 @@ technical and should never see jargon, column numbers, or tool names.
 Work through the tools in order: open the workbook, examine the sheet they want, agree \
 what its columns mean, summarise the figures, then add headline figures and charts, then \
 build the file.
+
+HOW YOU SPEAK: the customer only ever sees what you pass to reply_to_customer. Anything \
+you write outside a tool is thrown away and never reaches them. So when you want to ask a \
+question, explain a finding, or confirm something, call reply_to_customer — do not simply \
+write it out.
 
 How to behave:
 
@@ -86,16 +98,29 @@ def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
             tools=agent_tools.schemas(),
             temperature=0,
             max_tokens=MAX_REPLY_TOKENS,
+            extra_body={"models": AGENT_FALLBACKS, "route": "fallback"},
         )
         choice = completion.choices[0].message
         history.append(choice.model_dump(exclude_none=True))
 
-        if choice.content:
-            yield {"type": "message", "text": choice.content}
-
+        # Anything written outside reply_to_customer is deliberately discarded. Models
+        # vary in how much of their own reasoning they spill into ordinary content —
+        # one free model produced "We need to interpret columns. Let's list columns with
+        # positions…" in front of a production manager. Rather than hope each model
+        # behaves, the customer only ever sees what was passed to a tool, which makes
+        # the leak impossible instead of unlikely.
         if not choice.tool_calls:
-            yield {"type": "done"}
-            return
+            yield {"type": "nudge"}
+            history.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Say that to the customer using reply_to_customer, or carry on "
+                        "with the next tool. Anything written outside a tool is not seen."
+                    ),
+                }
+            )
+            continue
 
         for call in choice.tool_calls:
             name = call.function.name
@@ -103,6 +128,18 @@ def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
                 arguments = json.loads(call.function.arguments or "{}")
             except json.JSONDecodeError:
                 arguments = {}
+
+            if name == "reply_to_customer":
+                yield {"type": "message", "text": arguments.get("message", "")}
+                history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": agent_tools.reply_to_customer(**arguments),
+                    }
+                )
+                yield {"type": "done"}
+                return
 
             yield {"type": "tool_started", "tool": name}
             result = _tool_result(name, arguments)

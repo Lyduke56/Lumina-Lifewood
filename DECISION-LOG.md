@@ -1709,30 +1709,57 @@ Nobody had to catch that. **The tools refused work that would have produced a wr
 explained clearly enough that the AI could fix its own mistake.** That is precisely what Decisions 6
 and 7 were for, and it is the first time we have seen it work unprompted.
 
-### The problem: the AI model is not good enough
+### The AI model: what we first concluded, and what turned out to be true
 
-Two obstacles, both about the model rather than our software.
+Our first conclusion was that free models were not good enough and Lifewood would have to pay per
+report. **John Peter pushed back, and was right to.** Investigating properly changed the answer.
 
-**The account has no credits.** The first attempt with a capable model was refused outright:
-*"You requested up to 64,000 tokens, but can only afford 2,666."* Part of that was our fault — we
-were reserving far more room than a short reply needs, now corrected — but the balance is close to
-empty regardless.
+**What we got wrong.** The project already had an arrangement where OpenRouter tries several models
+in turn if one fails, and the agent was not using it — an omission on our part, now corrected.
 
-**The free model is not presentable.** A free model does work, and does call the tools correctly.
-But it spills its own thinking into what the customer sees:
+**What the free models can actually do.** Fourteen free models support the kind of tool use this
+needs. Tested on the exact step that had gone wrong, several produced clean, professional replies.
+The earlier bad output was not a hard limit of free models.
 
-> *"We need to interpret columns. Let's list columns with positions: 1: (unnamed) number - likely
-> row index or something, not needed. Probably ignore…"*
+**The real obstacle was never quality — it was a daily allowance.** The true error, once we read it
+properly:
 
-That is the AI reasoning out loud, shown to a production manager. The software is behaving
-correctly and the result is still unusable.
+> *Rate limit exceeded: free models per day. Add 10 credits to unlock 1000 free model requests per
+> day.* — with a limit of **50 requests per day**.
 
-**Why this matters to the business:** the machinery is finished and works. Whether customers get
-something professional now rests on which AI model we pay for — a running cost, not a development
-task. A capable model is a few US cents per report; a free one produces the text above.
+One conversation uses roughly fifteen requests. **The free allowance is about three conversations a
+day.** Nothing was too weak; we had simply run out.
 
-**This is a decision for Lifewood, not one we should quietly make.** The model is a single setting
-and can be changed in seconds once decided.
+**What this means for cost:** roughly **$10, once**, raises the allowance from 50 to 1000 free
+requests a day — around sixty conversations daily, at no per-report cost. That is a very different
+proposition from paying for every dashboard.
+
+### Two changes to use the allowance well
+
+Since every request counts, two wasteful habits were fixed:
+
+1. **The AI is given a ready-made starting list.** It was building the column meanings from scratch,
+   omitting one, being refused, and trying again — **six attempts in one conversation, each costing
+   a request**. It now receives a complete list with every column already present, and only has to
+   change the entries that matter.
+2. **Replies are no longer cut off.** One message to a customer stopped mid-sentence because the
+   allowance for a single reply was too small.
+
+### The customer only hears from us through a tool
+
+A structural change worth recording. The AI's ordinary writing is now **discarded entirely**. The
+only words a customer ever sees are those passed to a "reply to customer" tool.
+
+**Why:** one free model spilled its own thinking into what the customer would read — *"We need to
+interpret columns. Let's list columns with positions…"*. It did this intermittently, deeper into
+longer conversations, which is worse than doing it consistently.
+
+Rather than hope each model behaves, **the leak is now impossible**: prose that is not passed to a
+tool never reaches anybody. This is the same principle as Decisions 6 and 7 — the agent may only act
+through tools — extended to cover talking.
+
+**Still to be confirmed:** the daily allowance was exhausted during testing, so the improvements
+above are reasoned but not yet proven end to end. They need one more run once the allowance resets.
 
 ---
 
@@ -1783,3 +1810,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 24: **the last three tools, and the rebuild running end to end.** The Power BI model is now generated from whatever a workbook actually contains, rather than a fixed table of six known columns — which was the last place Decision 3's limitation survived. From the official workbook it produces a model describing *images*, taken from the customer's own spreadsheet. The full six-tool sequence now runs against the original untouched file that the previous software rejected outright, ending in a 48 KB Power BI file. The completion rate is recalculated rather than averaged and running totals take the largest value rather than being added up, so neither of the arithmetic traps found earlier can recur. |
 | 29 July 2026 | Added **Decision 9** (Section 25): the six tools will be exposed alongside the existing one, which is left untouched — **nobody's experience changes on the day this ships**, and the proven path keeps serving both the website and WhatsApp. Clarified that both surfaces currently use the old software; the new tools are used by nothing. Decided that the server holds the figures between steps rather than the AI carrying them, because a daily summary of the official workbook would flood the AI on every step and it needs to make decisions about the figures, not read them. The website gets the conversation first, since Decisions 1 and 2 put the conversation and the preview together; WhatsApp keeps the conveyor belt as a transitional state. |
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
+| 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |

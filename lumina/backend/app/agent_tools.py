@@ -23,6 +23,20 @@ from sheet_profiler import list_sheets, profile_sheet
 from summariser import SummaryError, summarise
 
 
+def reply_to_customer(message: str) -> str:
+    """Say something to the customer. This is the ONLY way they hear from you.
+
+    Anything written outside a tool is discarded and never reaches them, so use this for
+    every question, explanation and confirmation.
+
+    Args:
+        message: Plain language for a busy, non-technical production manager. No column
+            numbers, no tool names, no thinking out loud — just what they need to know
+            or decide. A few sentences at most.
+    """
+    return "Sent. Wait for their reply before doing anything further."
+
+
 def open_workbook(file_path: str) -> str:
     """Begin a report from an Excel workbook, and list the sheets it contains.
 
@@ -72,10 +86,28 @@ def examine_sheet(session_id: str, sheet_name: str) -> str:
     if profile.warnings:
         lines += ["", "Watch out for:"]
         lines += [f"  - {w}" for w in profile.warnings]
+    # A ready-made skeleton, every column already present and set to 'ignore'. Building
+    # this list from scratch is where models slip: they omit a column, are refused, and
+    # try again — six attempts in one observed conversation, each costing a request
+    # against a daily allowance. Editing a complete list is a far smaller task than
+    # composing one.
+    skeleton = "\n".join(
+        f'    {{"position": {c.position}, "role": "ignore"}},'
+        f'  # {c.heading or "(unnamed)"} — holds {c.mostly}'
+        for c in profile.columns
+    )
     lines += [
         "",
-        "Now say what each column is for with record_column_meanings. Every column "
-        "must be given a job, including 'ignore'.",
+        "Now say what each column is for with record_column_meanings. Every column must",
+        "be given a job. Start from this and change the roles that are not 'ignore':",
+        "",
+        "  columns = [",
+        skeleton,
+        "  ]",
+        "",
+        "Roles: date (the timeline), label (something to group by), target (a planned",
+        "figure — add unit), actual (an achieved figure — add unit and pairs_with),",
+        "calculated (worked out from the others — optionally add derives), ignore.",
     ]
     return "\n".join(lines)
 
@@ -255,6 +287,7 @@ def build_report_file(session_id: str, dataset_id: str) -> str:
 
 # The six tools of Decision 8, in the order they are meant to be used.
 TOOLS = [
+    reply_to_customer,
     open_workbook,
     examine_sheet,
     record_column_meanings,
@@ -270,6 +303,12 @@ BY_NAME = {fn.__name__: fn for fn in TOOLS}
 # model actually reads when deciding what to call — it deserves to be deliberate. The
 # shape of each tool is still taken from its signature, so the two cannot drift apart.
 PARAMETER_HELP: dict[str, dict[str, str]] = {
+    "reply_to_customer": {
+        "message": (
+            "Plain language for a busy, non-technical production manager. No column "
+            "numbers, no tool names, no thinking out loud. A few sentences at most."
+        ),
+    },
     "open_workbook": {
         "file_path": "Absolute path to the .xlsx file on disk.",
     },
