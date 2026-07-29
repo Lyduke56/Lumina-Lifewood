@@ -1258,15 +1258,73 @@ had the same name, and the branding vanished on save.
 
 ---
 
-## 19. Still to be decided
+## 19. The brand typeface — and the same trap a second time
+
+**Date:** 29 July 2026 · **Status:** Fixed and confirmed
+
+### Manrope is the brand typeface, not Fraunces
+
+The Lifewood typography guidelines were supplied: **Manrope**, in Semibold for display and
+headlines, Medium for accents, and Regular for body text.
+
+The software had been using **Fraunces and DM Sans** — fonts that appear nowhere in Lifewood's
+brand guidelines. They were the previous developer's own choice. The software now uses Manrope,
+mapped to the guidelines: Semibold for headings and the headline figure, Regular for body text.
+
+### Why fonts behaved differently from colours
+
+Power BI **cannot embed a font in a file.** It stores only a font's *name* and asks the computer
+opening the report to render it. This is why Microsoft's own built-in theme uses only Segoe UI
+and DIN — fonts that ship with Windows and Office, so they are always present.
+
+So a brand typeface has to be **installed on every machine that opens a report**. Manrope is free
+to install and distribute, and has now been installed locally. This is worth knowing before
+promising a customer their reports will look identical everywhere.
+
+### The same trap, caught a second time
+
+After the fix, the fonts still reverted on saving — exactly as the colours had done in Section 18.
+
+**The cause was our own incomplete fix.** When the theme problem was solved, only the *colours*
+were moved out of the theme and into the report definition. **The fonts were left behind.** So
+Manrope appeared on first open and vanished the moment a customer saved — the identical failure,
+in a place nobody had thought to re-check.
+
+This was caught because John Peter asked whether the font had really loaded the first time, and
+whether it had reverted like the colours. It had.
+
+**The fix:** the typeface is now written into each visual — chart titles, axis labels, legends,
+and the headline figure — rather than left to the theme. **Confirmed by inspecting the file after
+Power BI had saved it:** every one of those still carried Manrope, alongside the colours.
+
+### One element still outstanding
+
+An attempt to style the small caption beneath the headline figure was **silently discarded by
+Power BI** — the property name used is not one that visual type accepts. That caption alone still
+depends on the theme and will revert to a default font when a customer saves.
+
+It is a single line of small text and does not affect the rest of the report. The correct property
+name has not yet been identified.
+
+### The wider lesson
+
+Twice now, a fix has looked complete and was not, and both times it was **saving the file** that
+revealed it. Anything relying on Power BI's theme is fragile in a machine-generated report. The
+rule going forward: **if it should still be there after the customer saves, write it into the
+report definition, not the theme** — and verify by saving and reopening, never by looking at the
+file we produced.
+
+---
+
+## 20. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
-1. **Which fonts to use.** Fraunces and DM Sans are specified correctly but are not installed on
-   viewing machines, so Power BI substitutes a default. Three options: accept that reports look
-   different elsewhere, distribute the font files with the report, or restrict the choices to fonts
-   Windows already provides. **This is the most immediate open question** — it is the last thing
-   standing between the current output and a consistently branded result.
+1. **How to get Manrope onto customers' machines.** The typeface is now correct and survives
+   saving, but Power BI cannot embed a font — every machine that opens a report needs Manrope
+   installed or it substitutes a default. Manrope is free to distribute. Either have IT deploy it
+   across the company, ship the font file alongside the report, or accept that reports look
+   different on machines without it. **This is the most immediate open question.**
 2. **Whether to begin the rebuild with all seventeen tools, or the reduced set of six** described
    at the end of Section 13.
 3. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
@@ -1281,11 +1339,11 @@ These are open. They are recorded so they do not get forgotten or decided by acc
 should be read or recalculated (Decision 4), how the Power BI file obtains its data (Decision 5),
 which breakdowns to offer (Decision 6), the tool set itself (Decision 7, as a first draft), how
 multi-sheet workbooks are handled (Decision 7), how the page should be arranged (rebuilt — see
-Section 18), and branding the report page itself (done — see Section 18).
+Section 18), branding the report page itself (done — see Section 18), and which typeface to use (Manrope — see Section 19).
 
 ---
 
-## 20. Change history
+## 21. Change history
 
 | Date | Change |
 |------|--------|
@@ -1304,3 +1362,4 @@ Section 18), and branding the report page itself (done — see Section 18).
 | 28 July 2026 | Added Section 16. **Verified the Lifewood colours against the official brand guidelines** — all four core brand colours are exact, and the four extended chart colours were confirmed correct by John Peter, so the chart palette is fully compliant. **Identified a larger branding gap:** all text uses Microsoft's default grey rather than Lifewood green, and no background colour is set at all — the right palette applied to the wrong places. Added to the open list. Also **fixed the download filename** (raised by John Peter): every file was named identically, so Windows appended "(1)", "(2)" with no way to tell reports apart. Files are now named after the report with the date appended, e.g. "Test 1 - 2026-07-28.zip". Report names are treated as untrusted input and cleaned; ten awkward cases were tested including foreign alphabets and emoji. |
 | 28 July 2026 | Added Section 17: **fixed the headline completion figure** — the most serious defect on the baseline list, resolving three of them at once (wrong arithmetic, no formatting, unreadable label). The card was averaging 184 separate daily percentages, which reported 1.29 for a project that had delivered exactly 100%. It now uses a proper calculation — total delivered divided by total planned — which produces the right answer, carries a percentage format, and can be given a readable name. Two further improvements: the calculation is now always present rather than being tied to the optional colour-threshold feature, and the colour and the number are now derived from the same expression so they can no longer disagree. Verified: the figure reads 100.0% and is correctly green. |
 | 28 July 2026 | Added Section 18: **seven further defects fixed, and one serious new problem found and solved.** Presentation work: readable chart titles and legends, Lifewood text and page colours, proper number formatting, and a rebuilt page layout that puts the headline figure at the top instead of the bottom. Removed Microsoft's automatic date tables, which eliminated the alarming red warning on opening (though the Refresh step itself is inherent to the format and cannot be removed). **Most importantly:** discovered that all Lifewood branding vanished as soon as a customer saved the file — traced to a documented limitation in Power BI's preview support for machine-generated projects. Fixed by writing the colours directly into the charts and page rather than relying on a theme; confirmed to survive saving and reopening. Eight of the ten baseline defects are now resolved. |
+| 29 July 2026 | Added Section 19: **switched to Manrope, the actual Lifewood brand typeface** — the software had been using Fraunces and DM Sans, which appear nowhere in the brand guidelines and were the previous developer's own choice. Recorded that Power BI cannot embed fonts and relies on each viewing machine having them installed. **Caught the Section 18 trap a second time:** the earlier theme fix had moved only the colours into the report definition and left the fonts behind, so the typeface still vanished whenever a customer saved. Fonts are now written into each visual and confirmed to survive saving. One small caption remains theme-dependent, as Power BI rejected the property name used. |
