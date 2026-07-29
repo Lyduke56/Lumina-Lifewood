@@ -5,13 +5,13 @@ gsap.registerPlugin(useGSAP);
 import {
   LayoutDashboard, Settings, Plus,
   ChevronLeft, ChevronRight, CircleDot, LogOut,
-  Pencil, FolderOpen,
+  Pencil, FolderOpen, Sparkles,
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
 import type { GeneratedFile } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
 
-type ViewMode = "studio" | "files" | "dashboard";
+type ViewMode = "talk" | "studio" | "files" | "dashboard";
 
 interface SidebarProps {
   user: User | null;
@@ -115,6 +115,13 @@ export function Sidebar({
 
       {/* Navigation */}
       <nav className="ll-sidebar-section" style={{ padding: "12px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
+        <div
+          className={`ll-navitem ${view === "talk" ? "active" : ""}`}
+          onClick={() => { if (onRequireAuth()) setView("talk"); }}
+        >
+          <Sparkles size={16} />
+          <span className="ll-navitem-label">Talk to Lumina</span>
+        </div>
         <div
           className={`ll-navitem ${view === "studio" ? "active" : ""}`}
           onClick={() => { if (onRequireAuth()) setView("studio"); }}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar }       from "./Sidebar";
+import { ConversationView } from "./ConversationView";
 import { StudioView }    from "./StudioView";
 import { FilesView }     from "./FilesView";
 import SignOutModal      from "./SignOutModal";
@@ -11,14 +12,14 @@ import { useGeneratedFiles } from "@/hooks/useGeneratedFiles";
 import { WebDashboard }  from "./WebDashboard";
 import type { GeneratedFile, ChartPreviewJson } from "@/lib/types";
 
-type ViewMode = "studio" | "files" | "dashboard";
+type ViewMode = "talk" | "studio" | "files" | "dashboard";
 
 export default function App() {
   const { user, session } = useAuth();
   const router = useRouter();
   const [signOutOpen, setSignOutOpen]         = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [view, setView]                       = useState<ViewMode>("studio");
+  const [view, setView]                       = useState<ViewMode>("talk");
   const [activeFileId, setActiveFileId]       = useState<string | null>(null);
 
   // regen count map: fileId -> count (client-side only)
@@ -71,6 +72,13 @@ export default function App() {
       />
 
       {/* ── Main content area ────────────────────────────────────── */}
+      {view === "talk" && (
+        <ConversationView
+          session={session}
+          onReportChanged={refreshFiles}
+        />
+      )}
+
       {view === "studio" && (
         <StudioView
           session={session}
