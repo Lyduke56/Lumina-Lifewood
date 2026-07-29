@@ -377,12 +377,17 @@ def _card_visual_json(
     else:
         value_props["fontColor"] = {"solid": {"color": _literal(CASTLETON_GREEN)}}
 
-    # Only the number is styled here. A "labels" object was tried for the caption
-    # beneath it, but Power BI strips it on save — not a property cardVisual accepts —
-    # so that one caption still falls back to the theme, and to a default font once the
-    # customer saves. The correct object name has not been identified yet.
+    # "label" is the caption beneath the number, and is singular — a plural "labels" is
+    # silently discarded by Power BI on save, with no error. The name was settled by
+    # setting the font by hand in Power BI Desktop and reading back what it wrote.
     visual["objects"] = {
         "value": [{"properties": value_props, "selector": {"id": "default"}}],
+        "label": [
+            {
+                "properties": _text_style(BODY_FONT, DARK_SERPENT),
+                "selector": {"id": "default"},
+            }
+        ],
     }
 
     return {
