@@ -24,7 +24,7 @@ from typing import Any
 from openai import RateLimitError
 
 import agent_tools
-from llm_client import DEFAULT_MODEL, SUPPORTS_MODEL_FALLBACK, client
+from llm_client import DEFAULT_MODEL, available_suppliers
 
 AGENT_MODEL = DEFAULT_MODEL
 
@@ -79,37 +79,110 @@ RATE_LIMIT_ATTEMPTS = 4
 RATE_LIMIT_PAUSE_CAP = 65.0
 
 
-def _retry_after(error: Exception) -> float:
-    """How long the provider asked us to wait, if it said."""
-    match = re.search(r"retry in ([\d.]+)s", str(error), re.I)
+def _retry_after(error: Exception) -> float | None:
+    """How long to wait, or None if waiting will not help.
+
+    A per-minute limit comes with a delay and clears itself. A spent daily allowance
+    either offers no delay or one far too long to hold a customer through — in both
+    cases the answer is a different supplier, not patience.
+    """
+    text = str(error)
+    match = re.search(r"(?:retry in|try again in)\s*([\d.]+)\s*s", text, re.I)
     if match:
-        return min(float(match.group(1)) + 1, RATE_LIMIT_PAUSE_CAP)
-    return 20.0
+        wait = float(match.group(1)) + 1
+        return wait if wait <= RATE_LIMIT_PAUSE_CAP else None
+    if re.search(r"per[- ]day|daily|tokens per day|TPD|credits", text, re.I):
+        return None
+    return None
 
 
-def _complete(history: list[dict]):
-    """One call to the model, waiting out a rate limit rather than giving up on it."""
-    for attempt in range(RATE_LIMIT_ATTEMPTS):
-        try:
-            return client.chat.completions.create(
-                model=AGENT_MODEL,
-                messages=history,
-                tools=agent_tools.schemas(),
-                temperature=0,
-                max_tokens=MAX_REPLY_TOKENS,
-                # Only OpenRouter understands a list of models to try; the others
-                # reject the extra field outright.
-                **(
-                    {"extra_body": {"models": AGENT_FALLBACKS, "route": "fallback"}}
-                    if SUPPORTS_MODEL_FALLBACK
-                    else {}
-                ),
-            )
-        except RateLimitError as e:
-            if attempt == RATE_LIMIT_ATTEMPTS - 1:
-                raise
-            time.sleep(_retry_after(e))
-    raise RuntimeError("unreachable")
+def _complete(history: list[dict], tools: list[dict]):
+    """One call to the model.
+
+    A rate limit is worth waiting out; an exhausted allowance is not, and the two are
+    told apart by whether the supplier offers a retry delay. Where waiting will not
+    help, the next supplier holding a key is tried instead — free tiers run dry on
+    their own separate schedules, and a customer's conversation should not end because
+    one of them did.
+    """
+    suppliers = available_suppliers()
+    last: Exception | None = None
+
+    for supplier in suppliers:
+        for attempt in range(RATE_LIMIT_ATTEMPTS):
+            try:
+                return supplier.client.chat.completions.create(
+                    model=supplier.model,
+                    messages=history,
+                    tools=tools,
+                    temperature=0,
+                    max_tokens=MAX_REPLY_TOKENS,
+                    # Only OpenRouter understands a list of models to try; the others
+                    # reject the extra field outright.
+                    **(
+                        {"extra_body": {"models": AGENT_FALLBACKS, "route": "fallback"}}
+                        if supplier.name == "openrouter"
+                        else {}
+                    ),
+                )
+            except RateLimitError as e:
+                last = e
+                pause = _retry_after(e)
+                # No delay offered means the allowance is spent, not merely busy.
+                if pause is None or attempt == RATE_LIMIT_ATTEMPTS - 1:
+                    break
+                time.sleep(pause)
+            except Exception as e:  # a bad key or a withdrawn model: try the next one
+                last = e
+                break
+
+    raise last or RuntimeError("No AI supplier is configured.")
+
+
+# Tool output that has served its purpose, and what to leave in its place. The whole
+# conversation is re-sent on every call, so a long answer is paid for again and again.
+# The sheet description is the worst offender at roughly 500 tokens: essential while
+# deciding what the columns mean, and dead weight the moment that is settled, because
+# the answer is then held on the server and does not need repeating to the model.
+_SUPERSEDED = {
+    "examine_sheet": (
+        "record_column_meanings",
+        "(The sheet has been examined and its columns agreed; details omitted.)",
+    ),
+}
+
+
+def _trim(history: list[dict]) -> list[dict]:
+    """Replace tool output the conversation has moved past, keeping the shape intact.
+
+    The messages themselves stay — removing one would orphan the tool call that asked
+    for it — only their contents are shortened.
+    """
+    settled = {
+        call["function"]["name"]
+        for message in history
+        for call in (message.get("tool_calls") or [])
+    }
+    replacements: dict[str, str] = {}
+    for tool, (after, placeholder) in _SUPERSEDED.items():
+        if after in settled:
+            replacements[tool] = placeholder
+    if not replacements:
+        return history
+
+    # Which call ids belong to the tools we are shortening.
+    ids = {
+        call["id"]: call["function"]["name"]
+        for message in history
+        for call in (message.get("tool_calls") or [])
+        if call["function"]["name"] in replacements
+    }
+    return [
+        {**m, "content": replacements[ids[m["tool_call_id"]]]}
+        if m.get("role") == "tool" and m.get("tool_call_id") in ids
+        else m
+        for m in history
+    ]
 
 
 def _tool_result(name: str, arguments: dict) -> str:
@@ -133,7 +206,7 @@ def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
     history.append({"role": "user", "content": message})
 
     for _ in range(MAX_STEPS):
-        completion = _complete(history)
+        completion = _complete(_trim(history), agent_tools.schemas_for(history))
         choice = completion.choices[0].message
         history.append(choice.model_dump(exclude_none=True))
 

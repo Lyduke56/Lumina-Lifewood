@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -31,10 +32,19 @@ from summariser import Summary
 SESSION_LIFETIME_SECONDS = 6 * 60 * 60
 
 
+# Who the finished report belongs to, for the duration of one agent turn. The tools
+# take a session id and nothing else — a customer should never see an account id, and
+# the agent has no business handling one — so it is carried alongside rather than
+# passed through the conversation. Left unset on the WhatsApp path, which has its own
+# arrangements.
+CURRENT_OWNER: ContextVar[dict | None] = ContextVar("current_owner", default=None)
+
+
 @dataclass
 class Session:
     id: str
     workbook: Path
+    owner: dict | None = None  # {"user_id": ..., "conversation_id": ...}
     created_at: float = field(default_factory=time.time)
     touched_at: float = field(default_factory=time.time)
     profiles: dict[str, SheetProfile] = field(default_factory=dict)
@@ -58,7 +68,9 @@ def open_session(workbook: str | Path) -> Session:
     path = Path(workbook)
     if not path.exists():
         raise SessionError(f"No file at {path}.")
-    session = Session(id=uuid.uuid4().hex[:12], workbook=path)
+    session = Session(
+        id=uuid.uuid4().hex[:12], workbook=path, owner=CURRENT_OWNER.get()
+    )
     _sessions[session.id] = session
     return session
 

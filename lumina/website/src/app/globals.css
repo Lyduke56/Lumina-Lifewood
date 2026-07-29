@@ -146,6 +146,31 @@ body {
           align-self: flex-start; max-width: 78%; background: var(--white); border: 1px solid var(--line);
           color: var(--forest); padding: 12px 16px; border-radius: 4px 14px 14px 14px; font-size: 14px; line-height: 1.6;
         }
+        /* Rendered markdown inside a reply. Models write lists and the odd table by
+           habit; browser defaults would push them out of the bubble. */
+        .ll-msg-assistant > *:first-child { margin-top: 0; }
+        .ll-msg-assistant > *:last-child { margin-bottom: 0; }
+        .ll-msg-assistant p { margin: 0 0 8px; }
+        .ll-msg-assistant ul,
+        .ll-msg-assistant ol { margin: 6px 0 8px; padding-left: 20px; }
+        .ll-msg-assistant li { margin: 2px 0; }
+        .ll-msg-assistant li::marker { color: var(--emerald); }
+        .ll-msg-assistant strong { font-weight: 600; color: var(--forest); }
+        .ll-msg-assistant code {
+          font-family: ui-monospace, "Cascadia Code", monospace; font-size: 12.5px;
+          background: var(--emerald-tint); padding: 1px 5px; border-radius: 4px;
+        }
+        .ll-msg-assistant table {
+          border-collapse: collapse; margin: 8px 0; font-size: 13px; width: 100%;
+          display: block; overflow-x: auto;
+        }
+        .ll-msg-assistant th,
+        .ll-msg-assistant td {
+          border: 1px solid var(--line); padding: 5px 9px; text-align: left;
+        }
+        .ll-msg-assistant th { background: var(--offwhite); font-weight: 600; }
+        .ll-msg-assistant a { color: var(--emerald); }
+
         .ll-chan-tag {
           display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500;
           color: var(--amber-safe); margin-bottom: 4px;
@@ -424,4 +449,4 @@ body {
 
         /* keep ll-status-badge.compiling */
         .ll-status-badge.compiling { background: rgba(166,90,18,0.12); color: #A65A12; }
-
+

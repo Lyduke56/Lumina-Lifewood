@@ -25,6 +25,9 @@ class Conversation:
     id: str
     owner: str  # the Supabase user, so nobody can read anyone else's
     workbook: Path | None = None
+    # The Supabase conversations row a finished report belongs to, so it appears in
+    # the customer's Files list under a sensible name.
+    supabase_id: str | None = None
     history: list[dict] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     touched_at: float = field(default_factory=time.time)

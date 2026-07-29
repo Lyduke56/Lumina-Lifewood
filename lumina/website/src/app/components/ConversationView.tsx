@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FileSpreadsheet, Paperclip, Send, Sparkles } from "lucide-react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Session } from "@supabase/supabase-js";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
@@ -191,7 +193,11 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
       >
         {messages.map((m, i) => (
           <div key={i} className={m.role === "you" ? "ll-msg-user" : "ll-msg-assistant"}>
-            {m.text}
+            {/* Models write in markdown by habit. Rendering it beats forbidding it —
+                a list of columns genuinely reads better as a list, and it has already
+                produced a table when describing figures. Unrendered, a customer sees
+                stray asterisks. */}
+            {m.role === "you" ? m.text : <Markdown remarkPlugins={[remarkGfm]}>{m.text}</Markdown>}
           </div>
         ))}
 

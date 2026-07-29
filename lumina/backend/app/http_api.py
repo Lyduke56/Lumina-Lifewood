@@ -9,6 +9,8 @@ from fastapi.responses import StreamingResponse
 
 import agent
 import conversations
+import workbench
+from supabase_client import get_client
 from server import run_pipeline
 from supabase_client import get_authenticated_user_id, verify_conversation_owner
 
@@ -112,7 +114,16 @@ async def begin_conversation(
     with open(workbook, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
+    # The website lists files by conversation, so the report needs one to belong to.
+    record = (
+        get_client()
+        .table("conversations")
+        .insert({"user_id": owner, "title": Path(workbook.name).stem})
+        .execute()
+    )
+
     conversation = conversations.start(owner, workbook)
+    conversation.supabase_id = record.data[0]["id"]
     return {
         "conversation_id": conversation.id,
         "workbook": workbook.name,
@@ -148,7 +159,13 @@ async def send_message(
         # The agent's tools take a path, and the customer should never see one.
         opening = f"{message}\n\n(The workbook is at {conversation.workbook})"
 
+    owner_context = {
+        "user_id": conversation.owner,
+        "conversation_id": conversation.supabase_id,
+    }
+
     def stream():
+        token = workbench.CURRENT_OWNER.set(owner_context)
         try:
             for event in agent.respond(conversation.history, opening):
                 yield f"data: {json.dumps(event)}\n\n"

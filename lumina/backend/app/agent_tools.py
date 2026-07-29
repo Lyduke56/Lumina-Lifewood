@@ -20,6 +20,11 @@ import workbench
 from column_roles import Assignment, Role, RoleError, describe, set_column_roles
 from report_builder import ReportError, add_chart, add_kpi, build_powerbi
 from sheet_profiler import list_sheets, profile_sheet
+from supabase_client import (
+    save_dataset,
+    save_generated_file,
+    upload_generated_file,
+)
 from summariser import SummaryError, summarise
 
 
@@ -278,10 +283,46 @@ def build_report_file(session_id: str, dataset_id: str) -> str:
     session = workbench.get(session_id)
     summary = workbench.require_summary(session)
     folder = build_powerbi(session.spec, summary, dataset_id)
-    return (
-        f"Wrote the Power BI project to {folder}, with "
+
+    built = (
         f"{len(session.spec.kpis)} headline figure(s) and "
-        f"{len(session.spec.charts)} chart(s) over {summary.group_count} rows."
+        f"{len(session.spec.charts)} chart(s) over {summary.group_count} rows"
+    )
+
+    # Writing the file to the server is not delivering it. Without this the report
+    # existed only in a folder on our machine — it never reached the customer's Files
+    # list and there was nothing for them to download, while the agent cheerfully
+    # reported it as ready.
+    if not session.owner:
+        return f"Built the report ({built}), saved at {folder}."
+
+    dataset = save_dataset(
+        source_file_path=str(session.workbook),
+        parsed_rows=summary.rows,
+        conversation_id=session.owner["conversation_id"],
+    )
+    storage_path = upload_generated_file(
+        folder,
+        user_id=session.owner["user_id"],
+        dataset_id=dataset["id"],
+        report_name=session.spec.title,
+    )
+    save_generated_file(
+        dataset_id=dataset["id"],
+        layout_json={
+            "headline_figures": [k.title for k in session.spec.kpis],
+            "charts": [c.title for c in session.spec.charts],
+        },
+        # The website's preview expects the older fixed column names and cannot read
+        # these yet; that is the next piece of work, not something to fake here.
+        chart_preview_json=None,
+        conversation_id=session.owner["conversation_id"],
+        storage_path=storage_path,
+    )
+    return (
+        f"Built the report ({built}) and saved it to the customer's account. It is now "
+        f"in their Files list, ready to download. Tell them it is ready — do not mention "
+        f"folders or file paths."
     )
 
 
@@ -407,3 +448,48 @@ def register(mcp) -> None:
     """Add the six tools to an MCP server, leaving anything already there alone."""
     for fn in TOOLS:
         mcp.tool(fn)
+
+
+# Which tools are worth offering, given how far the conversation has got. Every tool
+# description is re-sent on every single call, and all eight cost about 1,100 tokens —
+# roughly 9,000 across a conversation, spent describing work that cannot be done yet.
+# Offering only what is reachable also removes a way to go wrong: the model cannot ask
+# to build a file before anything has been summarised if that tool is not on the table.
+_STAGE_TOOLS = {
+    "start": ["reply_to_customer", "open_workbook"],
+    "opened": ["reply_to_customer", "examine_sheet", "open_workbook"],
+    "examined": ["reply_to_customer", "record_column_meanings", "examine_sheet"],
+    "agreed": ["reply_to_customer", "summarise_figures", "record_column_meanings"],
+    "summarised": [
+        "reply_to_customer",
+        "add_headline_figure",
+        "add_report_chart",
+        "build_report_file",
+        "summarise_figures",
+    ],
+}
+
+
+def _stage(history: list[dict]) -> str:
+    """How far along we are, judged by which tools have already succeeded."""
+    done = {
+        call["function"]["name"]
+        for message in history
+        for call in (message.get("tool_calls") or [])
+        if isinstance(message, dict)
+    }
+    if "summarise_figures" in done:
+        return "summarised"
+    if "record_column_meanings" in done:
+        return "agreed"
+    if "examine_sheet" in done:
+        return "examined"
+    if "open_workbook" in done:
+        return "opened"
+    return "start"
+
+
+def schemas_for(history: list[dict]) -> list[dict]:
+    """Tool definitions worth sending, given where the conversation has got to."""
+    allowed = set(_STAGE_TOOLS[_stage(history)])
+    return [d for d in schemas() if d["function"]["name"] in allowed]
