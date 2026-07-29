@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     const adminClient = createAdminClient();
     const { data, error } = await adminClient.storage
-      .from("generated_dashboards")
+      .from("generated-files")
       .createSignedUrl(storagePath, 60);
 
     if (error) {
