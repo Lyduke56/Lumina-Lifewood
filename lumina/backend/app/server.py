@@ -155,6 +155,15 @@ def process_production_plan(
     )
 
 
+# The six tools of Decision 8, added alongside process_production_plan rather than
+# replacing it. Decision 9: the existing path keeps serving both the website and
+# WhatsApp untouched, so nobody's experience changes until a surface is deliberately
+# pointed at these.
+import agent_tools
+
+agent_tools.register(mcp)
+
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(_request: Request) -> PlainTextResponse:
     return PlainTextResponse("ok")

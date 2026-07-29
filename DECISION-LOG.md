@@ -1612,7 +1612,68 @@ the wiring that lets a customer reach any of it. Those come next.
 
 ---
 
-## 25. Still to be decided
+## 25. Decision 9 — how the tools are reached, and what changes for whom
+
+**Date:** 29 July 2026 · **Status:** Agreed
+
+The six tools are built but nothing can call them. They are finished machinery with no handle
+attached. This settles how they are reached, and — just as importantly — what does **not** change
+while that happens.
+
+### Where things actually stand today
+
+A point worth stating plainly, because it is easy to assume otherwise: **the website and WhatsApp
+both use the old software.** They reach it differently — the website over the web, WhatsApp through
+the messaging robot — but both end up in the same conveyor belt. Nothing anyone uses touches the
+new tools.
+
+### The decision
+
+**Expose the six tools alongside the existing one, and change nothing about the existing one.**
+
+The old path keeps serving both the website and WhatsApp exactly as it does now. The six tools sit
+next to it, reachable but unused, until a surface is deliberately pointed at them. Nobody's
+experience changes on the day this ships.
+
+**Why:** the new work has been safely inert until now. The moment it is reachable, a mistake in it
+could reach a customer. Keeping the proven path untouched means the new one can be exercised in
+real conditions without anything depending on it yet.
+
+### The server remembers; the agent does not carry the data
+
+Between them the tools pass substantial things around — a description of a sheet, an agreed set of
+column meanings, a table of summarised figures. The AI communicates in plain text, so either the
+server holds these between steps, or the AI carries them from one step to the next.
+
+**The server holds them.** Each tool returns a short reference and a readable summary; the figures
+themselves stay on the server.
+
+**Why:** a daily summary of the official workbook is 180 rows of seven figures, and a breakdown of
+the detailed sheet is far larger. Passing that through the AI on every step would flood it, making
+it slower, more expensive, and worse at deciding things. **The AI does not need to see the figures —
+it needs to make decisions about them.**
+
+**The cost:** the server holds information for the duration of a conversation, which has to be
+cleared up afterwards, and ties a conversation to one server.
+
+**What we rejected:** having the AI carry everything. Simpler to build, and it fails on exactly the
+large workbooks this product exists to handle.
+
+### Which surface gets the conversation first
+
+The website, and this follows from decisions already taken. Decision 1 wants the AI to ask rather
+than guess; Decision 2 wants the customer watching the dashboard take shape as it is built. Those
+two belong together, so the conversation goes where the preview is.
+
+The website has no chat interface today, so one has to be built.
+
+**WhatsApp keeps the conveyor belt for now.** That is a transitional state rather than the intended
+design — eventually it gets the conversation too, without the live preview, since a phone cannot
+show one usefully.
+
+---
+
+## 26. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -1632,7 +1693,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 26. Change history
+## 27. Change history
 
 | Date | Change |
 |------|--------|
@@ -1657,3 +1718,4 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 22: **built the second of the six tools** — the one that records what job each column does, which is where Decision 3 becomes real. What is being counted is now information carried through to the labels rather than something built into the code, so a customer counting videos or revenue needs no new development. The tool acts as a gate: it refuses eight kinds of mistake, including the two conditions Decision 3 attached — no column may be left unassigned, and every achieved figure must name the planned figure it belongs to. It also explains its reading back in plain language for the customer to confirm, including warning that the `-` placeholders will be read as missing rather than silently becoming zero. |
 | 29 July 2026 | Added Section 23: **built the third of the six tools** — summarising, which is Decision 5 in practice. Tested against the official workbook, it reproduces the project's real monthly history to the figure, correctly leaving out the grand total, the padding rows and the date-only rows. It declines to produce breakdowns no chart could show, offering a top ten instead. **It also corrected an earlier finding of ours:** the workbook's running totals were recorded as "7,137 short", but measured precisely the target running total is *incomplete* (filled in on 154 of 180 rows) rather than wrong, and the actual running total agrees with our arithmetic everywhere. Decision 4 stands, better supported — the software now reports agreement and completeness separately. |
 | 29 July 2026 | Added Section 24: **the last three tools, and the rebuild running end to end.** The Power BI model is now generated from whatever a workbook actually contains, rather than a fixed table of six known columns — which was the last place Decision 3's limitation survived. From the official workbook it produces a model describing *images*, taken from the customer's own spreadsheet. The full six-tool sequence now runs against the original untouched file that the previous software rejected outright, ending in a 48 KB Power BI file. The completion rate is recalculated rather than averaged and running totals take the largest value rather than being added up, so neither of the arithmetic traps found earlier can recur. |
+| 29 July 2026 | Added **Decision 9** (Section 25): the six tools will be exposed alongside the existing one, which is left untouched — **nobody's experience changes on the day this ships**, and the proven path keeps serving both the website and WhatsApp. Clarified that both surfaces currently use the old software; the new tools are used by nothing. Decided that the server holds the figures between steps rather than the AI carrying them, because a daily summary of the official workbook would flood the AI on every step and it needs to make decisions about the figures, not read them. The website gets the conversation first, since Decisions 1 and 2 put the conversation and the preview together; WhatsApp keeps the conveyor belt as a transitional state. |
