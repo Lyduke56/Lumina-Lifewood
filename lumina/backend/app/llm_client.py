@@ -32,7 +32,10 @@ PROVIDERS = {
     "groq": (
         "https://api.groq.com/openai/v1",
         "GROQ_API_KEY",
-        "llama-3.3-70b-versatile",
+        # Noticeably better at this than llama-3.3-70b, which described columns to the
+        # customer by number despite being told not to, and called for the file to be
+        # built before anything had been summarised.
+        "openai/gpt-oss-120b",
     ),
     "gemini": (
         "https://generativelanguage.googleapis.com/v1beta/openai",

@@ -325,7 +325,8 @@ PARAMETER_HELP: dict[str, dict[str, str]] = {
             "calculated or ignore); unit (for a figure, what it counts, e.g. 'Images'); "
             "pairs_with (for an actual, the column number of the target it belongs to); "
             "derives (for a calculated column, which figure it holds: completion_rate, "
-            "shortfall, cumulative_target or cumulative_actual)."
+            "shortfall, cumulative_target or cumulative_actual — pairs_with is only "
+            "needed here if the sheet has more than one planned figure)."
         ),
     },
     "summarise_figures": {
