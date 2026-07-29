@@ -33,8 +33,8 @@ def run_pipeline(
     report_name: str = "",
     instructions: str | None = None,
     data_colors: list[str] | None = None,
-    heading_font: str = "Fraunces",
-    body_font: str = "DM Sans",
+    heading_font: str = "Manrope SemiBold",
+    body_font: str = "Manrope",
     good_threshold: float | None = None,
     neutral_threshold: float | None = None,
 ) -> dict:
@@ -71,7 +71,10 @@ def run_pipeline(
         neutral_threshold=neutral_threshold,
     )
     object_path = upload_generated_file(
-        output_dir, user_id=user_id, dataset_id=dataset["id"]
+        output_dir,
+        user_id=user_id,
+        dataset_id=dataset["id"],
+        report_name=report_name,
     )
 
     generated_file = save_generated_file(
@@ -119,8 +122,8 @@ def process_production_plan(
     report_name: str = "",
     instructions: str = "",
     data_colors: list[str] | None = None,
-    heading_font: str = "Fraunces",
-    body_font: str = "DM Sans",
+    heading_font: str = "Manrope SemiBold",
+    body_font: str = "Manrope",
     good_threshold: float | None = None,
     neutral_threshold: float | None = None,
 ) -> dict:

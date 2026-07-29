@@ -51,7 +51,7 @@ export type Profile = {
 
 // ── Report configuration produced by SetupCard ───────────────────────────────
 export type ColorPresetId = "lifewood" | "plum-citrus" | "slate-coral" | "custom";
-export type FontPresetId  = "inter-inter" | "playfair-inter" | "montserrat-lato" | "fraunces-dm" | "custom";
+export type FontPresetId  = "manrope" | "inter-inter" | "playfair-inter" | "montserrat-lato" | "fraunces-dm" | "custom";
 export type ReportTypeId  = "Progress Overview" | "Executive Summary" | "Detailed Breakdown" | "Custom";
 
 export type ReportConfig = {
