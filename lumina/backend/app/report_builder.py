@@ -35,6 +35,11 @@ from summariser import ORDER_KEY, PERIOD_LABEL, Summary
 
 CHART_KINDS = {"line": "lineChart", "bar": "clusteredColumnChart", "table": "tableEx"}
 
+# How many bars or points a chart can carry and still be read. This belongs to the chart,
+# not to the figures behind it: a report may hold a hundred rows and still draw a perfectly
+# readable four-bar chart, because Power BI totals the rest.
+MAX_AXIS_VALUES = 30
+
 
 class ReportError(ValueError):
     """The request would produce a broken or meaningless report. The message says why."""
@@ -149,6 +154,19 @@ def add_chart(
             f"{group_by!r} is not something this summary is grouped by. Available: "
             f"{', '.join(summary.group_by)}."
         )
+    if kind != "table":
+        on_axis = {
+            row.get(group_by)
+            for row in summary.rows
+            if row.get(group_by) is not None
+        }
+        if len(on_axis) > MAX_AXIS_VALUES:
+            raise ReportError(
+                f"A chart against {group_by!r} would have {len(on_axis)} bars, more than "
+                f"anyone can read. Use a table for that many, chart against something with "
+                f"fewer values, or summarise it as a top ten."
+            )
+
     spec.charts.append(
         Chart(
             kind,

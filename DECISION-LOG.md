@@ -2940,7 +2940,41 @@ for. Establishing whether the last change worked is not.
 
 ---
 
-## 50. Still to be decided
+## 50. One rule doing two jobs
+
+A report could hold a monthly chart or a studio chart, never both. Lumina said so plainly to the
+customer, which was honest, and the plan was to stop pre-totalling altogether and put raw detail in
+the file — revisiting Decision 5, a substantial change.
+
+**The actual fault was one rule doing two unrelated jobs.** Summarising refused any grouping that
+produced more than sixty rows, reasoning that *"no chart can show sixty bars"*.
+
+That conflates the table with the chart. A table grouped by month, studio and editor holds 239 rows;
+a chart drawn against Studio still shows four bars, because Power BI adds up the rest. The size of
+the table and the number of bars on an axis are different numbers, and only one of them has anything
+to do with readability.
+
+So there are now two limits, each doing one job: **5,000 rows** for the file, **30 values** for a
+chart's axis. A report can carry several groupings and each visual draws against whichever it needs.
+
+```
+grouped by: ['period', 'Studio', 'Editor']  (239 rows, 64 KB)
+  Planned vs Completed by Month    ok
+  Achievement Rate by Studio       ok
+  Every Editor                     ok
+```
+
+Opened in Power BI Desktop, the editor table totals 2,966 planned and 2,563 completed — the
+spreadsheet's own figures, aggregated by Power BI across twenty-eight editors it was never told about
+directly.
+
+**Decision 5 stands untouched**, and no rewrite was needed. Worth recording because the instinct was
+to redesign: the limitation was real, the diagnosis of it was wrong, and reading the rule that
+produced it was cheaper than replacing the thing it constrained.
+
+---
+
+## 51. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -2968,7 +3002,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 51. Change history
+## 52. Change history
 
 | Date | Change |
 |------|--------|

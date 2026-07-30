@@ -28,7 +28,12 @@ from sheet_profiler import SheetProfile
 
 # More groups than this makes an unreadable chart, and is the point at which the tool
 # declines and suggests a top-N instead rather than producing something useless.
-MAX_GROUPS = 60
+# How many rows a report may carry. This limits the *file*, not what any chart shows:
+# a table grouped by month, studio and editor holds a hundred rows, and a chart drawn
+# against any one of those columns still shows four bars, or twenty-eight, because Power BI
+# adds up the rest. Conflating the two is what stopped a report having a monthly chart, a
+# studio chart and an editor table at once — the customer was told to choose.
+MAX_ROWS = 5_000
 
 PERIODS = ("day", "week", "month", "quarter", "none")
 
@@ -300,11 +305,12 @@ def _apply_top_n(buckets, summary, period, group_by, top_n, measure_columns):
         return buckets
 
     distinct = len({k[len([1] if period != "none" else []) :] for k in buckets})
-    if top_n is None and distinct > MAX_GROUPS:
+    if top_n is None and len(buckets) > MAX_ROWS:
         raise SummaryError(
-            f"Grouping this way produces {distinct} groups, which no chart can show "
-            f"readably. Ask for a top ten instead, or group by something with fewer "
-            f"values."
+            f"That grouping produces {len(buckets):,} rows, more than a report should "
+            f"carry. Ask for a top ten, or summarise by a longer period. Note that "
+            f"grouping by several columns is fine in itself — each chart draws against "
+            f"one of them and the rest are added up."
         )
     if top_n is None or distinct <= top_n:
         return buckets
