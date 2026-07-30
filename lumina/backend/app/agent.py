@@ -25,6 +25,7 @@ from typing import Any
 from openai import RateLimitError
 
 import agent_tools
+import figure_check
 import workbench
 from llm_client import (
     DEFAULT_MODEL,
@@ -348,6 +349,10 @@ def respond(
     # because the model's whole reply — all of its tool calls at once — is added to the
     # conversation before any of them runs.
     used: list[str] = agent_tools._called(history)
+    # The report being worked on, so a reply can be checked against its figures. Taken
+    # from the tool calls as they happen rather than asked of the model, which could
+    # forget or misreport it.
+    session_id: str | None = None
 
     for _ in range(MAX_STEPS):
         supplier, completion = yield from _complete(
@@ -408,7 +413,38 @@ def respond(
                 )
                 continue
 
+            if session := arguments.get("session_id"):
+                session_id = session
+
             if name == "reply_to_customer":
+                # Every figure in the message has to be one the tools produced. The
+                # instructions have always said so; a model told a customer 420 planned
+                # videos where the tools gave 2,966, so it is checked rather than asked.
+                spoken = workbench._sessions.get(session_id or "")
+                wrong = (
+                    figure_check.unsupported(arguments.get("message", ""), spoken)
+                    if spoken
+                    else []
+                )
+                if wrong:
+                    log.warning(
+                        "refused a reply quoting figures no tool produced: %s",
+                        ", ".join(wrong),
+                    )
+                    history.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": call.id,
+                            "content": (
+                                f"Not sent. {', '.join(wrong)} did not come from any tool, "
+                                f"and the customer must never be given a figure that did "
+                                f"not. Read the summarised figures again and quote them "
+                                f"exactly, or say it without numbers."
+                            ),
+                        }
+                    )
+                    continue
+
                 yield {
                     "type": "message",
                     "text": arguments.get("message", ""),

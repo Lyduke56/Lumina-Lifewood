@@ -2771,17 +2771,59 @@ minutes of searching before it is written down as a limitation.**
 
 ---
 
-## 47. Still to be decided
+## 47. A figure the tools never produced cannot be said
+
+The last thing standing between this and something defensible. Section 44 recorded it: Lumina told a
+customer 420 planned videos and a 98.8% achievement rate where the tools had handed it 2,966 and 86.4%.
+The report was right. The sentence describing it was not.
+
+**That is worse than a broken file**, because a broken file is noticed. A dashboard that is correct while
+the conversation about it is reassuring and wrong is the kind of thing that surfaces in a meeting.
+
+The instruction *"NEVER INVENT FIGURES. Everything you state must have come from a tool"* had been in
+place all along. Four times on the same day, instructions asked and only the tools enforced.
+
+**Every number in a message is now checked against the figures that exist**, and a message quoting
+anything else is not sent. The agent is told which figures were wrong and asked to quote the real ones.
+Verified through a conversation rather than in isolation:
+
+```
+log> refused a reply quoting figures no tool produced: 420, 98.8%
+what the customer sees:
+    Total planned videos: 2,966, of which 2,563 were completed — 86.4%.
+```
+
+The false sentence never reached the customer; the corrected one did.
+
+**Two limits, chosen deliberately.**
+
+Counts below twenty are not checked. "Four months", "two charts", "the top ten" describe the report
+rather than the data, and a rule strict enough to police them would refuse ordinary English. A figure
+under twenty could therefore still be misstated — a real gap, and the alternative was worse.
+
+Arithmetic is not allowed. Two months added together is a figure no tool produced and will be refused.
+That is the instruction applied rather than a hole in it: if a customer should see a figure, a tool
+should have produced it.
+
+**A near miss worth recording.** The first attempt to verify this appeared to show the guardrail
+failing — the false message went straight through. The fault was in the test: with an empty
+conversation the stage rules refused the summarising step, so no report was ever attached and there was
+nothing to check against. Had that result been believed, the conclusion would have been that the
+guardrail does not work, and the day would have ended looking for a bug that was not there. **A test
+that reports a failure has to be examined as carefully as one that reports success.**
+
+---
+
+## 48. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
 1. **Whether to hand semantic-model authoring to `powerbi-modeling-mcp`** — Section 45. Microsoft's
    local MCP server writes the model; our code writes it by hand, which their own guidance calls an
    anti-pattern. Needs a spike to see whether it runs headless. Would not cover report visuals.
-2. **Nothing checks the figures the AI states in conversation.** Section 44: it reported 420 videos
-   where the tools had given it 2,966. The report itself was right; the sentence describing it was not.
-   The remedy is not obvious — the numbers appear in ordinary prose — but every other guardrail works
-   by making a thing impossible, and this one does not exist at all.
+2. *(Closed 30 July — see Section 47.)* Figures stated in conversation are now checked against the
+   figures that exist, and a message quoting anything else is not sent. Counts below twenty remain
+   unchecked, deliberately.
 2. **How to make a collapse unmissable** without inventing figures — see Sections 38 and 41. A single
    headline cannot show that August failed. A chart of the shortfall does, plainly, and one appeared by
    accident in testing; whether Lumina should propose that chart by default is the remaining question.
@@ -2800,7 +2842,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 48. Change history
+## 49. Change history
 
 | Date | Change |
 |------|--------|
@@ -2829,6 +2871,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 47: **a figure no tool produced can no longer be said to a customer.** The last serious fault: Lumina reported 420 planned videos and 98.8% where the tools had given 2,966 and 86.4% — the report right, the sentence wrong, which is worse than a broken file because a broken file gets noticed. The instruction forbidding it had been in place all along; for the fourth time in a day, only the tools enforced. Every number in a message is now checked against the figures that exist and the message is not sent otherwise. Two deliberate limits: counts below twenty are unchecked, since policing "four months" would refuse ordinary English, and arithmetic is refused rather than recomputed. **Also recorded a near miss: the first verification appeared to show the guardrail failing, and the fault was in the test** — an empty conversation meant no report was attached to check against. A test reporting failure deserves the same scrutiny as one reporting success. |
 | 30 July 2026 | Extended Section 46: **every report was called "Production Plan"** — the project, the page, the download and the card, whatever the workbook contained. `ReportSpec.title` defaulted to our first customer's words and nothing ever set it: Decision 3 undone in one line, invisible for as long as only that customer's workbook was tested. A report now takes its name from the customer's own file, and the agent names it when it builds. **A default is a decision nobody remembers making**, and this one survived a rebuild, nine numbered decisions and two days of testing. |
 | 30 July 2026 | Added Section 46: **Power BI's own engine now checks every file before a customer sees it.** Microsoft's modelling MCP server loads a semantic model straight from a PBIP folder with no Power BI Desktop and no Fabric capacity — and refuses the two files that could not be opened earlier the same day, quoting the identical errors, including one word for word. Every build now runs it, in about three seconds, so a report that will not open fails here instead of in front of somebody who cannot act on it. **An hour earlier this log described that as a limitation no amount of testing could close.** Not fatal when Node is unavailable, since refusing to deliver a report because a checking tool is missing would be worse than the fault. Does not cover report visuals. Recorded plainly: three conclusions in this log were wrong through not looking, and "there is no way to verify this" deserves ten minutes of searching before being written down as a limitation. |
 | 30 July 2026 | Added Section 45: **Microsoft had written the rules down.** John Peter, out of patience with how long the Power BI output was taking, sent two links and asked whether they were not the thing we were building. They are a different product — instructions for a developer's AI coding assistant — but they document the hard part we had been deriving by trial and error: their TMDL guidelines state on line 12 the exact quoting rule that produced two unopenable reports that afternoon. **Their validation checklist is now encoded as `pbip_check.py` and every build runs it**, so a malformed project fails here rather than at a customer. Verified by breaking a working project four ways, all caught; it also found a real defect in the older Studio/WhatsApp flow — a measure with no `formatString` — that had gone unnoticed since it was written. Also recorded `powerbi-modeling-mcp`, Microsoft's local server for authoring semantic models in PBIP folders, as a candidate to replace most of our hand-written TMDL. |
