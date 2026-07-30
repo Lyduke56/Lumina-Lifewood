@@ -2696,7 +2696,59 @@ pre-totalling.
 
 ---
 
-## 46. Still to be decided
+## 46. Power BI's own engine now checks the file before a customer does
+
+Section 45 recorded that nothing in this environment could open a Power BI file, and that for one class
+of defect there was no substitute for a person trying it. **That turned out to be wrong, and the fix was
+in the links John Peter sent.**
+
+Microsoft's Power BI Modeling MCP Server loads a semantic model **straight from a PBIP folder**, with no
+Power BI Desktop and no Fabric capacity. Run against the reports we generate, it loads them:
+
+```
+Successfully loaded database from TMDL folder
+tablesLoaded: 1, measuresLoaded: 6
+```
+
+And run against the two files that a customer could not open earlier the same day, it refuses them —
+with the same words Power BI Desktop used:
+
+```
+a valid model                    loads: true
+a duplicate column name          loads: false
+   TMDL objects cannot be merged because both declare the same property: dataType
+   1st object: type=Column, name='Month'
+an unquoted name with a space    loads: false
+   TMDL Format Error: Parsing error type - Indentation
+```
+
+The first of those is word for word what he was shown. **This is not an approximation of the check; it
+is the same engine, run three seconds earlier.**
+
+Every build now does it. A report that will not open fails on our machine rather than in front of
+somebody who cannot act on it — which was, an hour before this, described in this log as a limitation
+no amount of testing could close.
+
+**Deliberately not fatal when it cannot run.** It needs Node, and the first run downloads a package.
+Where that is unavailable the build proceeds on the documented-rules check alone: refusing to deliver a
+report because a checking tool is absent would be a worse fault than the one being looked for.
+
+**What it still does not cover.** The modelling server cannot read report pages or visuals, so charts,
+cards, colours and layout remain ours to get right — and whether a report *reads* well is not a thing
+any engine can answer. But the model is where both failures were.
+
+### Worth recording about how this was found
+
+The capability had existed all along, in a public Microsoft repository, and was found only because a
+frustrated customer asked whether we were reinventing something. Three separate conclusions in this log
+were wrong as a result of not looking: that the TMDL rules had to be derived by experiment, that
+hand-writing the model was the only option, and that no check could prevent an unopenable file reaching
+a customer. **The lesson is not about Power BI. It is that "there is no way to verify this" deserves ten
+minutes of searching before it is written down as a limitation.**
+
+---
+
+## 47. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -2725,7 +2777,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 47. Change history
+## 48. Change history
 
 | Date | Change |
 |------|--------|
@@ -2754,6 +2806,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 46: **Power BI's own engine now checks every file before a customer sees it.** Microsoft's modelling MCP server loads a semantic model straight from a PBIP folder with no Power BI Desktop and no Fabric capacity — and refuses the two files that could not be opened earlier the same day, quoting the identical errors, including one word for word. Every build now runs it, in about three seconds, so a report that will not open fails here instead of in front of somebody who cannot act on it. **An hour earlier this log described that as a limitation no amount of testing could close.** Not fatal when Node is unavailable, since refusing to deliver a report because a checking tool is missing would be worse than the fault. Does not cover report visuals. Recorded plainly: three conclusions in this log were wrong through not looking, and "there is no way to verify this" deserves ten minutes of searching before being written down as a limitation. |
 | 30 July 2026 | Added Section 45: **Microsoft had written the rules down.** John Peter, out of patience with how long the Power BI output was taking, sent two links and asked whether they were not the thing we were building. They are a different product — instructions for a developer's AI coding assistant — but they document the hard part we had been deriving by trial and error: their TMDL guidelines state on line 12 the exact quoting rule that produced two unopenable reports that afternoon. **Their validation checklist is now encoded as `pbip_check.py` and every build runs it**, so a malformed project fails here rather than at a customer. Verified by breaking a working project four ways, all caught; it also found a real defect in the older Studio/WhatsApp flow — a measure with no `formatString` — that had gone unnoticed since it was written. Also recorded `powerbi-modeling-mcp`, Microsoft's local server for authoring semantic models in PBIP folders, as a candidate to replace most of our hand-written TMDL. |
 | 30 July 2026 | Added Section 44: **fourteen of the customer's videos quietly disappeared**, found because John Peter asked whether the calculations were correct. Two faults. The profiler flagged the first data row as a grand total and the summariser dropped it — one day in eighty-four disagreed with the spreadsheet. The rule was "more than five times the largest row below", which is not what a total is and misfires on any figure crossing zero; it now tests whether a row **adds up to the others**, verified in both directions, and the totals match the spreadsheet exactly. **This closes the open item carried for two days as "reliably detecting unlabelled total rows" — which was never cosmetic: a false positive deletes real data silently.** The second fault is worse and remains open: **the AI reported 420 planned videos where the tools had given it 2,966**, against an explicit instruction never to invent figures. The report was correct; the sentence describing it was not, and nothing checks one against the other. |
 | 30 July 2026 | Added Section 43: **tested against a second spreadsheet for the first time**, counting videos rather than images, with studios and editors. **Decision 3 holds** — Lumina read a workbook it had never seen, paired the planned and completed figures correctly, and proposed a report suited to that data, with no code written for it. It also **found five real defects in twenty minutes**, all of which had passed against the original file. The worst: summarising silently emptied the report, so an agent reaching for a second breakdown lost its work and rebuilt it four times before giving up. Also: a first attempt at that fix would have replaced the loop with a dead end; starting a report again was forbidden at every stage past the beginning, which the AI accurately reported to the customer as the system not letting it; and the total-row detector is wrong in both directions on this file. **A second spreadsheet was worth more than another day of testing against the first** — every test written against one file encodes that file's assumptions unnoticed. |

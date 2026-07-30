@@ -29,6 +29,7 @@ from pathlib import Path
 
 import pbib_generator as pbi
 import pbip_check
+import pbip_engine
 from summariser import ORDER_KEY, PERIOD_LABEL, Summary
 
 CHART_KINDS = {"line": "lineChart", "bar": "clusteredColumnChart", "table": "tableEx"}
@@ -349,6 +350,15 @@ def build_powerbi(
     # reading them. Nothing here can open a .pbip, so the rules have to be checked
     # mechanically rather than by eye.
     pbip_check.require_valid(root)
+
+    # And then have Power BI's own engine load it. Microsoft's modelling server reads a
+    # PBIP folder directly and reports the same errors Power BI Desktop does — the
+    # duplicate-column message it gives is word for word the one a customer saw. Reports
+    # that will not open are the one fault nothing here could catch; now they fail in
+    # three seconds on this machine instead. Reports that it cannot run are ignored: the
+    # documented rules are already checked above, and refusing to deliver a report because
+    # Node is missing would be worse than the fault being looked for.
+    pbip_engine.load_model(root / f"{stem}.SemanticModel")
     return root
 
 
