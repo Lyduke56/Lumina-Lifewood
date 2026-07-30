@@ -2974,7 +2974,69 @@ produced it was cheaper than replacing the thing it constrained.
 
 ---
 
-## 51. Still to be decided
+## 51. Making it look like a dashboard
+
+John Peter gave us a real Lifewood report — BuckedUP — and some published dashboards he admired, and
+asked us to take notice of the visualisations, the spacing, the structure and the branding. He was
+explicit that we were **not** to copy its structure: *"the contents of the Power BI ultimately depends
+on the result of the chat."* So what follows is standards, not a template.
+
+**What changed.** Every visual now sits in a white card with a soft rounded border, rather than
+floating on the page background — the single change that most closes the gap with a designed
+dashboard, and the thing every published example he sent has in common. Above them is a title band
+carrying the report's name and, beneath it, how much of the customer's sheet went into it. Beside the
+charts, taking about a third of the width, is a **written panel of insights** — the feature he
+singled out: *"one thing I like is that it has descriptive texts of insights."* It says which period
+did best and which worst, and by how much, in sentences.
+
+**And the Lifewood logo**, which he asked for after seeing BuckedUP's. This needed the mark as a PNG
+and only the website's SVGs existed, with no image library installed to convert one — but the SVGs
+turn out to carry a full-size PNG embedded inside them, which was extracted rather than redrawn, so
+it is the same mark customers already see. A picture on a Power BI page is not a file path: it is a
+declared item in the report's resource package, referred to by name. Copying the file in without
+declaring it leaves an empty box; declaring it without copying it in stops the report opening.
+
+**Three faults found by looking at the result**, all of which had passed every automated check:
+
+- The headline cards were 96 pixels tall and clipped the caption underneath the number, so a card
+  read *2,966* with no indication of what 2,966 was.
+- The title band said *"238 months"* for a report grouped three ways. It now says how many of the
+  customer's rows were used and what they were grouped by, which is true of any grouping.
+- The insights panel named the strongest month by finding the best **row** — *"Jan 2026 at 350.0%"*,
+  a single studio in a single month — where the chart beside it showed the month's total. A first fix
+  brought it to within 1.4 points, which was worse than being obviously wrong: rows whose planned
+  figure was a dash had their achieved figure skipped along with it. Panel and chart now agree
+  exactly.
+
+**Nothing automated could have caught any of the three.** They are all questions of whether the page
+reads well, which remains the one thing that still wants a person — but now a person looking at a
+finished report rather than clicking through a wizard to find out whether the last change worked
+(Section 49).
+
+---
+
+## 52. A total row counted as data, found by the harness
+
+While the design work was being checked, the unattended run (Section 49) failed the video workbook:
+the report totalled **6,020 planned where the spreadsheet has 2,966**. The difference, 3,054, is
+exactly the workbook's own grand-total row. It was being counted as data and roughly doubling every
+figure on the page.
+
+The cause is a rule that was doing its job only half the time. A row with no date was skipped **only
+when the figures were being placed on a timeline**. Group by studio alone — no timeline — and the
+unlabelled total row sailed through as though it were a studio's work. It is now skipped either way,
+and the count of skipped rows is already reported to the customer, so nothing disappears silently.
+
+Worth recording for two reasons. First, this is the **third** time a total row has caused a fault
+(Sections 44 and 50), and each time the rule that failed was narrower than the thing it was guarding
+against. Second, and more usefully: **the harness paid for itself the first week it existed.** This
+fault would have shipped. It only shows up when a customer groups by a label and not by month, which
+is exactly the combination no hand-run test had tried — the same shape of gap as Section 42, found
+this time by a script rather than by John Peter opening a file.
+
+---
+
+## 53. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -3002,7 +3064,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 52. Change history
+## 54. Change history
 
 | Date | Change |
 |------|--------|
@@ -3031,6 +3093,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 31 July 2026 | Added Section 51: **made the report look like a dashboard**, working from a real Lifewood report and the published examples John Peter sent — explicitly as standards to meet rather than a layout to copy, since what a report contains depends on the conversation. Visuals now sit in white cards with soft borders, a title band names the report and says how much of the sheet went into it, and a **written panel explains what the figures say** in sentences, the feature he singled out. **The Lifewood logo is now on every page**, extracted from inside the website's own SVG rather than redrawn. Looking at the result found three faults that every automated check had passed: a card height that clipped the caption under the number, a header claiming "238 months", and an insights panel naming the best *row* as the best month. **A fourth was found by the unattended harness rather than by a person** — a workbook's grand-total row was being counted as data whenever the figures were not placed on a timeline, roughly doubling every figure on the page. The rule skipping undated rows had only ever applied to timelines. **Third total-row fault in two days, and the first the harness caught before a customer could.** |
 | 30 July 2026 | Added Section 48: **Microsoft's validator, and the colours that never applied.** Chasing one cosmetic defect — 2,966 and 2,563 both displayed as "3K" — led to Microsoft's report-authoring CLI, which is the source of truth for property names and also validates a PBIR report. The abbreviation fix needed an enum value, not a new property: the name had been right and 0 means *Auto*, so it asked for the default. **Run against a report we had just shipped, the validator found seven errors** — six of them `fontColor` on chart axes and legends, where the property is `labelColor`, meaning every axis and legend in both flows had been Microsoft's default grey rather than Lifewood green since the code was written, with nothing ever complaining; and a theme registered without its `.json` extension, which Microsoft say makes a published report apply the theme incorrectly. Both fixed, both flows validate clean, and **the validator now runs on every build**. This supersedes Section 46's claim that only a person could check the visuals. **Third time in two days that a published capability was found only because a customer pushed back on "there is no way to check this from here".** |
 | 30 July 2026 | Added Section 47: **a figure no tool produced can no longer be said to a customer.** The last serious fault: Lumina reported 420 planned videos and 98.8% where the tools had given 2,966 and 86.4% — the report right, the sentence wrong, which is worse than a broken file because a broken file gets noticed. The instruction forbidding it had been in place all along; for the fourth time in a day, only the tools enforced. Every number in a message is now checked against the figures that exist and the message is not sent otherwise. Two deliberate limits: counts below twenty are unchecked, since policing "four months" would refuse ordinary English, and arithmetic is refused rather than recomputed. **Also recorded a near miss: the first verification appeared to show the guardrail failing, and the fault was in the test** — an empty conversation meant no report was attached to check against. A test reporting failure deserves the same scrutiny as one reporting success. |
 | 30 July 2026 | Extended Section 46: **every report was called "Production Plan"** — the project, the page, the download and the card, whatever the workbook contained. `ReportSpec.title` defaulted to our first customer's words and nothing ever set it: Decision 3 undone in one line, invisible for as long as only that customer's workbook was tested. A report now takes its name from the customer's own file, and the agent names it when it builds. **A default is a decision nobody remembers making**, and this one survived a rebuild, nine numbered decisions and two days of testing. |

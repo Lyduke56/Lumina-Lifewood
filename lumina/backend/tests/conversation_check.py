@@ -42,9 +42,25 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(APP.parent / ".env")
 
+import openai  # noqa: E402
+
 import agent  # noqa: E402
 import figure_check  # noqa: E402
 import workbench  # noqa: E402
+
+# Every free supplier being out of allowance, or the network being down, says nothing about
+# whether the code is right. Reported apart from a failure, because a checker that calls an
+# outage a defect gets ignored, and then so do its real findings.
+UNREACHABLE = (
+    openai.APIConnectionError,
+    openai.RateLimitError,
+    openai.AuthenticationError,
+    openai.PermissionDeniedError,
+)
+
+
+class CouldNotRun(Exception):
+    """No AI supplier could be reached, so nothing was tested either way."""
 
 # What a customer says to keep things moving. Deliberately unhelpful about the detail: if a
 # conversation only works when the customer knows the right words, it does not work.
@@ -147,7 +163,10 @@ def check(path: Path) -> list[str]:
     print(f"\n{path.name}")
     print("  holding a conversation...", flush=True)
 
-    outcome = hold_conversation(path)
+    try:
+        outcome = hold_conversation(path)
+    except UNREACHABLE as e:
+        raise CouldNotRun(f"{type(e).__name__}: {str(e).splitlines()[0][:120]}") from e
     built = [t for t, how in outcome["steps"] if t == "build_report_file" and how == "ok"]
     failed = [t for t, how in outcome["steps"] if how in ("broken",)]
 
@@ -219,9 +238,12 @@ def main() -> int:
         return 2
 
     everything: dict[str, list[str]] = {}
+    skipped: dict[str, str] = {}
     for path in workbooks:
         try:
             everything[path.name] = check(path)
+        except CouldNotRun as e:
+            skipped[path.name] = str(e)
         except Exception as e:  # a crash is a result, not a reason to stop
             everything[path.name] = [f"the run itself failed: {type(e).__name__}: {e}"]
 

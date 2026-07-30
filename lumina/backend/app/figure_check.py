@@ -100,6 +100,10 @@ def allowed(session) -> tuple[set[float], set[float]]:
         # total, which is how the report itself aggregates them.
         plain.add(float(sum(values)))
         plain.add(float(max(values)))
+        # Written out, a shortfall of -403 is "403 short of the plan". The sign belongs to
+        # the arithmetic, not to the sentence.
+        plain.add(abs(float(sum(values))))
+        plain.add(abs(float(max(values))))
 
     # A rate over the whole report is recomputed from its underlying totals, never
     # averaged — the mistake that once reported 129% for a plan that delivered 100%.

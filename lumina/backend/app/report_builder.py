@@ -40,6 +40,101 @@ CHART_KINDS = {"line": "lineChart", "bar": "clusteredColumnChart", "table": "tab
 # readable four-bar chart, because Power BI totals the rest.
 MAX_AXIS_VALUES = 30
 
+# The page, and how things sit on it. Measured against a real Lifewood-style report John
+# Peter supplied: 1280x720, headline cards about 95 tall in a row, and content visuals
+# roughly 480 tall placed *beside* each other rather than stacked. Ours stacked everything
+# full width and split the leftover height evenly, so a table of twenty-eight editors got
+# 170 pixels and showed four rows with a scrollbar — the figures were right and unusable.
+PAGE_WIDTH = 1280
+PAGE_HEIGHT = 720
+MARGIN = 24
+GAP = 16
+# 96 clipped the caption under the number — a card shows a value *and* what it is.
+CARD_HEIGHT = 118
+
+# Two side by side is as far as it goes: three across on a 1280 page leaves each too narrow
+# to label, which is the same mistake in the other direction.
+PER_ROW = 2
+
+# A table earns more of the page than a chart. A chart says the same thing at 250 pixels as
+# at 400; a table just shows fewer rows.
+TABLE_WEIGHT = 1.6
+
+
+def _layout_positions(
+    kpis: list[Kpi], charts: list[Chart], written: bool = False
+) -> tuple[list[dict], dict, dict | None]:
+    """Where everything sits: the visuals, the title band, and the written panel.
+
+    Deliberately separate from the older flow's version, which Studio and WhatsApp still
+    draw with and which John Peter asked to leave alone.
+    """
+    positions: list[dict] = []
+    inner = PAGE_WIDTH - 2 * MARGIN
+    y = MARGIN
+
+    header = {
+        "x": MARGIN, "y": y, "z": 0, "width": inner, "height": HEADER_HEIGHT,
+        "tabOrder": 0,
+    }
+    y += HEADER_HEIGHT + GAP
+
+    if kpis:
+        width = (inner - GAP * (len(kpis) - 1)) / len(kpis)
+        for slot in range(len(kpis)):
+            positions.append({
+                "x": MARGIN + slot * (width + GAP),
+                "y": y,
+                "z": len(positions),
+                "width": width,
+                "height": CARD_HEIGHT,
+                "tabOrder": len(positions),
+            })
+        y += CARD_HEIGHT + GAP
+
+    if not charts:
+        return positions, header, None
+
+    # The written panel runs down the right of the content, as it does in every published
+    # dashboard John Peter compared ours against — beside the charts it explains, not
+    # beneath them where nobody scrolls.
+    panel = None
+    content = inner
+    if written:
+        panel_width = round(inner * INSIGHT_SHARE)
+        content = inner - panel_width - GAP
+        panel = {
+            "x": MARGIN + content + GAP,
+            "y": y,
+            "z": 1,
+            "width": panel_width,
+            "height": PAGE_HEIGHT - MARGIN - y,
+            "tabOrder": 1,
+        }
+
+    rows = [charts[i : i + PER_ROW] for i in range(0, len(charts), PER_ROW)]
+    weights = [
+        max((TABLE_WEIGHT if c.kind == "table" else 1.0) for c in row) for row in rows
+    ]
+    available = PAGE_HEIGHT - MARGIN - y - GAP * (len(rows) - 1)
+    share = available / sum(weights)
+
+    for row, weight in zip(rows, weights):
+        height = share * weight
+        width = (content - GAP * (len(row) - 1)) / len(row)
+        for slot in range(len(row)):
+            positions.append({
+                "x": MARGIN + slot * (width + GAP),
+                "y": y,
+                "z": len(positions),
+                "width": width,
+                "height": height,
+                "tabOrder": len(positions),
+            })
+        y += height + GAP
+
+    return positions, header, panel
+
 
 class ReportError(ValueError):
     """The request would produce a broken or meaningless report. The message says why."""
@@ -654,9 +749,8 @@ def _write_page(root: Path, stem: str, spec: ReportSpec, summary: Summary) -> No
     visuals.mkdir(parents=True)
 
     palette = pbi._valid_data_colors(spec.palette)
-    layout = pbi._layout_positions(
-        [{"type": "card"} for _ in spec.kpis] + [{"type": c.kind} for c in spec.charts]
-    )
+    written = insights(spec, summary)
+    layout, header, panel = _layout_positions(spec.kpis, spec.charts, bool(written))
 
     for index, kpi in enumerate(spec.kpis):
         _write_visual(visuals, _kpi_json(kpi, layout[index], spec))
@@ -665,6 +759,60 @@ def _write_page(root: Path, stem: str, spec: ReportSpec, summary: Summary) -> No
     for offset, chart in enumerate(spec.charts):
         position = layout[len(spec.kpis) + offset]
         _write_visual(visuals, _chart_json(chart, position, palette, axis))
+
+    # The brand mark sits at the right of the title band, as it does in the report John
+    # Peter asked us to match. The title keeps the room the logo does not take.
+    band = dict(header)
+    if _register_logo(root, stem):
+        band["width"] = header["width"] - LOGO_WIDTH - GAP
+        _write_visual(visuals, _logo_json(uuid.uuid4().hex[:20], {
+            "x": header["x"] + header["width"] - LOGO_WIDTH,
+            "y": header["y"] + (HEADER_HEIGHT - LOGO_HEIGHT) / 2,
+            "z": 0,
+            "width": LOGO_WIDTH,
+            "height": LOGO_HEIGHT,
+            "tabOrder": 0,
+        }))
+
+    # The title band, so the page says what it is before anything else does.
+    _write_visual(visuals, _textbox(uuid.uuid4().hex[:20], band, [
+        {
+            "textRuns": [_run(spec.title, 20, pbi.DARK_SERPENT, bold=True)],
+            "horizontalTextAlignment": "left",
+        },
+        {
+            "textRuns": [
+                # Grouped three ways, 238 rows are not 238 months. Say what is true of
+                # any grouping: how much of the customer's sheet went into this.
+                _run(
+                    f"Built from {summary.source_rows_used:,} of "
+                    f"{summary.source_rows_used + summary.source_rows_skipped:,} rows"
+                    + (
+                        f", grouped by {', '.join(summary.group_by).replace('period', _axis_name(summary))}"
+                        if summary.group_by
+                        else ""
+                    ),
+                    10,
+                    pbi.CASTLETON_GREEN,
+                )
+            ],
+            "horizontalTextAlignment": "left",
+        },
+    ]))
+
+    if panel and written:
+        paragraphs = [{
+            "textRuns": [_run("What the figures say", 13, pbi.DARK_SERPENT, bold=True)],
+            "horizontalTextAlignment": "left",
+        }]
+        for line in written:
+            paragraphs.append({
+                "textRuns": [_run(line, 10, pbi.DARK_SERPENT)],
+                "horizontalTextAlignment": "left",
+            })
+        written_panel = _textbox(uuid.uuid4().hex[:20], panel, paragraphs)
+        _framed(written_panel["visual"])
+        _write_visual(visuals, written_panel)
 
     pbi.apply_page_background(page)
     _name_page(page, spec.title)
@@ -685,6 +833,7 @@ def _write_visual(visuals: Path, content: dict) -> None:
 
 
 def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
+    card: dict = {}
     title = _measure_dax(kpi.measure)[2]
     value_props = pbi._text_style(spec.heading_font)
     # Show the number in full. A card abbreviates by default, so 2,966 and 2,563 both read
@@ -713,7 +862,7 @@ def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
     else:
         value_props["fontColor"] = {"solid": {"color": pbi._literal(pbi.CASTLETON_GREEN)}}
     name = uuid.uuid4().hex[:20]
-    return {
+    card = {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
         "name": name,
         "position": position,
@@ -752,6 +901,8 @@ def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
             "drillFilterOtherVisuals": True,
         },
     }
+    _framed(card["visual"])
+    return card
 
 
 def _chart_json(chart: Chart, position: dict, palette: list[str], axis: str) -> dict:
@@ -792,6 +943,7 @@ def _chart_json(chart: Chart, position: dict, palette: list[str], axis: str) -> 
 
     visual = {"visualType": CHART_KINDS[chart.kind], "query": query, "drillFilterOtherVisuals": True}
     pbi._titled(visual, chart.title)
+    _framed(visual)
     if chart.kind != "table":
         visual["objects"] = {"dataPoint": _series_colors(chart.measures, palette)}
         pbi._styled_axes(visual)
@@ -803,6 +955,9 @@ def _chart_json(chart: Chart, position: dict, palette: list[str], axis: str) -> 
         visual["objects"]["valueAxis"][0]["properties"]["showAxisTitle"] = {
             "expr": {"Literal": {"Value": "false"}}
         }
+        # The number written on each bar. Every published dashboard John Peter compared
+        # ours against does this, and it saves a reader estimating against a gridline.
+        visual["objects"]["labels"] = [{"properties": {"show": _literal("true")}}]
     return {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
         "name": name,
@@ -868,3 +1023,249 @@ def web_preview(spec: ReportSpec, summary: Summary) -> dict:
         "heading_font": spec.heading_font,
         "body_font": spec.body_font,
     }
+
+
+# ── Making it look like a dashboard rather than three visuals on a page ──────
+#
+# John Peter put ours beside a real Lifewood report and some published dashboards and the
+# difference was not the figures — it was that theirs are *designed*: white cards on a
+# tinted page, a title band, numbers written on the bars, and a panel of written insights
+# beside the charts. He singled out the last of those.
+#
+# Every property below was read out of the real Power BI file he supplied rather than
+# guessed at, because a wrong visual property is accepted in silence and discovered by a
+# customer. `pbir_check` now refuses the ones Microsoft does not document.
+
+CARD_WHITE = "#FFFFFF"
+CARD_RADIUS = 10
+HEADER_HEIGHT = 64
+INSIGHT_SHARE = 0.34  # how much of the content width the written insights take
+
+
+def _literal(value: str | float | bool) -> dict:
+    return {"expr": {"Literal": {"Value": value}}}
+
+
+def _framed(visual: dict, tinted: bool = False) -> dict:
+    """Put a visual in a white card with a soft rounded border.
+
+    The single change that most closes the gap with a designed dashboard: visuals stop
+    floating on the page background and become cards, the way every published example does.
+    """
+    container = visual.setdefault("visualContainerObjects", {})
+    container["background"] = [
+        {
+            "properties": {
+                "show": _literal("true"),
+                "color": {"solid": {"color": _literal(f"'{CARD_WHITE}'")}},
+                "transparency": _literal("0D"),
+            }
+        }
+    ]
+    container["border"] = [
+        {
+            "properties": {
+                "show": _literal("true"),
+                "color": {"solid": {"color": _literal(f"'{pbi.PAPER}'")}},
+                "radius": _literal(f"{CARD_RADIUS}D"),
+                "width": _literal("1D"),
+            }
+        }
+    ]
+    return visual
+
+
+def _textbox(name: str, position: dict, paragraphs: list[dict]) -> dict:
+    """A block of written text on the page — a title, or the insights panel.
+
+    The shape of `paragraphs` is copied from the working report: a list of paragraphs, each
+    a list of text runs carrying their own size, weight and colour.
+    """
+    return {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+        "name": name,
+        "position": position,
+        "visual": {
+            "visualType": "textbox",
+            "objects": {"general": [{"properties": {"paragraphs": paragraphs}}]},
+            "drillFilterOtherVisuals": True,
+        },
+    }
+
+
+# The brand mark, and its shape on the page. Taken from the PNG embedded in the website's
+# own logo file, so it is the same mark customers already see, not a redrawn one.
+LOGO_SOURCE = Path(__file__).resolve().parent.parent / "pbib_reference" / "lifewood-full-green.png"
+LOGO_ITEM = "LifewoodLogo.png"
+LOGO_HEIGHT = 36
+LOGO_WIDTH = round(LOGO_HEIGHT * 1519 / 429)  # the file's own proportions, not a guess
+
+
+def _register_logo(root: Path, stem: str) -> bool:
+    """Put the logo in the report's resources and declare it, the way the reference does.
+
+    A picture on a Power BI page is not a file path: it is an item in the report's
+    RegisteredResources package, referred to by name. Copying the file in without declaring
+    it leaves an empty box, and declaring it without copying it in stops the report opening.
+    """
+    if not LOGO_SOURCE.exists():
+        return False
+
+    report = root / f"{stem}.Report"
+    resources = report / "StaticResources" / "RegisteredResources"
+    resources.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(LOGO_SOURCE, resources / LOGO_ITEM)
+
+    path = report / "definition" / "report.json"
+    content = json.loads(path.read_text(encoding="utf-8"))
+    for package in content.get("resourcePackages", []):
+        if package.get("type") != "RegisteredResources":
+            continue
+        items = package.setdefault("items", [])
+        if not any(item.get("name") == LOGO_ITEM for item in items):
+            items.append({"name": LOGO_ITEM, "path": LOGO_ITEM, "type": "Image"})
+        path.write_text(json.dumps(content, indent=2), encoding="utf-8")
+        return True
+    return False
+
+
+def _logo_json(name: str, position: dict) -> dict:
+    """The logo as an image visual, sized to fit rather than stretched."""
+    return {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+        "name": name,
+        "position": position,
+        "visual": {
+            "visualType": "image",
+            "objects": {
+                "image": [
+                    {
+                        "properties": {
+                            "sourceFile": {
+                                "image": {
+                                    "name": _literal(f"'{LOGO_ITEM}'"),
+                                    "url": {
+                                        "expr": {
+                                            "ResourcePackageItem": {
+                                                "PackageName": "RegisteredResources",
+                                                "PackageType": 1,
+                                                "ItemName": LOGO_ITEM,
+                                            }
+                                        }
+                                    },
+                                    "scaling": _literal("'Normal'"),
+                                }
+                            },
+                            # Fit, not Fill: Fill crops the mark to the box, and a cropped
+                            # logo is worse than none.
+                            "fit": _literal("'Fit'"),
+                        },
+                        "selector": {"id": "default"},
+                    }
+                ]
+            },
+            "drillFilterOtherVisuals": True,
+        },
+    }
+
+
+def _run(text: str, size: int, colour: str, bold: bool = False) -> dict:
+    style = {"fontSize": f"{size}pt", "color": colour, "fontFamily": pbi.BODY_FONT}
+    if bold:
+        style["fontWeight"] = "bold"
+    return {"value": text, "textStyle": style}
+
+
+def insights(spec: ReportSpec, summary: Summary) -> list[str]:
+    """What the figures say, in sentences, for the panel beside the charts.
+
+    John Peter liked this in the published dashboards he compared ours against, and it is
+    the one thing on a dashboard that tells a manager what happened rather than leaving
+    them to work it out from bars.
+
+    Every figure here is read out of the summary, never recomputed and never estimated —
+    the same rule the conversation is held to. A written insight that quietly rounds or
+    guesses is worse than no insight, because prose is believed more readily than a chart.
+    """
+    lines: list[str] = []
+    if not summary.rows or not summary.group_by:
+        return lines
+
+    axis = summary.group_by[0]
+    period_label = _axis_name(summary) if axis == "period" else axis
+
+    for measure in summary.measures:
+        if not measure.startswith("completion_rate_"):
+            continue
+        unit = measure[len("completion_rate_") :]
+        planned = [r.get(f"target_{unit}") for r in summary.rows]
+        achieved = [r.get(f"actual_{unit}") for r in summary.rows]
+        total_planned = sum(v for v in planned if isinstance(v, (int, float)))
+        total_achieved = sum(v for v in achieved if isinstance(v, (int, float)))
+        if not total_planned:
+            continue
+
+        rate = total_achieved / total_planned
+        shortfall = total_achieved - total_planned
+        lines.append(
+            f"{total_achieved:,.0f} of {total_planned:,.0f} {unit.lower()} planned were "
+            f"delivered — {rate:.1%}."
+        )
+        if shortfall < 0:
+            lines.append(f"That is {abs(shortfall):,.0f} {unit.lower()} short of the plan.")
+        elif shortfall > 0:
+            lines.append(f"That is {shortfall:,.0f} {unit.lower()} above the plan.")
+
+        # The best and worst periods, which is the thing a single overall figure hides —
+        # a project can meet its contract exactly and still have collapsed in one month.
+        # Named as the finished report names it: "Feb 2026", not "2026-02".
+        def shown(value) -> str:
+            return (
+                _format_period(value, summary.period) if axis == "period" else str(value)
+            )
+
+        # Totalled per period first. Grouped by month *and* studio *and* editor, a single
+        # row is one editor in one studio in one month — reading the rate off it reported
+        # "strongest month: Jan at 350%" when January as a whole ran at 118%. The best row
+        # is not the best month, and prose that says "month" must mean the month.
+        per_period: dict[str, list[float]] = {}
+        for row in summary.rows:
+            key = row.get(axis)
+            if key is None:
+                continue
+            # Counted independently. A row whose planned figure is a dash still delivered
+            # what it delivered, and the chart adds it up — skipping the whole row put the
+            # panel 1.4 points below the bar beside it, which is the sort of small
+            # disagreement that costs more trust than a large one.
+            got = per_period.setdefault(shown(key), [0.0, 0.0])
+            planned_here = row.get(f"target_{unit}")
+            achieved_here = row.get(f"actual_{unit}")
+            if isinstance(planned_here, (int, float)):
+                got[0] += planned_here
+            if isinstance(achieved_here, (int, float)):
+                got[1] += achieved_here
+
+        rated = [
+            (name, totals[1] / totals[0])
+            for name, totals in per_period.items()
+            if totals[0]
+        ]
+        if len(rated) > 1:
+            best = max(rated, key=lambda pair: pair[1])
+            worst = min(rated, key=lambda pair: pair[1])
+            if best[0] != worst[0]:
+                lines.append(
+                    f"Strongest {period_label.lower()}: {best[0]} at {best[1]:.1%}."
+                )
+                lines.append(
+                    f"Weakest {period_label.lower()}: {worst[0]} at {worst[1]:.1%}."
+                )
+        break
+
+    if summary.source_rows_skipped:
+        lines.append(
+            f"{summary.source_rows_used:,} of "
+            f"{summary.source_rows_used + summary.source_rows_skipped:,} rows were used; "
+            f"the rest had no date or no figures."
+        )
+    return lines

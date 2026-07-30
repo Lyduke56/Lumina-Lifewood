@@ -189,8 +189,14 @@ def summarise(
 
             date_value = row[schema.date_column - 1] if schema.date_column <= len(row) else None
             key_period = _period_key(date_value, period)
-            if period != "none" and key_period is None:
-                skipped += 1  # no date, so it cannot be placed on a timeline
+            # A row with no date is skipped whether or not the figures are being placed on
+            # a timeline. It used to be skipped only when they were, so grouping by label
+            # alone let an unlabelled grand total through as though it were a studio's
+            # work: 2,966 planned became 6,020, the difference being the total row itself.
+            # A dated sheet with an undated row is missing something, not reporting a
+            # category, and the count of skipped rows is already told to the customer.
+            if date_value is None or (period != "none" and key_period is None):
+                skipped += 1
                 continue
 
             figures = {
