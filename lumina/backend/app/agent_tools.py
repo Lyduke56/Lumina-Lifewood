@@ -209,6 +209,37 @@ def summarise_figures(
             f"they are entitled to know their own rows were not all counted.",
         ]
     lines += ["", f"Figures available: {', '.join(summary.measures)}"]
+
+    # What else these figures could be split by. The description of the sheet is dropped
+    # from the conversation once the columns are agreed, to save re-sending 500 tokens on
+    # every step — so by the time charts are chosen the agent no longer knows which
+    # columns were suitable to group by, and cannot offer the short list Decision 6 asks
+    # for. Restated here, where it is needed, rather than carried the whole way.
+    profile = session.profiles.get(session.schema.sheet)
+    if profile:
+        used = {p for p in group_by or []}
+        others = []
+        for position in session.schema.labels:
+            if position in used:
+                continue
+            column = next(
+                (c for c in profile.columns if c.position == position), None
+            )
+            if column is None or column.breakdown_suitability == "unsuitable":
+                continue
+            note = (
+                f"{column.heading} ({column.distinct} values"
+                + (", ask for a top ten" if column.breakdown_suitability == "top-n-only" else "")
+                + ")"
+            )
+            others.append(f"{position}: {note}")
+        if others:
+            lines += [
+                "",
+                "These figures could also be broken down by — offer these if they would "
+                "help, do not list them all at the customer:",
+            ]
+            lines += [f"  {o}" for o in others]
     preview = summary.rows[:6]
     if preview:
         lines += ["", "First rows:"]

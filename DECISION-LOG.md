@@ -2386,11 +2386,53 @@ checked — which is the mistake this log has recorded several times today in ot
 
 ---
 
-## 39. Still to be decided
+## 39. The last baseline defect, smaller than recorded
+
+Section 15 left one defect open: *"the chart-choosing step must see the spreadsheet profile first."*
+Looking at it properly, **it is largely already solved, and by a guardrail rather than by memory.**
+
+The worry was that the AI would offer a nonsensical breakdown — a chart with one bar per participant.
+It cannot: the summarising tool refuses outright, and says what to do instead.
+
+> Grouping this way produces 143 groups, which no chart can show readably. Ask for a top ten instead,
+> or group by something with fewer values.
+
+That is Decision 6 as intended — the tool declines rather than the AI being trusted to know better.
+Worth recording plainly, because the defect was carried on the open list for two days as though
+nothing protected against it.
+
+**A smaller, real gap remained.** The description of the sheet is dropped from the conversation once
+the columns are agreed, to avoid re-sending 500 tokens on every subsequent step. That is a sensible
+economy, but it means that by the time charts are chosen the AI no longer knows which columns *could*
+be broken down by — so it cannot offer the short list Decision 6 asks it to propose. It was not making
+bad charts; it was unable to suggest good alternatives.
+
+The summarising step now restates them, at the moment they are needed rather than carrying them the
+whole way:
+
+```
+These figures could also be broken down by — offer these if they would help:
+  2: Month (7 values)
+  9: Remarks (2 values)
+```
+
+Unsuitable columns are left out, and a column with too many values is marked *"ask for a top ten"*, so
+the AI is told the workable form rather than left to discover the refusal.
+
+A note on the correction: this section originally would have said the trimming had made an existing
+defect worse. Checking rather than assuming showed the opposite — the guardrail was already there, and
+the trimming cost a suggestion, not a safeguard.
+
+---
+
+## 40. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
-1. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
+1. **How to make a collapse unmissable** without inventing figures — see Section 38. A single
+   headline cannot show that August failed; the chart and table can. This is a question of which
+   visual leads the page, and nobody has decided it.
+2. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
    warns about them — but building detection that works across many different spreadsheets is a
    genuine problem still to be solved.
 2. **Whether the unfinished Microsoft-publishing work should be revived or removed.**
@@ -2406,7 +2448,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 40. Change history
+## 41. Change history
 
 | Date | Change |
 |------|--------|
@@ -2435,6 +2477,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 39: **the last open baseline defect, examined and found smaller than recorded.** Section 15 worried that charts were chosen without the sheet description; in fact the summarising tool already refuses a grouping that no chart could show, naming the workable alternative — Decision 6 working as intended, and the defect had sat on the open list for two days as though nothing protected against it. The real remaining gap was smaller: because the sheet description is dropped from the conversation to save re-sending 500 tokens, the AI could no longer *offer* the other breakdowns available, which Decision 6 asks it to propose. Those are now restated at the summarising step, with unsuitable columns left out and high-cardinality ones marked "ask for a top ten". |
 | 30 July 2026 | Added Section 38: **colour thresholds proposed, examined and dropped.** The suggestion was to colour the 100% headline against a 90%/75% threshold so a project that collapsed in August would not look healthy. **John Peter challenged the premise — the target is already the baseline** — and he was right; the 90% and 75% were never anybody's decision, only the previous developer's form defaults. It also would not have worked: the overall figure *is* 100%, so the card would have stayed green. The real cause is that one number summarises six very different months, which no single number can fix; the chart and table already tell the truth, and making the collapse unmissable is a layout question, left open deliberately rather than solved badly. Kept: thresholds were stored and silently ignored, which is fixed — but placed **out of the agent's reach**, since nobody has decided what counts as acceptable and the colouring DAX has never been opened in Power BI Desktop. |
 | 30 July 2026 | Added Section 37: **four of the customer's rows were dropped and nobody was told.** 180 of 184 rows were summarised — correctly, since four carry a date and no figures — but the step said only "from 180 rows" and the AI never mentioned it. **The AI was never told**: the warning came several exchanges earlier and nothing restated it when it mattered. The step row now reads "180 of 184 rows used, 4 skipped", read from what the tool did so it shows whatever the AI says, and the tool tells the AI to pass it on so the conversation can explain why. The examining step also now says how many things it found worth checking. Separately, the on-screen legend listed Actual before Target while the bars were drawn the other way; it is now built from the chart's own list of figures. |
 | 30 July 2026 | Added Section 36: **four ticked "Building your Power BI file" rows and no report.** The build was failing on that morning's own month-ordering fix — the hidden ordering value was a date, and those rows are stored as JSON, which a date cannot be. **The verification missed it because the test built without an owner, and without an owner the code skips saving entirely: the one line that broke was the one line the test could not reach.** Two further faults: the step display ticked refusals as though they had succeeded, so four failures read as four finished reports (refusals now show in red, with the reason, and are logged); refusals and faults are now told apart on screen (amber "Adjusting and trying again" against red "Something went wrong") with the technical wording going to the log rather than the customer, while the AI's own copy is left exactly as it was so it can still correct itself; and the "only speak once a file is built" guardrail was checked once per model reply, while the model put four build calls in a single reply — it is checked before every individual call now. **Fourth time today the same lesson: a guardrail is only as good as the moment it is checked.** |
