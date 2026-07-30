@@ -2814,7 +2814,75 @@ that reports a failure has to be examined as carefully as one that reports succe
 
 ---
 
-## 48. Still to be decided
+## 48. Microsoft's validator, and the colours that never applied
+
+Chasing one cosmetic defect — two different figures both displayed as "3K" — turned into the most
+useful hour of the project.
+
+**The immediate fault.** A card abbreviates its number by default. 2,966 and 2,563 both read "3K":
+two different figures shown identically, as the largest thing on the page. Three attempts to fix it
+failed, and each failure is instructive.
+
+The first guessed a property name and a value. Power BI accepted it into the file and ignored it
+without a word. **This is the thing that makes Power BI authoring expensive: a wrong property is not an
+error, it is silence.**
+
+The second read what Power BI itself wrote after John Peter changed the setting by hand — a technique
+that has worked before. It produced a real property, `format` on the projection, which turned out to
+control the *data format* and not the abbreviation. He then tried the same setting inside Power BI
+Desktop, with a custom format code, and reported that it did not work either. That ruled out a whole
+avenue in one message.
+
+**The third attempt asked Microsoft.** Their report-authoring skill names a CLI that is *"the source of
+truth for visual roles, formatting objects, property names, enum values"*:
+
+```
+powerbi-report-author formatting describe-object cardVisual value
+-> labelDisplayUnits {"type":"enum","values":["0","1","1000","1000000",...],
+                      "displayName":"Display units"}
+```
+
+The property name had been right in the first attempt. The **value** was wrong: it is an enum where 0
+means Auto — the default — so setting 0 asked for exactly what was already happening. 1 is None.
+
+### The validator found something much worse
+
+The same CLI validates a PBIR report. Run against a report we had just built and shipped, it reported
+seven errors. Six were the same fault repeated:
+
+> Unknown property `fontColor` in formatting object `categoryAxis` for clusteredColumnChart
+
+**An axis takes `labelColor`. We had been writing `fontColor`.** So every chart axis and every legend,
+on every report, in both flows, had been Microsoft's default grey rather than Lifewood green since that
+code was written — and nothing had ever complained, because nothing complains. Section 18 recorded
+"Lifewood text and page colours" as done. Half of it never applied.
+
+The seventh: the custom theme was registered as `LuminaTheme` where it must be `LuminaTheme.json`,
+which the validator says "causes the published report on the Power BI service to incorrectly apply the
+theme". Both flows, since the template was made.
+
+Both fixed; both flows now validate with zero errors. **And the validator runs on every build**, so a
+property Power BI would quietly ignore fails here instead.
+
+### What this means for the claim in Section 46
+
+Section 46 said the engine check closed the gap for files that will not open, but that visuals remained
+ours to get right and only a person could check them. That was true when written and is no longer.
+There are now two mechanical checks — the engine loads the model, the validator checks the report — and
+between them they cover the two classes of silent failure that have cost the most time.
+
+What still needs a person: whether a report *reads* well. Whether a chart of four near-identical bars
+is worth showing. Whether the number in the corner is the one a manager needs. No validator answers
+those.
+
+**The pattern, for the third time in two days:** the capability existed, published, and was found only
+because a customer pushed back rather than accepting the explanation. First the TMDL rules, then the
+engine that loads a model, now the validator that checks a report. Each time the honest-sounding
+sentence was "there is no way to check this from here", and each time it was wrong.
+
+---
+
+## 49. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -2842,7 +2910,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 49. Change history
+## 50. Change history
 
 | Date | Change |
 |------|--------|
@@ -2871,6 +2939,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 48: **Microsoft's validator, and the colours that never applied.** Chasing one cosmetic defect — 2,966 and 2,563 both displayed as "3K" — led to Microsoft's report-authoring CLI, which is the source of truth for property names and also validates a PBIR report. The abbreviation fix needed an enum value, not a new property: the name had been right and 0 means *Auto*, so it asked for the default. **Run against a report we had just shipped, the validator found seven errors** — six of them `fontColor` on chart axes and legends, where the property is `labelColor`, meaning every axis and legend in both flows had been Microsoft's default grey rather than Lifewood green since the code was written, with nothing ever complaining; and a theme registered without its `.json` extension, which Microsoft say makes a published report apply the theme incorrectly. Both fixed, both flows validate clean, and **the validator now runs on every build**. This supersedes Section 46's claim that only a person could check the visuals. **Third time in two days that a published capability was found only because a customer pushed back on "there is no way to check this from here".** |
 | 30 July 2026 | Added Section 47: **a figure no tool produced can no longer be said to a customer.** The last serious fault: Lumina reported 420 planned videos and 98.8% where the tools had given 2,966 and 86.4% — the report right, the sentence wrong, which is worse than a broken file because a broken file gets noticed. The instruction forbidding it had been in place all along; for the fourth time in a day, only the tools enforced. Every number in a message is now checked against the figures that exist and the message is not sent otherwise. Two deliberate limits: counts below twenty are unchecked, since policing "four months" would refuse ordinary English, and arithmetic is refused rather than recomputed. **Also recorded a near miss: the first verification appeared to show the guardrail failing, and the fault was in the test** — an empty conversation meant no report was attached to check against. A test reporting failure deserves the same scrutiny as one reporting success. |
 | 30 July 2026 | Extended Section 46: **every report was called "Production Plan"** — the project, the page, the download and the card, whatever the workbook contained. `ReportSpec.title` defaulted to our first customer's words and nothing ever set it: Decision 3 undone in one line, invisible for as long as only that customer's workbook was tested. A report now takes its name from the customer's own file, and the agent names it when it builds. **A default is a decision nobody remembers making**, and this one survived a rebuild, nine numbered decisions and two days of testing. |
 | 30 July 2026 | Added Section 46: **Power BI's own engine now checks every file before a customer sees it.** Microsoft's modelling MCP server loads a semantic model straight from a PBIP folder with no Power BI Desktop and no Fabric capacity — and refuses the two files that could not be opened earlier the same day, quoting the identical errors, including one word for word. Every build now runs it, in about three seconds, so a report that will not open fails here instead of in front of somebody who cannot act on it. **An hour earlier this log described that as a limitation no amount of testing could close.** Not fatal when Node is unavailable, since refusing to deliver a report because a checking tool is missing would be worse than the fault. Does not cover report visuals. Recorded plainly: three conclusions in this log were wrong through not looking, and "there is no way to verify this" deserves ten minutes of searching before being written down as a limitation. |

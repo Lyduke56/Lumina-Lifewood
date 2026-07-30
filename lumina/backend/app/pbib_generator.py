@@ -236,12 +236,21 @@ def _text_style(font: str, color: str | None = None) -> dict:
 
 
 def _styled_axes(visual: dict) -> dict:
-    """Apply the brand typeface to a chart's axes and legend."""
+    """Apply the brand typeface and colour to a chart's axes and legend.
+
+    An axis takes `labelColor`, not `fontColor`. We had been writing `fontColor`, which
+    Power BI accepts into the file and silently ignores, so every axis and legend on every
+    report has been Microsoft's default grey rather than Lifewood green since this was
+    written. Found by Microsoft's own PBIR validator, which names the property:
+
+        powerbi-report-author formatting describe-object clusteredColumnChart categoryAxis
+        -> labelColor  fill  "Color"
+    """
     objects = visual.setdefault("objects", {})
     for part in ("categoryAxis", "valueAxis", "legend"):
-        objects.setdefault(part, [{"properties": {}}])[0]["properties"].update(
-            _text_style(BODY_FONT, DARK_SERPENT)
-        )
+        properties = objects.setdefault(part, [{"properties": {}}])[0]["properties"]
+        properties.update(_text_style(BODY_FONT))
+        properties["labelColor"] = {"solid": {"color": _literal(DARK_SERPENT)}}
     return visual
 
 

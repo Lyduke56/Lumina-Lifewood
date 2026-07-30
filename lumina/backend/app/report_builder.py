@@ -30,6 +30,7 @@ from pathlib import Path
 import pbib_generator as pbi
 import pbip_check
 import pbip_engine
+import pbir_check
 from summariser import ORDER_KEY, PERIOD_LABEL, Summary
 
 CHART_KINDS = {"line": "lineChart", "bar": "clusteredColumnChart", "table": "tableEx"}
@@ -360,7 +361,31 @@ def build_powerbi(
     # documented rules are already checked above, and refusing to deliver a report because
     # Node is missing would be worse than the fault being looked for.
     pbip_engine.load_model(root / f"{stem}.SemanticModel")
+
+    # And the visuals, which the engine check cannot see. A property Power BI does not
+    # recognise is accepted into the file and then ignored without complaint, so a report
+    # looks wrong for no visible reason. This ran once and immediately found that every
+    # chart axis and legend had been coloured with a property that does not exist.
+    pbir_check.require_valid(root / f"{stem}.Report")
     return root
+
+
+def _rename(source: Path, target: Path, attempts: int = 10) -> None:
+    """Rename, waiting out a transient lock.
+
+    Windows refuses to rename a folder anything still holds open, and on this machine that
+    is briefly true for a folder just written — a virus scanner reading it, or a checking
+    tool that has not quite let go. It presents as "Access is denied" on a folder nothing
+    appears to be using.
+    """
+    for attempt in range(attempts):
+        try:
+            source.rename(target)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.3)
 
 
 def _name_project(root: Path, title: str) -> str:
@@ -369,7 +394,7 @@ def _name_project(root: Path, title: str) -> str:
     if stem == TEMPLATE_STEM:
         return stem
     for suffix in (".Report", ".SemanticModel"):
-        (root / f"{TEMPLATE_STEM}{suffix}").rename(root / f"{stem}{suffix}")
+        _rename(root / f"{TEMPLATE_STEM}{suffix}", root / f"{stem}{suffix}")
     (root / f"{TEMPLATE_STEM}.pbip").rename(root / f"{stem}.pbip")
 
     # Both files name the folders by hand, so renaming without these is a broken project.
@@ -576,13 +601,26 @@ def _series_colors(measures: list[str], palette: list[str]) -> list[dict]:
     ]
 
 
-def _projection(name: str, as_measure: bool) -> dict:
-    title = _measure_dax(name)[2] if as_measure else _pretty(name)
-    return {
+def _projection(name: str, as_measure: bool, formatted: bool = False) -> dict:
+    """One field on a visual.
+
+    `formatted` writes the measure's format string onto the projection, which is how a
+    visual overrides how a number is shown. A card otherwise abbreviates: 2,966 and 2,563
+    both read "3K" — two different figures displayed identically, and the first thing a
+    manager sees. The property is not `labelDisplayUnits` on the value object, which is
+    what a plausible-looking guess tried and Power BI silently ignored; it is a `format`
+    beside `queryRef`, learned by setting it by hand in Power BI Desktop and reading back
+    the single line it wrote.
+    """
+    dax, fmt, title = _measure_dax(name) if as_measure else (None, None, _pretty(name))
+    projection = {
         "field": _measure_ref(title) if as_measure else _column_ref(name),
         "queryRef": f"{ENTITY}.{title if as_measure else name}",
         "nativeQueryRef": title,
     }
+    if formatted and fmt:
+        projection["format"] = fmt
+    return projection
 
 
 def _write_page(root: Path, stem: str, spec: ReportSpec, summary: Summary) -> None:
@@ -631,6 +669,14 @@ def _write_visual(visuals: Path, content: dict) -> None:
 def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
     title = _measure_dax(kpi.measure)[2]
     value_props = pbi._text_style(spec.heading_font)
+    # Show the number in full. A card abbreviates by default, so 2,966 and 2,563 both read
+    # "3K" — two different figures displayed identically, and the first thing a manager
+    # sees. The property name was right the first time and the *value* was wrong: this is
+    # an enum where 0 means Auto, so setting 0 asked for the default and changed nothing.
+    # 1 is None. Established from Microsoft's own CLI rather than guessed:
+    #   powerbi-report-author formatting describe-object cardVisual value
+    #   -> labelDisplayUnits {"type":"enum","values":["0","1","1000",...]}
+    value_props["labelDisplayUnits"] = {"expr": {"Literal": {"Value": "'1'"}}}
     if kpi.good is not None and kpi.neutral is not None:
         # Bound to the colour measure written alongside the figure. Thresholds were being
         # stored and then ignored here: every card was painted green whatever it said.
@@ -657,7 +703,11 @@ def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
             "visualType": "cardVisual",
             "query": {
                 "queryState": {
-                    "Data": {"projections": [_projection(kpi.measure, as_measure=True)]}
+                    "Data": {
+                        "projections": [
+                            _projection(kpi.measure, as_measure=True, formatted=True)
+                        ]
+                    }
                 }
             },
             "objects": {
@@ -666,7 +716,17 @@ def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
                 ],
                 "label": [
                     {
-                        "properties": pbi._text_style(spec.body_font, pbi.DARK_SERPENT),
+                        "properties": {
+                            **pbi._text_style(spec.body_font, pbi.DARK_SERPENT),
+                            "show": {"expr": {"Literal": {"Value": "true"}}},
+                            # The name the customer agreed to. Without this a card shows
+                            # the raw measure name from the model, so a figure asked for
+                            # as "Total Planned Videos" was captioned "Cumulative Target
+                            # (Videos)". Documented in Microsoft's card reference:
+                            # "By default the card shows the raw measure name from the
+                            # model. Override with label.text."
+                            "text": pbi._literal(kpi.title),
+                        },
                         "selector": {"id": "default"},
                     }
                 ],

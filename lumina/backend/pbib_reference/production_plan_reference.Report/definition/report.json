@@ -11,7 +11,7 @@
       "type": "SharedResources"
     },
     "customTheme": {
-      "name": "LuminaTheme",
+      "name": "LuminaTheme.json",
       "reportVersionAtImport": {
         "visual": "2.9.0",
         "report": "3.3.0",
@@ -65,7 +65,7 @@
       "type": "RegisteredResources",
       "items": [
         {
-          "name": "LuminaTheme",
+          "name": "LuminaTheme.json",
           "path": "LuminaTheme.json",
           "type": "CustomTheme"
         }

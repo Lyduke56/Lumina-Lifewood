@@ -145,7 +145,23 @@ def load_model(model_folder: Path) -> str | None:
         return None
     finally:
         if process is not None:
+            # Disconnected before being killed, so the folder it loaded is released.
+            # Left connected, Windows keeps a handle on the definition folder and the next
+            # build cannot rename it — "Access is denied" on a folder nothing appears to
+            # be using.
+            try:
+                _rpc(process, {
+                    "jsonrpc": "2.0", "id": 99, "method": "tools/call",
+                    "params": {
+                        "name": "connection_operations",
+                        "arguments": {"request": {"operation": "Disconnect"}},
+                    },
+                })
+                _await_reply(process, 99)
+            except OSError:
+                pass
             try:
                 process.kill()
-            except OSError:
+                process.wait(timeout=10)
+            except (OSError, subprocess.TimeoutExpired):
                 pass
