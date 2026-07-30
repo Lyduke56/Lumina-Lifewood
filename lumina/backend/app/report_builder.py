@@ -19,8 +19,10 @@ files, so it cannot express something the emitter would choke on.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -139,11 +141,20 @@ def add_chart(
     return spec
 
 
+# What a derived figure is called in the report, where it differs from what the code
+# calls it. "shortfall" is achieved minus planned, which is positive in a good month and
+# negative in a bad one — so a figure called Shortfall showed −114,561 for the month
+# production collapsed, which reads backwards. The customer's own workbook calls that
+# column Balance, and John Peter chose to keep his word rather than invent ours.
+DISPLAY_NAMES = {"shortfall": "Balance"}
+
+
 def _pretty(name: str) -> str:
     """'completion_rate_Images' -> 'Completion Rate (Images)'."""
     for stem in ("completion_rate", "cumulative_target", "cumulative_actual", "shortfall"):
         if name.startswith(stem + "_"):
-            return f"{stem.replace('_', ' ').title()} ({name[len(stem) + 1:]})"
+            label = DISPLAY_NAMES.get(stem, stem.replace("_", " ").title())
+            return f"{label} ({name[len(stem) + 1:]})"
     if "_" in name:
         head, _, unit = name.partition("_")
         return f"{head.title()} ({unit})"
@@ -161,6 +172,55 @@ def _chart_title(kind: str, measures: list[str], group_by: str) -> str:
 # ── Tool six: compile the specification into a Power BI file ─────────────────
 
 ENTITY = "report_data"
+
+# What the template's folders are called before we name them after the report.
+TEMPLATE_STEM = "production_plan_reference"
+
+# What the timeline should be called on a chart. "period" is our word for it; a
+# production manager reading the report has never heard it.
+PERIOD_LABEL = {"day": "Date", "week": "Week", "month": "Month", "quarter": "Quarter"}
+
+# The ISO values are kept in a hidden companion column and the visible one is sorted by
+# it, which is how Power BI is meant to be told that "Apr 2025" comes before "May 2025".
+# Sorted on the readable text alone, a year of months reads Apr, Aug, Dec, Feb.
+ORDER_COLUMN = "period_order"
+
+
+def _project_name(title: str) -> str:
+    """A folder name for this report, from its title.
+
+    Every report used to be called 'production_plan_reference' — the template's name,
+    which nobody chose. Two open at once in Power BI Desktop were indistinguishable.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9 _-]+", "", title).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned[:60] or "Report"
+
+
+def _axis_name(summary: Summary) -> str:
+    """What to call the timeline column in the finished report."""
+    return PERIOD_LABEL.get(summary.period, "Date")
+
+
+def _format_period(value, period: str) -> str:
+    """'2025-04' -> 'Apr 2025'. Left alone if it is not the shape we expect."""
+    text = str(value)
+    try:
+        if period == "month":
+            year, month = text.split("-")
+            return f"{MONTHS[int(month) - 1]} {year}"
+        if period == "quarter":
+            year, quarter = text.split("-Q")
+            return f"Q{quarter} {year}"
+        if period == "day":
+            year, month, day = text.split("-")
+            return f"{int(day)} {MONTHS[int(month) - 1]} {year}"
+    except (ValueError, IndexError):
+        pass
+    return text
+
+
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
 def _tmdl_type(values: list) -> str:
@@ -213,19 +273,75 @@ def build_powerbi(
     if root.exists():
         shutil.rmtree(root)
     shutil.copytree(pbi.TEMPLATE_DIR, root)
+    stem = _name_project(root, spec.title)
 
-    columns = summary.group_by + summary.measures
-    types = {
-        c: _tmdl_type([r.get(c) for r in summary.rows]) for c in columns
-    }
-    _write_model(root, summary, columns, types)
-    _write_page(root, spec, summary)
+    rows, columns, types = _model_columns(summary)
+    _write_model(root, stem, summary, rows, columns, types)
+    _write_page(root, stem, spec, summary)
 
     pbi.apply_theme(root, spec.palette, spec.heading_font, spec.body_font)
+
+    # copytree carries the template's own modification times across, so Power BI Desktop
+    # announced a report built today as last saved on the day the template was made.
+    now = time.time()
+    for path in root.rglob("*"):
+        os.utime(path, (now, now))
+    os.utime(root, (now, now))
     return root
 
 
-def _write_model(root: Path, summary: Summary, columns: list[str], types: dict) -> None:
+def _name_project(root: Path, title: str) -> str:
+    """Rename the copied template after the report, and fix what points at it."""
+    stem = _project_name(title)
+    if stem == TEMPLATE_STEM:
+        return stem
+    for suffix in (".Report", ".SemanticModel"):
+        (root / f"{TEMPLATE_STEM}{suffix}").rename(root / f"{stem}{suffix}")
+    (root / f"{TEMPLATE_STEM}.pbip").rename(root / f"{stem}.pbip")
+
+    # Both files name the folders by hand, so renaming without these is a broken project.
+    for relative in (f"{stem}.pbip", f"{stem}.Report/definition.pbir"):
+        path = root / relative
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(TEMPLATE_STEM, stem),
+            encoding="utf-8",
+        )
+    return stem
+
+
+def _model_columns(summary: Summary) -> tuple[list[dict], list[str], dict]:
+    """The columns to write, with the timeline given a name and readable values.
+
+    Done here rather than in the summariser because it is a presentation decision: the
+    figures are the same either way, and the summariser's own callers want the sortable
+    form.
+    """
+    axis = _axis_name(summary)
+    rows: list[dict] = []
+    for row in summary.rows:
+        copy = dict(row)
+        if "period" in copy:
+            copy[ORDER_COLUMN] = str(copy["period"])
+            copy[axis] = _format_period(copy.pop("period"), summary.period)
+        rows.append(copy)
+
+    columns = [axis if c == "period" else c for c in summary.group_by]
+    if "period" in summary.group_by:
+        columns.append(ORDER_COLUMN)
+    columns += summary.measures
+
+    types = {c: _tmdl_type([r.get(c) for r in rows]) for c in columns}
+    return rows, columns, types
+
+
+def _write_model(
+    root: Path,
+    stem: str,
+    summary: Summary,
+    rows: list[dict],
+    columns: list[str],
+    types: dict,
+) -> None:
     """Generate the table from whatever the summary holds, rather than a fixed six."""
     lines = [f"table {ENTITY}", f"\tlineageTag: {uuid.uuid4()}", ""]
 
@@ -238,6 +354,7 @@ def _write_model(root: Path, summary: Summary, columns: list[str], types: dict) 
             "",
         ]
 
+    axis = _axis_name(summary)
     for column in columns:
         kind = types[column]
         lines += [
@@ -248,15 +365,19 @@ def _write_model(root: Path, summary: Summary, columns: list[str], types: dict) 
             # must not offer its own implicit aggregation as well.
             "\t\tsummarizeBy: none",
             f"\t\tsourceColumn: {column}",
-            "",
-            "\t\tannotation SummarizationSetBy = User",
-            "",
         ]
+        if column == axis and ORDER_COLUMN in columns:
+            # 'Apr 2025' comes before 'Aug 2025' in the alphabet but not in a year, so
+            # the readable column is ordered by the sortable one beside it.
+            lines.append(f"\t\tsortByColumn: {ORDER_COLUMN}")
+        if column == ORDER_COLUMN:
+            lines.append("\t\tisHidden")  # it exists only to put the other in order
+        lines += ["", "\t\tannotation SummarizationSetBy = User", ""]
 
     signature = ", ".join(f"{c}={_m_type(types[c])}" for c in columns)
-    rows = ",\n".join(
+    literals = ",\n".join(
         "\t\t\t\t\t{" + ", ".join(_m_literal(r.get(c), types[c]) for c in columns) + "}"
-        for r in summary.rows
+        for r in rows
     )
     lines += [
         f"\tpartition {ENTITY} = m",
@@ -266,7 +387,7 @@ def _write_model(root: Path, summary: Summary, columns: list[str], types: dict) 
         "\t\t\t\tSource = #table(",
         f"\t\t\t\t\ttype table [{signature}],",
         "\t\t\t\t\t{",
-        rows,
+        literals,
         "\t\t\t\t\t}",
         "\t\t\t\t)",
         "\t\t\tin",
@@ -276,7 +397,7 @@ def _write_model(root: Path, summary: Summary, columns: list[str], types: dict) 
         "",
     ]
 
-    tables = root / "production_plan_reference.SemanticModel" / "definition" / "tables"
+    tables = root / f"{stem}.SemanticModel" / "definition" / "tables"
     for stale in tables.glob("*.tmdl"):
         stale.unlink()
     (tables / f"{ENTITY}.tmdl").write_text("\n".join(lines), encoding="utf-8")
@@ -341,10 +462,10 @@ def _projection(name: str, as_measure: bool) -> dict:
     }
 
 
-def _write_page(root: Path, spec: ReportSpec, summary: Summary) -> None:
+def _write_page(root: Path, stem: str, spec: ReportSpec, summary: Summary) -> None:
     page = (
         root
-        / "production_plan_reference.Report"
+        / f"{stem}.Report"
         / "definition"
         / "pages"
         / "2bb6229a2baa33c2479a"
@@ -361,11 +482,21 @@ def _write_page(root: Path, spec: ReportSpec, summary: Summary) -> None:
     for index, kpi in enumerate(spec.kpis):
         _write_visual(visuals, _kpi_json(kpi, layout[index], spec))
 
+    axis = _axis_name(summary)
     for offset, chart in enumerate(spec.charts):
         position = layout[len(spec.kpis) + offset]
-        _write_visual(visuals, _chart_json(chart, position, palette))
+        _write_visual(visuals, _chart_json(chart, position, palette, axis))
 
     pbi.apply_page_background(page)
+    _name_page(page, spec.title)
+
+
+def _name_page(page: Path, title: str) -> None:
+    """Call the tab after the report rather than leaving it as 'Page 1'."""
+    path = page / "page.json"
+    content = json.loads(path.read_text(encoding="utf-8"))
+    content["displayName"] = title
+    path.write_text(json.dumps(content, indent=2), encoding="utf-8")
 
 
 def _write_visual(visuals: Path, content: dict) -> None:
@@ -406,13 +537,16 @@ def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
     }
 
 
-def _chart_json(chart: Chart, position: dict, palette: list[str]) -> dict:
+def _chart_json(chart: Chart, position: dict, palette: list[str], axis: str) -> dict:
+    """One chart. `axis` is what the timeline column ended up being called."""
     name = uuid.uuid4().hex[:20]
+    # The specification talks about "period"; the model calls it Month, Week or Date.
+    group_by = axis if chart.group_by == "period" else chart.group_by
     if chart.kind == "table":
         query = {
             "queryState": {
                 "Values": {
-                    "projections": [_projection(chart.group_by, as_measure=False)]
+                    "projections": [_projection(group_by, as_measure=False)]
                     + [_projection(m, as_measure=True) for m in chart.measures]
                 }
             }
@@ -422,7 +556,7 @@ def _chart_json(chart: Chart, position: dict, palette: list[str]) -> dict:
             "queryState": {
                 "Category": {
                     "projections": [
-                        {**_projection(chart.group_by, as_measure=False), "active": True}
+                        {**_projection(group_by, as_measure=False), "active": True}
                     ]
                 },
                 "Y": {
@@ -433,7 +567,7 @@ def _chart_json(chart: Chart, position: dict, palette: list[str]) -> dict:
             },
             "sortDefinition": {
                 "sort": [
-                    {"field": _column_ref(chart.group_by), "direction": "Ascending"}
+                    {"field": _column_ref(group_by), "direction": "Ascending"}
                 ],
                 "isDefaultSort": True,
             },
@@ -444,6 +578,14 @@ def _chart_json(chart: Chart, position: dict, palette: list[str]) -> dict:
     if chart.kind != "table":
         visual["objects"] = {"dataPoint": _series_colors(chart.measures, palette)}
         pbi._styled_axes(visual)
+        # Power BI titles the value axis by listing every series on it, which produced
+        # "Target (Images) and Actual (Images)" beside a chart already titled and
+        # labelled with exactly that. The chart title and legend say it once; an axis
+        # does not need to say it again. `showAxisTitle` is Microsoft's own property
+        # name, taken from the base theme they ship rather than guessed at.
+        visual["objects"]["valueAxis"][0]["properties"]["showAxisTitle"] = {
+            "expr": {"Literal": {"Value": "false"}}
+        }
     return {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
         "name": name,

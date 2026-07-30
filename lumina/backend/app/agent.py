@@ -24,7 +24,8 @@ from typing import Any
 from openai import RateLimitError
 
 import agent_tools
-from llm_client import DEFAULT_MODEL, available_suppliers
+import workbench
+from llm_client import DEFAULT_MODEL, available_suppliers, mark_exhausted
 
 AGENT_MODEL = DEFAULT_MODEL
 
@@ -49,7 +50,8 @@ technical and should never see jargon, column numbers, or tool names.
 
 Work through the tools in order: open the workbook, examine the sheet they want, agree \
 what its columns mean, summarise the figures, then add headline figures and charts, then \
-build the file.
+build the file. Building the file finishes the job: say it is ready and stop there. Never \
+build a second time unless they have asked for a change.
 
 HOW YOU SPEAK: the customer only ever sees what you pass to reply_to_customer. Anything \
 you write outside a tool is thrown away and never reaches them. So when you want to ask a \
@@ -97,18 +99,28 @@ def _retry_after(error: Exception) -> float | None:
 
 
 def _complete(history: list[dict], tools: list[dict]):
-    """One call to the model.
+    """One call to the model, reporting anything that delays it.
 
     A rate limit is worth waiting out; an exhausted allowance is not, and the two are
     told apart by whether the supplier offers a retry delay. Where waiting will not
     help, the next supplier holding a key is tried instead — free tiers run dry on
     their own separate schedules, and a customer's conversation should not end because
     one of them did.
+
+    Both of those take time, and a customer watching a conversation that has gone quiet
+    deserves to know why rather than assuming it has broken. So this yields notices as
+    it goes and returns the answer at the end — a generator rather than a plain call.
     """
     suppliers = available_suppliers()
     last: Exception | None = None
 
-    for supplier in suppliers:
+    for index, supplier in enumerate(suppliers):
+        if index:
+            yield {
+                "type": "notice",
+                "key": "switched_supplier",
+                "detail": "The last one has reached its limit for now",
+            }
         for attempt in range(RATE_LIMIT_ATTEMPTS):
             try:
                 return supplier.client.chat.completions.create(
@@ -130,7 +142,13 @@ def _complete(history: list[dict], tools: list[dict]):
                 pause = _retry_after(e)
                 # No delay offered means the allowance is spent, not merely busy.
                 if pause is None or attempt == RATE_LIMIT_ATTEMPTS - 1:
+                    mark_exhausted(supplier.name)
                     break
+                yield {
+                    "type": "notice",
+                    "key": "waiting",
+                    "detail": f"It is busy — trying again in {pause:.0f} seconds",
+                }
                 time.sleep(pause)
             except Exception as e:  # a bad key or a withdrawn model: try the next one
                 last = e
@@ -185,17 +203,65 @@ def _trim(history: list[dict]) -> list[dict]:
     ]
 
 
-def _tool_result(name: str, arguments: dict) -> str:
-    """Run one tool. A refusal is an answer, not a crash — the model has to see it."""
+def _tool_result(name: str, arguments: dict, owner: dict | None) -> str:
+    """Run one tool. A refusal is an answer, not a crash — the model has to see it.
+
+    Who the report belongs to is set here, immediately before the call, rather than
+    once for the whole reply. A streamed reply is resumed step by step and each step
+    runs in a fresh copy of the context, so anything set on an earlier step has
+    vanished by the next one — which is why a finished report was quietly never
+    uploaded: by the time the workbook was opened, the owner had gone.
+    """
+    token = workbench.CURRENT_OWNER.set(owner)
     try:
         return str(agent_tools.BY_NAME[name](**arguments))
     except KeyError:
         return f"There is no tool called {name!r}. Available: {', '.join(agent_tools.BY_NAME)}."
     except Exception as e:  # tools raise deliberately, with messages meant to be read
         return f"That did not work: {e}"
+    finally:
+        workbench.CURRENT_OWNER.reset(token)
 
 
-def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
+def _detail(name: str, session) -> str | None:
+    """A line of plain fact about what a step just did, for the customer to watch.
+
+    Read from what the tools actually produced rather than from what the AI said about
+    them, so a step that claims to have summarised 180 rows has genuinely done so.
+    """
+    if session is None:
+        return None
+    try:
+        if name == "open_workbook":
+            return session.workbook.name
+        if name == "examine_sheet" and session.profiles:
+            p = list(session.profiles.values())[-1]
+            rows = "row" if p.data_row_count == 1 else "rows"
+            cols = "column" if len(p.columns) == 1 else "columns"
+            return f"{p.data_row_count:,} {rows} · {len(p.columns)} {cols}"
+        if name == "record_column_meanings" and session.schema:
+            measures = sum(1 + len(p.actuals) for p in session.schema.pairs)
+            breakdowns = len(session.schema.labels)
+            ways = "way" if breakdowns == 1 else "ways"
+            return f"{measures} figures · {breakdowns} {ways} to break them down"
+        if name == "summarise_figures" and session.summary:
+            s = session.summary
+            periods = "period" if len(s.rows) == 1 else "periods"
+            return f"{len(s.rows)} {periods} from {s.source_rows_used:,} rows"
+        if name == "add_headline_figure" and session.spec.kpis:
+            return session.spec.kpis[-1].title
+        if name == "add_report_chart" and session.spec.charts:
+            return session.spec.charts[-1].title
+        if name == "build_report_file" and session.last_report:
+            return "Ready to download"
+    except Exception:  # a display detail is never worth failing a conversation over
+        return None
+    return None
+
+
+def respond(
+    history: list[dict], message: str, owner: dict | None = None
+) -> Iterator[dict[str, Any]]:
     """Answer the customer, using tools as needed. Yields events as work happens.
 
     `history` is the conversation so far in the model's own format, and is appended to
@@ -206,7 +272,7 @@ def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
     history.append({"role": "user", "content": message})
 
     for _ in range(MAX_STEPS):
-        completion = _complete(_trim(history), agent_tools.schemas_for(history))
+        completion = yield from _complete(_trim(history), agent_tools.schemas_for(history))
         choice = completion.choices[0].message
         history.append(choice.model_dump(exclude_none=True))
 
@@ -249,17 +315,36 @@ def respond(history: list[dict], message: str) -> Iterator[dict[str, Any]]:
                 return
 
             yield {"type": "tool_started", "tool": name}
-            result = _tool_result(name, arguments)
+            result = _tool_result(name, arguments, owner)
             history.append(
                 {"role": "tool", "tool_call_id": call.id, "content": result}
             )
+            # A finished report travels with the event, so the conversation can
+            # offer it for download rather than telling the customer it exists and
+            # leaving them to go looking.
+            session = workbench._sessions.get(arguments.get("session_id", ""))
+            report = (
+                session.last_report
+                if session and name == "build_report_file"
+                else None
+            )
+
             yield {
                 "type": "tool_finished",
                 "tool": name,
+                "report": report,
+                "detail": _detail(name, session),
                 # The website watches for these to know when to redraw the preview.
                 "session_id": arguments.get("session_id"),
                 "changed_report": name
-                in {"summarise_figures", "add_headline_figure", "add_report_chart"},
+                in {
+                    "summarise_figures",
+                    "add_headline_figure",
+                    "add_report_chart",
+                    # Without this the finished file lands in the customer's account
+                    # and the list they are looking at never notices.
+                    "build_report_file",
+                },
             }
 
     yield {

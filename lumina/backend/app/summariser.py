@@ -37,6 +37,10 @@ class Summary:
 
     group_by: list[str]
     measures: list[str]
+    # Whether the timeline was gathered by day, week, month or quarter. Carried through
+    # because the report has to *label* it — an axis headed "period" is our word for it,
+    # not the customer's.
+    period: str = "day"
     rows: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     reconciliation: list[str] = field(default_factory=list)
@@ -168,6 +172,7 @@ def summarise(
     summary = Summary(
         group_by=(["period"] if period != "none" else []) + [f"column_{g}" for g in group_by],
         measures=[],
+        period=period,
         source_rows_used=used,
         source_rows_skipped=skipped,
     )

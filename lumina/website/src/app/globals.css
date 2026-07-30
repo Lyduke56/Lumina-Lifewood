@@ -450,3 +450,83 @@ body {
         /* keep ll-status-badge.compiling */
         .ll-status-badge.compiling { background: rgba(166,90,18,0.12); color: #A65A12; }
 
+
+/* The finished report, offered inside the conversation that produced it. */
+.ll-report-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--emerald);
+  border-radius: 10px;
+  background: rgba(19, 110, 74, 0.05);
+  font: inherit;
+  font-size: 13px;
+  color: var(--forest);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.ll-report-card:hover { background: rgba(19, 110, 74, 0.12); }
+
+/* The work, shown as it happens and left on screen afterwards, so the conversation
+   keeps a visible record of what was actually done to the customer's spreadsheet. */
+.ll-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: flex-start;
+  max-width: 90%;
+  padding: 6px 4px;
+}
+.ll-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  transition: opacity 0.3s ease;
+  animation: ll-step-in 0.35s ease both;
+}
+@keyframes ll-step-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.ll-step-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(19, 110, 74, 0.09);
+  color: var(--emerald);
+}
+.ll-step-done .ll-step-icon { background: rgba(19, 110, 74, 0.14); }
+.ll-step-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.ll-step-text strong { font-size: 13.5px; font-weight: 600; color: var(--forest); }
+.ll-step-text small { font-size: 12px; opacity: 0.6; color: var(--forest); }
+.ll-step-tick {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--emerald);
+  color: #fff;
+}
+/* Still running: a quiet ring rather than anything that draws the eye away. */
+.ll-step-spinner {
+  flex: 0 0 16px;
+  height: 16px;
+  border: 2px solid rgba(19, 110, 74, 0.2);
+  border-top-color: var(--emerald);
+  border-radius: 50%;
+  animation: ll-spin 0.7s linear infinite;
+}
+@keyframes ll-spin { to { transform: rotate(360deg); } }
+
+/* An explanation rather than a step of the work — amber, and without a tick, so it
+   reads as "here is where the time went" rather than as progress on the report. */
+.ll-step-notice .ll-step-icon { background: rgba(214, 158, 46, 0.14); color: #B7791F; }
+.ll-step-notice .ll-step-text strong { font-weight: 500; opacity: 0.85; }

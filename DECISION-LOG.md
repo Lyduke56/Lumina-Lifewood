@@ -1849,7 +1849,188 @@ evenly. Both are configured, so switching is one line if Groq ever becomes the c
 
 ---
 
-## 27. Still to be decided
+## 27. The finished file reaches the customer
+
+The conversation was producing a genuine Power BI file and then losing it. The agent would
+announce that the dashboard was ready; nothing appeared in the customer's Files list, and there
+was no way to get hold of it. Two separate faults, one of ours and one of design.
+
+**The fault: the file was built but never delivered.** The software knew whose report it was at
+the moment the customer sent their message, and stored that away for the rest of the reply. But a
+reply that streams its progress is resumed step by step, and each step begins from a fresh copy
+of that store — so by the time the file was actually built, several steps later, the software no
+longer knew who it belonged to. It saved the file into a folder for nobody and moved on without
+complaint. The ownership is now attached immediately before each individual step instead of once
+at the start, which is the only arrangement that survives the streaming.
+
+This was reported as fixed once before it was. The earlier check confirmed the code uploads a
+file **when it knows the owner**; it did not confirm the owner was still there under real
+conditions. The check that found the truth was looking in the database for the row, which was
+absent. Verification now means looking at the result, not at the code.
+
+**The design change: the file is offered in the conversation.** Raised by John Peter — a customer
+who has just spent five minutes discussing their report should not then have to go hunting for it
+in a different part of the website. The finished report now appears as a download in the
+conversation itself, at the moment it is built, in addition to being listed in Files. It is the
+same file and the same permission check either way; only the offer is new.
+
+**A third fault found alongside them:** the Files list only refreshed while the report was being
+assembled, and not when the file was finally built — so even a successful delivery would have
+stayed invisible until the customer navigated away and came back.
+
+### Why it also felt slow
+
+Watching a real conversation, it appeared to hang. The cause was not our software but the
+settings: **two of the three AI suppliers had run out of their daily allowance**, and the one
+still working was listed last. Every step of every conversation therefore queued behind two
+suppliers that were certain to refuse.
+
+Two changes. The working supplier is now the preferred one — but more usefully, **a supplier that
+runs out is remembered as spent for fifteen minutes and skipped**, rather than being hopefully
+asked again several times a minute. Allowances reset daily, so it is given another chance
+automatically. This makes the arrangement from Section 26 genuinely self-managing: running dry
+now costs one refusal rather than one per step, and nobody has to notice or edit anything.
+
+### The work is now visible while it happens
+
+Prompted by John Peter, who saw the pattern in another product and preferred it. Previously a
+single line of status appeared and vanished, so a customer waiting had nothing to look at and no
+record afterwards of what had been done.
+
+Each step now appears as its own row — opening the file, reading the sheet, agreeing the columns,
+adding up the figures, adding each chart, building the file — turning from a spinner to a tick as
+it completes, and **staying on screen**. Each carries a line of plain fact taken from what the
+tool actually produced: *180 rows · 12 columns*, *6 periods from 180 rows*. Those figures are read
+from the work itself rather than from anything the AI says about it, so a step claiming to have
+summarised 180 rows has demonstrably done so. It doubles as an audit trail the customer can read,
+which is what Decision 6 promised and had not yet shown anyone.
+
+**The delays are shown too**, which was John Peter's point rather than ours: the switch between AI
+suppliers described above is invisible work that takes real time, and a conversation that goes
+quiet without explanation reads as broken. Switching suppliers and waiting out a busy one now
+appear in the same list, in amber and without a tick — *"Switching to another AI service — the
+last one has reached its limit for now"* — so a wait reads as the system coping rather than
+failing. The same wait, unexplained, is what prompted the report that it had hung.
+
+---
+
+## 28. Why it built the same report over and over
+
+John Peter watched a conversation add a chart, build a file, add a chart, build a file, and keep
+going. Three faults stacked on top of each other, and the visible one was the least important.
+
+**The cause was a database rule, not the AI.** The table that records a finished report demanded a
+chart preview, and the new conversation does not produce one yet — that is honest, since the
+preview cannot read the new flexible column names. So every save was rejected. The column now
+accepts nothing, because nothing is the truth, and the website already draws a placeholder when a
+preview is missing.
+
+**The fault that hid it:** the report was marked as delivered *before* the record was saved. So a
+rejected save still lit a green tick, still said "ready to download", and still offered the file —
+while the AI was quietly handed the refusal. It is now marked delivered last of all, so the
+customer cannot be shown a success the database never accepted.
+
+**The fault that made it a loop:** the AI, told its build had failed, sensibly tried again — and
+nothing stopped it. There was no notion of the job being *finished*. The tools now recognise that
+state: **once a file has been built, the only thing the AI is permitted to do is tell the
+customer.** Judged by position rather than presence, so somebody asking for a change after being
+handed a file can still have one made. The instructions say the same thing in words, but the
+guardrail is what enforces it — Decision 6's principle applied to the one place it was missing.
+
+Verified by running a real build against the real database: 45 records became 46, the file is
+named *Production Plan - 2026-07-30.zip*, and the missing preview is recorded as genuinely absent.
+
+This is the same lesson as Section 27, and it had to be learned twice. Both times the code was
+right about what it intended to do and wrong about what actually happened, and both times the
+thing that found the truth was counting rows in the database rather than reading the code.
+
+---
+
+## 29. Conversations are now remembered
+
+Raised by John Peter: leaving "Talk to Lumina" to look at a file and coming back showed an empty
+page, as though the conversation had never happened.
+
+**It had never been saved anywhere.** The database has a `messages` table — conversation, who
+spoke, what was said — which has existed since before this work began and had **never been written
+to once**. Not a design decision that went wrong; a connection nobody ever made.
+
+Three things are now kept, and the third is the one that matters:
+
+1. **What was said**, in that unused table — every message and every step of the work, so returning
+   shows the record rather than a blank page. Including the finished report, which is offered again
+   as a download.
+2. **Which spreadsheet it was about**, so a resumed conversation knows what it is discussing.
+3. **The agent's own working memory.** Without this the conversation would *look* restored while
+   the agent had no idea what had been agreed — the customer asks for one more chart and is asked
+   to explain their spreadsheet from the beginning. Saving what a customer can see is the easy
+   half; saving what the agent knows is what makes it a real fix rather than a convincing one.
+
+**A trap removed along the way.** Each conversation carried two identities: a throwaway one made
+up by the server, and the database row's own id. The browser only ever held the throwaway one — so
+it had nothing durable to ask to be resumed, and no amount of saving would have helped until that
+was fixed. There is now one id, the database's.
+
+**Two honest limits, both said out loud rather than hidden.** The uploaded spreadsheet sits in
+temporary storage and does not last for ever; a conversation read back after it has gone now says
+so plainly and invites the customer to attach the file again, instead of failing at the next
+question for reasons they could not guess. And a batch of saved messages needed a proper sequence
+number, because everything written in one go carries the same timestamp — ordering by time would
+have shuffled a conversation into nonsense.
+
+Verified by saving a conversation, wiping the server's memory exactly as a restart would, and
+reading it back: the messages, the steps grouped as they appeared, the download, and the agent's
+own memory all returned.
+
+---
+
+## 30. The report stops showing its own plumbing
+
+John Peter opened a finished report in Power BI Desktop, and five things were wrong — none of
+them the figures, all of them the words. The report was displaying our internal names instead of
+his.
+
+| What it said | What it says now |
+|---|---|
+| `production_plan_reference` in the title bar | Production Plan |
+| Last saved two days before it was built | today |
+| `Page 1` on the tab | Production Plan |
+| An axis headed `period`, with values `2025-04` | Month, with values `Apr 2025` |
+| A y-axis headed `Target (Images) and Actual (Images)` | nothing — the title and legend already say it |
+
+**Every report was called `production_plan_reference`** — the template's name, which nobody chose.
+Two open at once in Power BI Desktop were indistinguishable. Renaming it turned out to touch more
+than the folders: two files inside name them by hand, and **five places elsewhere in the code
+spelled the template's name out**, including the one that writes the branding — which is written
+last, so a renamed project would have shipped with no Lifewood colours at all. Those five now find
+the folder rather than assuming its name, which also protects the older WhatsApp path.
+
+**The dates were the template's.** Copying a folder carries its modification times with it, so a
+report built today announced itself as last saved on the day the template was made.
+
+**`period` was our word for the timeline**, and it was on the axis of every chart. It is now called
+what it is — Month, Week, Quarter or Date — and its values read `Apr 2025` rather than `2025-04`.
+That needed care: sorted on the readable text alone, a year of months reads Apr, Aug, Dec, Feb, so
+the sortable form is kept in a hidden column beside it and the visible one is ordered by that. This
+is Decision 3's principle reaching the labels — the software already knew it was counting images by
+month, and simply wasn't saying so.
+
+**A sixth thing, decided by John Peter rather than by us.** The figure taken from his "Balance"
+column was being presented as *Shortfall*, and it is calculated as achieved minus planned — so it
+read −114,561 for August, the month production collapsed. A figure called a shortfall that goes
+negative when you fall short is backwards. Offered the choice of renaming it or flipping the sign,
+he chose to **keep his own word: Balance**. The right call, and worth recording as a principle — the
+customer's vocabulary wins over ours. Nothing about the arithmetic changed.
+
+**One thing was removed rather than fixed.** Power BI titles a y-axis by listing every series on
+it, which put *"Target (Images) and Actual (Images)"* down the side of a chart already titled
+"Planned vs Actual Images by Month" with both series in its legend. Said three times, so now said
+once. The property name came from the theme file Microsoft ships rather than from a guess — the
+lesson of Section 19, applied without needing to find it the hard way again.
+
+---
+
+## 31. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -1869,7 +2050,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 28. Change history
+## 32. Change history
 
 | Date | Change |
 |------|--------|
@@ -1898,5 +2079,12 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Renamed the *Shortfall* figure to **Balance**, John Peter's decision. It is achieved minus planned, so it read −114,561 for the month production collapsed — a shortfall that goes negative when you fall short. Given the choice between renaming it and flipping the sign, he kept the word his own workbook uses. Worth recording as a principle beyond this one label: **the customer's vocabulary wins over ours.** The arithmetic is unchanged. |
+| 30 July 2026 | Added Section 30: **the report stops showing its own plumbing.** John Peter opened a finished report and found five things wrong, none of them the figures and all of them the words: every report was named after the template rather than itself, the saved date was the template's, the tab said "Page 1", the timeline axis was headed `period` with values like `2025-04`, and the y-axis repeated what the title and legend already said. All five fixed. Renaming the project turned out to reach further than expected — **five places in the code spelled the template's name out by hand, including the one that writes the Lifewood branding**, so a renamed report would have shipped unbranded. Readable months needed a hidden sortable column beside them, since Apr, Aug, Dec is the alphabet's idea of a year. This is Decision 3 reaching the labels: the software already knew it was counting images by month and simply was not saying so. |
+| 30 July 2026 | Added Section 29: **conversations are now remembered.** John Peter noticed that leaving "Talk to Lumina" and coming back showed an empty page. Nothing had ever been saved — and the database's `messages` table, which is exactly the right shape for it, had existed since before this work began without a single row ever being written. Three things are now kept: what was said, which spreadsheet it was about, and — the part that makes it a real fix rather than a convincing one — **the agent's own working memory**, so a follow-up still knows what was agreed instead of asking the customer to explain their spreadsheet again. Also removed a trap: each conversation carried two identities and the browser only held the throwaway one, so it had nothing durable to ask to be resumed. Verified by wiping the server's memory as a restart would and reading everything back. |
+| 30 July 2026 | Added Section 28: **found why a conversation built the same report over and over.** Three faults stacked up. The database refused every save, because it demanded a chart preview the new conversation does not yet produce — the column now accepts its absence, which is the truth. The report was being marked as delivered *before* that save, so a rejected save still showed a green tick, still said "ready to download" and still offered the file, while the AI was handed the refusal — it is now marked delivered last. And the AI, told its build had failed, sensibly tried again with nothing to stop it, because **the tools had no notion of the job being finished**; once a file exists the only permitted action is now to tell the customer. Verified against the real database: 45 records became 46. Also used the new database access for the first time, to relax the constraint. |
+| 29 July 2026 | Added Section 27: **the finished file now actually reaches the customer.** The conversation was building a real Power BI file and then losing it — announced as ready, but absent from the customer's Files and impossible to retrieve. The software forgot whose report it was partway through, because a reply that streams its progress restarts from a fresh copy of that information at every step, so the file was saved for nobody. Ownership is now recorded immediately before each step. Two further faults fixed alongside it: the Files list never noticed a newly built file, and — raised by John Peter — **the report is now offered as a download inside the conversation itself**, rather than making a customer who has just discussed their report go looking for it elsewhere. Also recorded that this was reported as fixed once before it was: the earlier check confirmed the code was correct rather than confirming the file had arrived. |
+| 29 July 2026 | Extended Section 27 after watching a real conversation appear to hang. **The cause was the supplier settings, not the software:** two of the three AI suppliers had spent their daily allowance and the working one was listed last, so every step queued behind two certain refusals. The working supplier is now preferred, and — the more useful change — **a supplier that runs out is remembered as spent and skipped for fifteen minutes**, then given another chance automatically. Also **made the work visible while it happens**, at John Peter's suggestion: each step now appears as its own row that turns from a spinner to a tick and stays on screen, carrying a line of plain fact read from the work itself rather than from anything the AI claims about it. That doubles as the audit trail Decision 6 promised and had never actually shown anyone. |
+| 29 July 2026 | Gained direct database access, at John Peter's suggestion, so schema changes no longer need a person in the loop. Two obstacles were worth recording: the connection address Supabase offers first is **IPv6-only and unreachable** from this network, so the shared pooler address must be used instead; and the password reset dialog has separate *generate* and *confirm* buttons, so copying a generated password without confirming leaves the old one in force and looks exactly like a typing mistake. |
 | 29 July 2026 | **The conversation now works end to end on a free tier.** Groq supplies the AI; Google's key was already at quota. A full exchange produced a real Power BI file from the official workbook — asking which sheet, explaining the columns in plain words, seeking confirmation, then summarising and building. Two problems found by watching it work: the first free model described columns by number and tried to build before summarising, fixed by naming a better free model on the same tier; and **we were making the AI repeat itself five or six times per conversation through two mistakes of our own** — refusing a sensible answer about running totals, and demanding a clarification where nothing was ambiguous. Both corrected, cutting a conversation from about fifteen requests to eight. |
 | 29 July 2026 | Got Google working as a second supplier, and corrected two things we had recorded. A model with **no** free allowance reports `limit: 0`, which reads as an exhausted key but is not — naming a current model fixed it. And the binding limit is **per minute, not per day**: Google allows five requests a minute where a conversation makes about eight, so it trips halfway through however much daily allowance remains. Being asked to wait is normal on a free tier, so the software now waits and carries on. **Groq stays the default** — its higher per-minute allowance matters more here than Google's larger daily one, because the work arrives in bursts. |

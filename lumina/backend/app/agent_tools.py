@@ -294,7 +294,10 @@ def build_report_file(session_id: str, dataset_id: str) -> str:
     # list and there was nothing for them to download, while the agent cheerfully
     # reported it as ready.
     if not session.owner:
-        return f"Built the report ({built}), saved at {folder}."
+        return (
+            f"Built the report ({built}), saved at {folder}. The job is finished — tell "
+            f"the customer and stop. Do not build again unless they ask for a change."
+        )
 
     dataset = save_dataset(
         source_file_path=str(session.workbook),
@@ -319,10 +322,16 @@ def build_report_file(session_id: str, dataset_id: str) -> str:
         conversation_id=session.owner["conversation_id"],
         storage_path=storage_path,
     )
+    # Set last of all, once the record exists. Set any earlier and a failure here still
+    # offered the customer a download and told the step it had succeeded — which is how
+    # a broken save presented itself as a finished report, and why the agent, seeing the
+    # refusal it was actually given, went round again adding charts and rebuilding.
+    session.last_report = {"storage_path": storage_path, "title": session.spec.title}
     return (
-        f"Built the report ({built}) and saved it to the customer's account. It is now "
-        f"in their Files list, ready to download. Tell them it is ready — do not mention "
-        f"folders or file paths."
+        f"Built the report ({built}) and saved it to the customer's account, where it is "
+        f"ready to download. The job is finished: tell them it is ready and stop there. "
+        f"Do not add anything else or build again unless they ask for a change, and do "
+        f"not mention folders or file paths."
     )
 
 
@@ -467,17 +476,33 @@ _STAGE_TOOLS = {
         "build_report_file",
         "summarise_figures",
     ],
+    # Once a file exists there is nothing left to do but hand it over. Without this
+    # stage the agent would add another chart, rebuild, add another chart, rebuild —
+    # producing a file per step until the step limit stopped it, because nothing in the
+    # tools said the job was finished.
+    "built": ["reply_to_customer"],
 }
 
 
 def _stage(history: list[dict]) -> str:
     """How far along we are, judged by which tools have already succeeded."""
-    done = {
+    order: list[str] = [
         call["function"]["name"]
         for message in history
-        for call in (message.get("tool_calls") or [])
         if isinstance(message, dict)
-    }
+        for call in (message.get("tool_calls") or [])
+    ]
+    done = set(order)
+
+    # A file built since the last thing we said to the customer means the customer has
+    # not been told yet. Judged by position rather than mere presence, so that somebody
+    # asking for a change *after* being handed a file can still have one made.
+    def last(name: str) -> int:
+        return max((i for i, n in enumerate(order) if n == name), default=-1)
+
+    if last("build_report_file") > last("reply_to_customer"):
+        return "built"
+
     if "summarise_figures" in done:
         return "summarised"
     if "record_column_meanings" in done:

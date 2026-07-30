@@ -12,6 +12,7 @@ for anyone who has not chosen.
 """
 
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -88,6 +89,19 @@ class Supplier:
     model: str
 
 
+# A supplier that has run out stays out for a while. Without this, every step of
+# every conversation pays the cost of asking two exhausted suppliers before reaching the
+# working one — which is what made a conversation feel like it had hung: the allowances
+# reset daily, but the software kept hopefully asking, several times a minute.
+EXHAUSTED_FOR_SECONDS = 15 * 60
+_exhausted: dict[str, float] = {}
+
+
+def mark_exhausted(name: str) -> None:
+    """Remember that this supplier has nothing left, so we stop asking for a while."""
+    _exhausted[name] = time.time() + EXHAUSTED_FOR_SECONDS
+
+
 def available_suppliers() -> list[Supplier]:
     """Every supplier we hold a key for, preferred one first.
 
@@ -100,6 +114,8 @@ def available_suppliers() -> list[Supplier]:
     """
     order = [PROVIDER] + [p for p in PROVIDERS if p != PROVIDER]
     suppliers: list[Supplier] = []
+    for stale in [n for n, until in _exhausted.items() if until <= time.time()]:
+        del _exhausted[stale]  # allowances come back; give them another chance
     for name in order:
         base, key_var, default_model = PROVIDERS[name]
         key = os.getenv(key_var, "")
@@ -108,6 +124,8 @@ def available_suppliers() -> list[Supplier]:
             base = BASE_URL
             default_model = DEFAULT_MODEL
         if not key:
+            continue
+        if _exhausted.get(name, 0) > time.time():
             continue
         suppliers.append(
             Supplier(name, OpenAI(base_url=base, api_key=key), default_model)

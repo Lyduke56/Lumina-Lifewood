@@ -98,6 +98,76 @@ def _caller(authorization: str) -> str:
         raise HTTPException(403, str(e))
 
 
+@app.get("/conversation/latest")
+async def latest_conversation(authorization: str = Header(...)) -> dict:
+    """The conversation this customer was last having, ready to put back on screen.
+
+    Exists because a conversation used to vanish the moment they looked at anything
+    else. The shaping is done here rather than in the browser so that both know one
+    arrangement of a conversation, not two.
+    """
+    owner = _caller(authorization)
+    found = (
+        get_client()
+        .table("conversations")
+        .select("id, title, workbook_path")
+        .eq("user_id", owner)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not found.data:
+        return {"conversation_id": None}
+
+    row = found.data[0]
+    said = (
+        get_client()
+        .table("messages")
+        .select("role, content, payload")
+        .eq("conversation_id", row["id"])
+        .order("seq")
+        .execute()
+    )
+
+    # Consecutive steps belong together as one run of work, which is how they were shown
+    # and how they read afterwards.
+    entries: list[dict] = []
+    for m in said.data:
+        payload = m.get("payload") or {}
+        if m["role"] == "step":
+            step = {
+                "tool": m["content"],
+                "detail": payload.get("detail"),
+                "done": True,
+                "notice": payload.get("notice", False),
+            }
+            if entries and entries[-1]["kind"] == "steps":
+                entries[-1]["steps"].append(step)
+            else:
+                entries.append({"kind": "steps", "steps": [step]})
+        else:
+            entries.append(
+                {
+                    "kind": "said",
+                    "role": m["role"],
+                    "text": m["content"],
+                    "report": payload.get("report"),
+                }
+            )
+
+    workbook = Path(row["workbook_path"]).name if row.get("workbook_path") else None
+    return {
+        "conversation_id": row["id"],
+        "workbook": workbook,
+        # A conversation can be read back long after the uploaded spreadsheet has gone
+        # from temporary storage. Better to say so than to let a follow-up fail obscurely.
+        "workbook_available": bool(
+            row.get("workbook_path") and Path(row["workbook_path"]).exists()
+        ),
+        "entries": entries,
+    }
+
+
 @app.post("/conversation")
 async def begin_conversation(
     file: UploadFile,
@@ -115,24 +185,21 @@ async def begin_conversation(
         shutil.copyfileobj(file.file, f)
 
     # The website lists files by conversation, so the report needs one to belong to.
-    record = (
-        get_client()
-        .table("conversations")
-        .insert({"user_id": owner, "title": Path(workbook.name).stem})
-        .execute()
-    )
+    conversation = conversations.start(owner, workbook, Path(workbook.name).stem)
 
-    conversation = conversations.start(owner, workbook)
-    conversation.supabase_id = record.data[0]["id"]
+    # The opening message is written here rather than asked of the model: it is the
+    # same every time, and a free tier's requests are worth saving for real work.
+    greeting = (
+        f"I have your file, {workbook.name}. Tell me what you would like to see, "
+        f"or just say 'go ahead' and I will suggest something."
+    )
+    conversations.record(
+        conversation.id, [{"role": "lumina", "content": greeting}]
+    )
     return {
         "conversation_id": conversation.id,
         "workbook": workbook.name,
-        # The opening message is written here rather than asked of the model: it is the
-        # same every time, and a free tier's requests are worth saving for real work.
-        "greeting": (
-            f"I have your file, {workbook.name}. Tell me what you would like to see, "
-            f"or just say 'go ahead' and I will suggest something."
-        ),
+        "greeting": greeting,
     }
 
 
@@ -164,14 +231,56 @@ async def send_message(
         "conversation_id": conversation.supabase_id,
     }
 
+    # Saved before the reply is attempted, so a turn that fails halfway still leaves the
+    # customer's own words in the record rather than losing the question they asked.
+    conversations.record(conversation.id, [{"role": "you", "content": message}])
+
     def stream():
-        token = workbench.CURRENT_OWNER.set(owner_context)
+        # What appeared on screen, kept so that coming back to this conversation shows
+        # it again instead of an empty page. Written once at the end of the turn: a
+        # round trip per step would slow the very stream it is recording.
+        seen: list[dict] = []
         try:
-            for event in agent.respond(conversation.history, opening):
+            for event in agent.respond(conversation.history, opening, owner_context):
+                if event["type"] == "message":
+                    seen.append({"role": "lumina", "content": event["text"]})
+                elif event["type"] == "tool_finished":
+                    seen.append(
+                        {
+                            "role": "step",
+                            "content": event["tool"],
+                            "payload": {"detail": event.get("detail")},
+                        }
+                    )
+                    if event.get("report"):
+                        seen.append(
+                            {
+                                "role": "lumina",
+                                "content": "",
+                                "payload": {"report": event["report"]},
+                            }
+                        )
+                elif event["type"] == "notice":
+                    seen.append(
+                        {
+                            "role": "step",
+                            "content": event["key"],
+                            "payload": {
+                                "detail": event.get("detail"),
+                                "notice": True,
+                            },
+                        }
+                    )
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:  # a failed reply must not look like a hung page
             yield f"data: {json.dumps({'type': 'error', 'text': str(e)})}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        finally:
+            conversations.record(conversation.id, seen)
+            # The agent's own working memory, so a follow-up after a restart or a day
+            # later still knows what was agreed rather than only looking as though it
+            # does.
+            conversations.remember(conversation)
 
     return StreamingResponse(
         stream(),

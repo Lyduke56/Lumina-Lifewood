@@ -51,6 +51,9 @@ class Session:
     schema: Schema | None = None
     summary: Summary | None = None
     spec: ReportSpec = field(default_factory=ReportSpec)
+    # Where the finished report ended up, so the conversation can offer it for
+    # download instead of merely announcing that it exists.
+    last_report: dict | None = None
 
     def touch(self) -> None:
         self.touched_at = time.time()

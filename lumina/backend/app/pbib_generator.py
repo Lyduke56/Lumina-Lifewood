@@ -10,6 +10,24 @@ OUTPUT_ROOT = BACKEND_DIR / "generated_dashboards"
 
 ENTITY = "clean_export"
 
+
+def _part(output_dir, suffix: str):
+    """The .Report or .SemanticModel folder inside a generated project.
+
+    Found rather than assumed. Reports are now named after themselves instead of after
+    the template, and five places in this file spelled the template's name out by hand —
+    so renaming the project silently broke the theme, which is written last and would
+    have shipped an unbranded report.
+    """
+    from pathlib import Path as _Path
+
+    output_dir = _Path(output_dir)
+    found = sorted(output_dir.glob(f"*{suffix}"))
+    if not found:
+        raise FileNotFoundError(f"No {suffix} folder in {output_dir}.")
+    # The name, not the path: every caller joins it onto output_dir themselves.
+    return found[0].name
+
 from llm_client import ask
 
 REPORT_TYPES = {
@@ -561,7 +579,7 @@ def add_page(
 ) -> str:
     """Create a new report page with the given display name and visuals. Returns the new page's id."""
     pages_root = (
-        output_dir / "production_plan_reference.Report" / "definition" / "pages"
+        output_dir / _part(output_dir, ".Report") / "definition" / "pages"
     )
     page_id = uuid.uuid4().hex[:20]
     page_dir = pages_root / page_id
@@ -683,7 +701,7 @@ def apply_theme(
     """
     theme_path = (
         output_dir
-        / "production_plan_reference.Report"
+        / _part(output_dir, ".Report")
         / "StaticResources"
         / "RegisteredResources"
         / "LuminaTheme.json"
@@ -757,7 +775,7 @@ def add_completion_measures(
     """
     tmdl_path = (
         output_dir
-        / "production_plan_reference.SemanticModel"
+        / _part(output_dir, ".SemanticModel")
         / "definition"
         / "tables"
         / "clean_export.tmdl"
@@ -819,7 +837,7 @@ def generate_pbip(
 
     tmdl_path = (
         output_dir
-        / "production_plan_reference.SemanticModel"
+        / _part(output_dir, ".SemanticModel")
         / "definition"
         / "tables"
         / "clean_export.tmdl"
@@ -861,7 +879,7 @@ def generate_pbip(
 
     page_dir = (
         output_dir
-        / "production_plan_reference.Report"
+        / _part(output_dir, ".Report")
         / "definition"
         / "pages"
         / "2bb6229a2baa33c2479a"
