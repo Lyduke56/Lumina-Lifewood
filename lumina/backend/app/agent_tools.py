@@ -187,12 +187,39 @@ def summarise_figures(
     session = workbench.get(session_id)
     schema = workbench.require_schema(session)
     profile = session.profiles[schema.sheet]
+
+    # What the report already depends on. Summarising used to empty it without a word,
+    # so an agent that added four figures and two charts, then summarised again to reach
+    # a different breakdown, silently lost the lot — and added them again, and again,
+    # until it ran out of steps and gave up on a report it had built four times.
+    axes = {c.group_by for c in session.spec.charts}
+    figures = {k.measure for k in session.spec.kpis} | {
+        m for c in session.spec.charts for m in c.measures
+    }
+
     summary = summarise(
         session.workbook, profile, schema, period=period, group_by=group_by, top_n=top_n
     )
+
+    # Refused only if the new totals genuinely cannot carry what is already on the page.
+    # A blanket refusal would be a dead end instead of a loop: three breakdowns will not
+    # always fit in one summary — month by studio by editor is 107 groups, more than any
+    # chart can show — so summarising again has to stay possible.
+    lost_axes = sorted(a for a in axes if a not in summary.group_by)
+    lost_figures = sorted(f for f in figures if f not in summary.measures)
+    if lost_axes or lost_figures:
+        raise workbench.SessionError(
+            f"Totalling the figures that way would leave the report broken: "
+            + (f"nothing would be grouped by {', '.join(lost_axes)}. " if lost_axes else "")
+            + (f"{', '.join(lost_figures)} would not exist. " if lost_figures else "")
+            + f"The figures are still grouped by "
+            f"{', '.join(session.summary.group_by) if session.summary else 'nothing'} and "
+            f"the report is untouched — chart against those, or decide every breakdown you "
+            f"need before totalling, because each chart takes its axis from this grouping."
+        )
+
+    # Kept, not cleared. Everything on the report still has its axis and its figures.
     session.summary = summary
-    session.spec.charts.clear()
-    session.spec.kpis.clear()
 
     total = summary.source_rows_used + summary.source_rows_skipped
     lines = [
@@ -236,8 +263,10 @@ def summarise_figures(
         if others:
             lines += [
                 "",
-                "These figures could also be broken down by — offer these if they would "
-                "help, do not list them all at the customer:",
+                "These figures could also be broken down by. To chart against one of "
+                "these, summarise ONCE including it — every chart takes its axis from "
+                "this grouping, and summarising again is refused once the report has "
+                "anything on it:",
             ]
             lines += [f"  {o}" for o in others]
     preview = summary.rows[:6]
@@ -511,13 +540,20 @@ def register(mcp) -> None:
 # roughly 9,000 across a conversation, spent describing work that cannot be done yet.
 # Offering only what is reachable also removes a way to go wrong: the model cannot ask
 # to build a file before anything has been summarised if that tool is not on the table.
+# Starting again is always allowed. It was not, and an agent that reached a genuine
+# dead end — a report grouped one way, a customer asking for another — told the customer
+# "the system isn't letting me reopen the workbook right now", which is a fair report of
+# a gate that should never have been closed. Whatever else is true, beginning afresh is a
+# legitimate thing to want.
+_ALWAYS = ["reply_to_customer", "open_workbook"]
+
 _STAGE_TOOLS = {
-    "start": ["reply_to_customer", "open_workbook"],
-    "opened": ["reply_to_customer", "examine_sheet", "open_workbook"],
-    "examined": ["reply_to_customer", "record_column_meanings", "examine_sheet"],
-    "confirmed": ["reply_to_customer", "summarise_figures", "record_column_meanings"],
+    "start": _ALWAYS,
+    "opened": [*_ALWAYS, "examine_sheet"],
+    "examined": [*_ALWAYS, "record_column_meanings", "examine_sheet"],
+    "confirmed": [*_ALWAYS, "summarise_figures", "record_column_meanings"],
     "summarised": [
-        "reply_to_customer",
+        *_ALWAYS,
         "add_headline_figure",
         "add_report_chart",
         "build_report_file",
@@ -529,12 +565,12 @@ _STAGE_TOOLS = {
     # dashboard that nobody can tell is wrong by looking. Asked for in the instructions
     # too, but a model that skipped it went from spreadsheet to finished file without a
     # word — so it is a guardrail now, in the spirit of Decision 6.
-    "agreed": ["reply_to_customer"],
+    "agreed": _ALWAYS,
     # Once a file exists there is nothing left to do but hand it over. Without this
     # stage the agent would add another chart, rebuild, add another chart, rebuild —
     # producing a file per step until the step limit stopped it, because nothing in the
     # tools said the job was finished.
-    "built": ["reply_to_customer"],
+    "built": _ALWAYS,
 }
 
 

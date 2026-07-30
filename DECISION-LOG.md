@@ -2551,7 +2551,51 @@ written before the timeline had a proper name and left disagreeing with it since
 
 ---
 
-## 43. Still to be decided
+## 43. A second spreadsheet, and five defects in twenty minutes
+
+Everything until now had been tested against one file. Decision 3's whole claim is that Lumina works
+on a workbook nobody has seen, counting something other than images — and that had never once been
+tried. A second workbook was made for the purpose: **videos** rather than images, two sheets, four
+studios, twenty-eight editors, four months with a collapse in March, and the same hazards as the real
+thing — dashes for missing figures, an unlabelled total row, padding, and rows carrying a date and
+nothing else.
+
+**Decision 3 holds.** Lumina read a workbook it had never seen, paired *planned videos* with
+*completed videos*, recognised the achievement rate and variance as calculated, ignored the notes
+column, and offered breakdowns by week, studio and editor. No code was written for any of it, and the
+report it proposed suited that data rather than repeating what it had done with images.
+
+**It also found five real defects in about twenty minutes**, every one of which had passed unnoticed
+against the original file.
+
+**The report was being wiped without a word.** Summarising emptied the figures and charts already on
+the page. So an agent that added four headline figures and two charts, then totalled the figures a
+different way to reach a further breakdown, lost the lot — and added them again, and again, until it
+exhausted its step allowance and gave up on a report it had built four times over. It was not
+confused; it was being robbed on every attempt. The report is now kept, and re-totalling is refused
+only when the new figures genuinely cannot carry what is already there.
+
+**A first attempt at that fix was worse**, refusing to re-total whenever a report had anything on it.
+Testing showed why within a minute: month by studio by editor is 107 groups, more than any chart can
+show, so three breakdowns will not always fit in one summary and re-totalling has to stay possible. A
+blanket refusal would have replaced a loop with a dead end.
+
+**Starting again was forbidden.** Reaching a genuine impasse, Lumina told the customer *"the system
+isn't letting me reopen the workbook right now"* — an accurate report of a gate that should never have
+been shut. Beginning afresh is now allowed at every point.
+
+**The total-row detector is wrong on this file in both directions**: it flags row 2, which is ordinary
+data, and misses the real total at the bottom. It compares the first row against those below, and a
+collapse later in the year makes an early row look anomalous. Left on the open list, where it already
+was, now with a case that reproduces it.
+
+The lesson is not any one of these. **A second spreadsheet was worth more than another day of
+testing against the first**, because every test written against one file encodes that file's
+assumptions without anybody noticing.
+
+---
+
+## 44. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -2574,7 +2618,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 44. Change history
+## 45. Change history
 
 | Date | Change |
 |------|--------|
@@ -2603,6 +2647,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 43: **tested against a second spreadsheet for the first time**, counting videos rather than images, with studios and editors. **Decision 3 holds** — Lumina read a workbook it had never seen, paired the planned and completed figures correctly, and proposed a report suited to that data, with no code written for it. It also **found five real defects in twenty minutes**, all of which had passed against the original file. The worst: summarising silently emptied the report, so an agent reaching for a second breakdown lost its work and rebuilt it four times before giving up. Also: a first attempt at that fix would have replaced the loop with a dead end; starting a report again was forbidden at every stage past the beginning, which the AI accurately reported to the customer as the system not letting it; and the total-row detector is wrong in both directions on this file. **A second spreadsheet was worth more than another day of testing against the first** — every test written against one file encodes that file's assumptions unnoticed. |
 | 30 July 2026 | Added Section 42: **a delivered report that Power BI refused to open.** Two columns called Month in one table: John Peter's workbook has its own Month column, and when the figures are summarised by month *and* grouped by that column, the renamed timeline collides with it. Each of the two earlier fixes was right alone; together they broke the file. The collision check was comparing against `period`, the internal name, which never reaches Power BI. There is now one shared definition of what the timeline is called, and a colliding heading is distinguished — "Month (2)" — rather than falling back to "column_2", which would undo Section 30. **A net was added underneath: duplicate column names are refused before a file is written at all**, because a report that will not open is worse than one never built — the failure appears days later in front of somebody who cannot act on it. Not caught because every test summarised by period *or* by a label, never both; the combination is what a real conversation produced first time. |
 | 30 July 2026 | Added Section 41: **a rate and a count on one axis.** A "monthly summary" chart put Target, Actual and Balance — in the hundreds of thousands — beside a completion rate of 1.07 to 1.96, so the rate was an invisible line on the floor. The tool now refuses it and names the alternatives, which protects the **Power BI file** and not just the preview: nothing previously stopped this reaching a customer's dashboard. Two smaller corrections: a table visual was being drawn as bars in the preview, which is how the unreadable chart appeared at all — the file correctly contained a table — and the line chart was smoothing between six monthly readings, implying values nobody measured. **And a finding worth keeping:** the chart of Balance by month, one huge negative bar for August, tells the story of the collapse better than any headline figure, which is the open question from Section 38 partly answering itself. |
 | 30 July 2026 | Added Section 40: **"Your dashboard is ready" — and nothing had been built.** The AI asked for three figures, two charts, a build and a reply all at once, correctly; but the reply sat in the middle of that list and our loop stopped at the first reply it found, discarding the third figure, both charts and the build in silence. Work is now done first and the reply sent last, whatever order they arrive in. A second fault underneath: the abandoned calls were left with no results in the conversation, which is malformed — a model's request and its answer must come in pairs, and the next message would have been built on a broken one. **Fourth time today that treating a batch of requests as one request has caused a fault** — the report built four times, the confirmation skipped, the guardrail bypassed, and now the work discarded. A model asking for six things at once is ordinary; every part of the loop has to treat that list as a list. |
