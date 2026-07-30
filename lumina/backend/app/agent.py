@@ -237,6 +237,35 @@ def _trim(history: list[dict]) -> list[dict]:
     ]
 
 
+def _portable(choice) -> dict:
+    """A model's reply, reduced to the parts every supplier understands.
+
+    Suppliers add fields of their own — one returns `reasoning_details` — and the whole
+    conversation is re-sent on every step. Store a reply verbatim and the next supplier
+    rejects the lot: "property 'reasoning_details' is unsupported". So switching supplier
+    mid-conversation, which is the entire point of having several, could poison the
+    conversation for all of them. Found by a script holding a real conversation, not by
+    reading the code.
+    """
+    reply = choice.model_dump(exclude_none=True)
+    portable = {"role": reply.get("role", "assistant")}
+    if reply.get("content"):
+        portable["content"] = reply["content"]
+    if reply.get("tool_calls"):
+        portable["tool_calls"] = [
+            {
+                "id": call["id"],
+                "type": "function",
+                "function": {
+                    "name": call["function"]["name"],
+                    "arguments": call["function"].get("arguments", "{}"),
+                },
+            }
+            for call in reply["tool_calls"]
+        ]
+    return portable
+
+
 def _tool_result(name: str, arguments: dict, owner: dict | None) -> tuple[str, str]:
     """Run one tool. A refusal is an answer, not a crash — the model has to see it.
 
@@ -362,7 +391,7 @@ def respond(
         model = supplier.model.rsplit("/", 1)[-1].removesuffix(":free")
         credit = {"supplier": supplier.name, "model": model}
         choice = completion.choices[0].message
-        history.append(choice.model_dump(exclude_none=True))
+        history.append(_portable(choice))
 
         # Anything written outside reply_to_customer is deliberately discarded. Models
         # vary in how much of their own reasoning they spill into ordinary content —

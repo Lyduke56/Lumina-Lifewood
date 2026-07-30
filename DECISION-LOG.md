@@ -2882,7 +2882,65 @@ sentence was "there is no way to check this from here", and each time it was wro
 
 ---
 
-## 49. Still to be decided
+## 49. Testing stopped being John Peter's job
+
+He said it plainly: *"I hate the current style where we have to test for every little single
+thing. It's wasting my time."* He was right, and it had become the working method — change
+something, ask him to upload a workbook, tell him what to type, ask him to open the file,
+wait. Every small fix cost an exchange, and several exchanges were spent establishing things
+a script could have established in a minute.
+
+**A conversation can now be held and checked without anybody clicking anything.**
+`lumina/backend/tests/conversation_check.py` talks to the real AI as a customer would, on
+every test workbook, and then:
+
+  * recomputes the totals **straight from the spreadsheet** with openpyxl — deliberately not
+    through our own summariser, because a check that uses the code under test to decide what
+    the answer should be proves nothing;
+  * compares those against the figures in the finished report;
+  * relies on the build's own checks, so a build that succeeds has already passed Power BI's
+    engine and Microsoft's visual validator;
+  * reads every sentence the AI said and flags any figure no tool produced.
+
+```
+PASS  Video Production Plan - TEST.xlsx
+PASS  Lumina Test - Production Plan (values only).xlsx
+    planned  2,966    matches the spreadsheet
+    actual   2,563    matches the spreadsheet
+    planned  352,626  matches the spreadsheet
+    actual   352,626  matches the spreadsheet
+```
+
+Four minutes, unattended, against both workbooks.
+
+**It found two things immediately that no amount of reading would have.**
+
+The first: switching AI supplier could poison a conversation. Suppliers add fields of their
+own to a reply — one returns `reasoning_details` — and the whole conversation is re-sent on
+every step, so the next supplier rejected the lot: *"property 'reasoning_details' is
+unsupported"*. Having several suppliers is the entire free-AI strategy, and moving between
+them mid-conversation was quietly broken. Replies are now stored in the form every supplier
+accepts.
+
+The second: **the figure guard fired in a real conversation**, not a scripted one.
+
+```
+refused a reply quoting figures no tool produced:
+  1,245,000, 1,102,500, 88.5%, 142,500, 103,750, 91,875
+```
+
+An entire table of plausible figures, invented, and stopped before anybody saw it. Section 47
+built that guard on the strength of one observed incident; this is the first evidence of how
+readily it happens.
+
+**What still needs a person.** Whether a report reads well, whether a chart is worth showing,
+whether the number in the corner is the one a manager needs — and any Power BI *visual*
+property, which is why the display-units question took two exchanges. Those are worth asking
+for. Establishing whether the last change worked is not.
+
+---
+
+## 50. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -2910,7 +2968,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 50. Change history
+## 51. Change history
 
 | Date | Change |
 |------|--------|
