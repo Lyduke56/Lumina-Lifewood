@@ -2737,6 +2737,29 @@ report because a checking tool is absent would be a worse fault than the one bei
 cards, colours and layout remain ours to get right — and whether a report *reads* well is not a thing
 any engine can answer. But the model is where both failures were.
 
+### Every report was called "Production Plan"
+
+Opening the videos report showed it, once there was a second workbook to notice it with. The report
+was titled *Production Plan*. So was the project Power BI opened, the page inside it, and the file
+downloaded. A workbook counting videos across four studios produced a report named after somebody
+else's images.
+
+`ReportSpec.title` defaulted to `"Production Plan"` and **nothing ever set it**. Our first customer's
+words, baked into a default — Decision 3 undone in one line, and completely invisible for as long as
+only that customer's workbook was ever tested.
+
+A report now takes its name from the customer's own file, and the agent can name it properly when it
+builds — the tool asks for what the report is *about*, in their words. That name reaches the project,
+the page and the download together:
+
+```
+project folders: Video Production Plan.pbip / .Report / .SemanticModel
+page tab       : Video Production Plan
+```
+
+A default is a decision that nobody remembers making. This one survived a rebuild, nine numbered
+decisions and two days of testing because the file it was wrong for had not been tried yet.
+
 ### Worth recording about how this was found
 
 The capability had existed all along, in a public Microsoft repository, and was found only because a
@@ -2806,6 +2829,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Extended Section 46: **every report was called "Production Plan"** — the project, the page, the download and the card, whatever the workbook contained. `ReportSpec.title` defaulted to our first customer's words and nothing ever set it: Decision 3 undone in one line, invisible for as long as only that customer's workbook was tested. A report now takes its name from the customer's own file, and the agent names it when it builds. **A default is a decision nobody remembers making**, and this one survived a rebuild, nine numbered decisions and two days of testing. |
 | 30 July 2026 | Added Section 46: **Power BI's own engine now checks every file before a customer sees it.** Microsoft's modelling MCP server loads a semantic model straight from a PBIP folder with no Power BI Desktop and no Fabric capacity — and refuses the two files that could not be opened earlier the same day, quoting the identical errors, including one word for word. Every build now runs it, in about three seconds, so a report that will not open fails here instead of in front of somebody who cannot act on it. **An hour earlier this log described that as a limitation no amount of testing could close.** Not fatal when Node is unavailable, since refusing to deliver a report because a checking tool is missing would be worse than the fault. Does not cover report visuals. Recorded plainly: three conclusions in this log were wrong through not looking, and "there is no way to verify this" deserves ten minutes of searching before being written down as a limitation. |
 | 30 July 2026 | Added Section 45: **Microsoft had written the rules down.** John Peter, out of patience with how long the Power BI output was taking, sent two links and asked whether they were not the thing we were building. They are a different product — instructions for a developer's AI coding assistant — but they document the hard part we had been deriving by trial and error: their TMDL guidelines state on line 12 the exact quoting rule that produced two unopenable reports that afternoon. **Their validation checklist is now encoded as `pbip_check.py` and every build runs it**, so a malformed project fails here rather than at a customer. Verified by breaking a working project four ways, all caught; it also found a real defect in the older Studio/WhatsApp flow — a measure with no `formatString` — that had gone unnoticed since it was written. Also recorded `powerbi-modeling-mcp`, Microsoft's local server for authoring semantic models in PBIP folders, as a candidate to replace most of our hand-written TMDL. |
 | 30 July 2026 | Added Section 44: **fourteen of the customer's videos quietly disappeared**, found because John Peter asked whether the calculations were correct. Two faults. The profiler flagged the first data row as a grand total and the summariser dropped it — one day in eighty-four disagreed with the spreadsheet. The rule was "more than five times the largest row below", which is not what a total is and misfires on any figure crossing zero; it now tests whether a row **adds up to the others**, verified in both directions, and the totals match the spreadsheet exactly. **This closes the open item carried for two days as "reliably detecting unlabelled total rows" — which was never cosmetic: a false positive deletes real data silently.** The second fault is worse and remains open: **the AI reported 420 planned videos where the tools had given it 2,966**, against an explicit instruction never to invent figures. The report was correct; the sentence describing it was not, and nothing checks one against the other. |

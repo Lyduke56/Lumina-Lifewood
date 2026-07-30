@@ -74,6 +74,12 @@ def open_session(workbook: str | Path) -> Session:
     session = Session(
         id=uuid.uuid4().hex[:12], workbook=path, owner=CURRENT_OWNER.get()
     )
+    # Named after the customer's own file until the agent chooses something better.
+    # The default was "Production Plan" — our first customer's words, baked in, so a
+    # workbook counting videos produced a report called Production Plan, a project folder
+    # called Production Plan and a download called Production Plan. Decision 3 undone by a
+    # default value, and invisible for as long as only that one workbook was tested.
+    session.spec.title = path.stem
     _sessions[session.id] = session
     return session
 

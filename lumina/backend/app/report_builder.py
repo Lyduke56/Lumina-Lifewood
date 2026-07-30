@@ -59,7 +59,8 @@ class Chart:
 class ReportSpec:
     """What the report should contain. The agent edits this; nothing else."""
 
-    title: str = "Production Plan"
+    # Set from the workbook when a session opens, and by the agent when it builds.
+    title: str = "Report"
     kpis: list[Kpi] = field(default_factory=list)
     charts: list[Chart] = field(default_factory=list)
     palette: list[str] | None = None

@@ -342,14 +342,22 @@ def add_report_chart(
     )
 
 
-def build_report_file(session_id: str, dataset_id: str) -> str:
+def build_report_file(
+    session_id: str, dataset_id: str, title: str | None = None
+) -> str:
     """Write the Power BI file from everything added so far.
 
     Args:
         session_id: From open_workbook.
         dataset_id: A unique name for this report's folder.
+        title: What to call the report — it names the file the customer downloads, the
+            project Power BI opens and the page inside it. Say what the report is *about*,
+            in their words: "Video Production Plan", not "Report" or "Dashboard".
+            Defaults to the workbook's own name.
     """
     session = workbench.get(session_id)
+    if title and title.strip():
+        session.spec.title = title.strip()
     summary = workbench.require_summary(session)
     folder = build_powerbi(session.spec, summary, dataset_id)
 
