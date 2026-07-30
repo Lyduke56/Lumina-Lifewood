@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pbib_generator as pbi
+import pbip_check
 from summariser import ORDER_KEY, PERIOD_LABEL, Summary
 
 CHART_KINDS = {"line": "lineChart", "bar": "clusteredColumnChart", "table": "tableEx"}
@@ -342,6 +343,12 @@ def build_powerbi(
     for path in root.rglob("*"):
         os.utime(path, (now, now))
     os.utime(root, (now, now))
+
+    # Checked against Microsoft's own TMDL and PBIP rules before anybody sees it. Two
+    # files shipped today that Power BI refused to open, both after being "verified" by
+    # reading them. Nothing here can open a .pbip, so the rules have to be checked
+    # mechanically rather than by eye.
+    pbip_check.require_valid(root)
     return root
 
 

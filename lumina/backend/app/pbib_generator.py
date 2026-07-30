@@ -804,6 +804,10 @@ def add_completion_measures(
             "\t\t\t    )\n"
             "\t\t\t\n"
             "\t\t\t```\n"
+            # Required on every measure by Microsoft's TMDL guidelines, and absent since
+            # this measure was written. Found by checking a generated project against
+            # those rules, not by anything going wrong — see pbip_check.py.
+            "\t\tformatString: General\n"
             f"\t\tlineageTag: {uuid.uuid4()}\n"
         )
 

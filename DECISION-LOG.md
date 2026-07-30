@@ -2634,11 +2634,76 @@ discouraged, and this is the one place where a claim reaches the customer with n
 
 ---
 
-## 45. Still to be decided
+## 45. Microsoft had written the rules down
+
+John Peter, reasonably out of patience with how long the Power BI output was taking to get right, sent
+two links and asked whether they were not the thing we were building.
+
+**They are not the same product, and one of them changes how we should be working.**
+
+Microsoft publish **Fabric Skills** — instructions for a developer's AI coding assistant (GitHub Copilot
+CLI) to author Power BI artefacts. The user is a developer with a repository. Lumina is for a production
+manager who uploads a spreadsheet and talks to it. Different person, different job; they do not replace
+what we are building.
+
+**But the hard part — writing a valid Power BI file — is documented there, and we had been deriving it
+by trial and error.** Their `tmdl-guidelines.md` runs to 582 lines. Line 12 reads:
+
+> Names with spaces or special characters (`.`, `=`, `:`, `'`) must be wrapped in **single quotes**:
+> `column 'Order Date'`
+
+That is exactly the rule that produced two reports Power BI refused to open earlier the same day, each
+established by shipping a broken file and being told. It was written down the whole time. A TMDL emitter
+was built by experiment when the specification was public.
+
+### What was done about it
+
+Their skill prescribes a validation checklist, and the two steps that need no live Power BI connection
+are the two available here: **check the project structure, and check the definition against the
+guidelines.** Those are now encoded as `pbip_check.py`, and **every build runs them before the file is
+handed over**. A malformed project now fails on our machine instead of on a customer's.
+
+Verified by deliberately breaking a working project four ways — each fault being one that actually
+occurred or was documented:
+
+```
+a duplicate column name            caught: True
+an unquoted name with a space       caught: True
+a measure with no formatString      caught: True
+a sortByColumn pointing nowhere     caught: True
+```
+
+**It found a real defect in the older flow immediately** — the "Completion Status" measure used by
+Studio and WhatsApp has no `formatString`, which the guidelines require on every measure. It had been
+there since that measure was written and nothing had ever complained.
+
+**What this does not do.** It cannot say whether a report reads well, whether a measure returns the
+right number, or whether a visual property is one Power BI honours. Those still need a person and Power
+BI Desktop. It catches the class of fault that makes a file unopenable — which is the class that cost an
+afternoon.
+
+### The other thing in those links
+
+`powerbi-modeling-mcp` is a local server from Microsoft that authors semantic models — including in PBIP
+folders, which is exactly what our code writes by hand. Their own guidance calls hand-authoring TMDL an
+anti-pattern when it is available. It **cannot** touch report pages or visuals, so the charts and cards
+would remain ours.
+
+That is potentially a large simplification: most of the TMDL writing in `report_builder.py` would become
+Microsoft's problem rather than ours. It needs a spike to establish whether it runs headless on a
+server. Recorded as the next architectural question, alongside putting detail in the file rather than
+pre-totalling.
+
+---
+
+## 46. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
-1. **Nothing checks the figures the AI states in conversation.** Section 44: it reported 420 videos
+1. **Whether to hand semantic-model authoring to `powerbi-modeling-mcp`** — Section 45. Microsoft's
+   local MCP server writes the model; our code writes it by hand, which their own guidance calls an
+   anti-pattern. Needs a spike to see whether it runs headless. Would not cover report visuals.
+2. **Nothing checks the figures the AI states in conversation.** Section 44: it reported 420 videos
    where the tools had given it 2,966. The report itself was right; the sentence describing it was not.
    The remedy is not obvious — the numbers appear in ordinary prose — but every other guardrail works
    by making a thing impossible, and this one does not exist at all.
@@ -2660,7 +2725,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 46. Change history
+## 47. Change history
 
 | Date | Change |
 |------|--------|
@@ -2689,6 +2754,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 45: **Microsoft had written the rules down.** John Peter, out of patience with how long the Power BI output was taking, sent two links and asked whether they were not the thing we were building. They are a different product — instructions for a developer's AI coding assistant — but they document the hard part we had been deriving by trial and error: their TMDL guidelines state on line 12 the exact quoting rule that produced two unopenable reports that afternoon. **Their validation checklist is now encoded as `pbip_check.py` and every build runs it**, so a malformed project fails here rather than at a customer. Verified by breaking a working project four ways, all caught; it also found a real defect in the older Studio/WhatsApp flow — a measure with no `formatString` — that had gone unnoticed since it was written. Also recorded `powerbi-modeling-mcp`, Microsoft's local server for authoring semantic models in PBIP folders, as a candidate to replace most of our hand-written TMDL. |
 | 30 July 2026 | Added Section 44: **fourteen of the customer's videos quietly disappeared**, found because John Peter asked whether the calculations were correct. Two faults. The profiler flagged the first data row as a grand total and the summariser dropped it — one day in eighty-four disagreed with the spreadsheet. The rule was "more than five times the largest row below", which is not what a total is and misfires on any figure crossing zero; it now tests whether a row **adds up to the others**, verified in both directions, and the totals match the spreadsheet exactly. **This closes the open item carried for two days as "reliably detecting unlabelled total rows" — which was never cosmetic: a false positive deletes real data silently.** The second fault is worse and remains open: **the AI reported 420 planned videos where the tools had given it 2,966**, against an explicit instruction never to invent figures. The report was correct; the sentence describing it was not, and nothing checks one against the other. |
 | 30 July 2026 | Added Section 43: **tested against a second spreadsheet for the first time**, counting videos rather than images, with studios and editors. **Decision 3 holds** — Lumina read a workbook it had never seen, paired the planned and completed figures correctly, and proposed a report suited to that data, with no code written for it. It also **found five real defects in twenty minutes**, all of which had passed against the original file. The worst: summarising silently emptied the report, so an agent reaching for a second breakdown lost its work and rebuilt it four times before giving up. Also: a first attempt at that fix would have replaced the loop with a dead end; starting a report again was forbidden at every stage past the beginning, which the AI accurately reported to the customer as the system not letting it; and the total-row detector is wrong in both directions on this file. **A second spreadsheet was worth more than another day of testing against the first** — every test written against one file encodes that file's assumptions unnoticed. |
 | 30 July 2026 | Added Section 42: **a delivered report that Power BI refused to open.** Two columns called Month in one table: John Peter's workbook has its own Month column, and when the figures are summarised by month *and* grouped by that column, the renamed timeline collides with it. Each of the two earlier fixes was right alone; together they broke the file. The collision check was comparing against `period`, the internal name, which never reaches Power BI. There is now one shared definition of what the timeline is called, and a colliding heading is distinguished — "Month (2)" — rather than falling back to "column_2", which would undo Section 30. **A net was added underneath: duplicate column names are refused before a file is written at all**, because a report that will not open is worse than one never built — the failure appears days later in front of somebody who cannot act on it. Not caught because every test summarised by period *or* by a label, never both; the combination is what a real conversation produced first time. |
