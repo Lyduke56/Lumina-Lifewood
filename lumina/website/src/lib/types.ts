@@ -37,6 +37,58 @@ export type ChartPreviewJson = {
   }>;
 };
 
+/**
+ * A report built by conversation, describing itself.
+ *
+ * A different shape from ChartPreviewJson above, which names six fixed figures. That is
+ * the limitation Decision 3 removes: a customer counting videos or revenue has no
+ * `target_quantity` or `actual_hours`. This carries its own labels and whatever figures
+ * the report actually holds. `kind: "flexible"` is how the two are told apart, so
+ * existing reports keep being drawn exactly as they are now.
+ */
+export type FlexiblePreview = {
+  kind: "flexible";
+  title: string;
+  group_by: { key: string; label: string };
+  measures: Array<{
+    key: string;
+    label: string;
+    format: "number" | "percent";
+    aggregate: "sum" | "max";
+  }>;
+  /** A rate, and the achieved/planned totals it is made of, so it is never averaged. */
+  rates?: Record<string, [string, string]>;
+  headline_figures: Array<{ measure: string; label: string }>;
+  charts: Array<{ kind: string; title: string; measures: string[] }>;
+  rows: Array<Record<string, string | number | null>>;
+  data_colors?: string[];
+  heading_font?: string;
+  body_font?: string;
+};
+
+/**
+ * One past conversation, as the sidebar lists it.
+ *
+ * The sidebar used to list finished reports, which duplicated the Files tab and offered
+ * no way back into a conversation. It lists these instead, the way a messaging app does.
+ */
+export type ChatSummary = {
+  id: string;
+  title: string;
+  created_at: string;
+  last_at: string;
+  /** The most recent thing said, so a chat is recognisable without opening it. */
+  preview: string;
+  messages: number;
+};
+
+/** Either shape may be stored against a generated file. */
+export type AnyPreview = ChartPreviewJson | FlexiblePreview;
+
+export function isFlexible(preview: unknown): preview is FlexiblePreview {
+  return !!preview && (preview as FlexiblePreview).kind === "flexible";
+}
+
 // ── User profile (mirrors public.profiles table) ─────────────────────────────
 export type Profile = {
   id: string;

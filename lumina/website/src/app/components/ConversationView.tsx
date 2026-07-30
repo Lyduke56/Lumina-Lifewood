@@ -6,15 +6,19 @@ import {
   Calculator,
   Check,
   Columns3,
+  Cpu,
   Download,
+  Eye,
   FileSpreadsheet,
   Gauge,
   Hourglass,
   PackageCheck,
   Paperclip,
   RefreshCw,
+  RotateCcw,
   Search,
   Send,
+  X,
   Sparkles,
 } from "lucide-react";
 import Markdown from "react-markdown";
@@ -34,6 +38,10 @@ const STEPS: Record<string, { label: string; Icon: typeof Search }> = {
   add_headline_figure: { label: "Adding a headline figure", Icon: Gauge },
   add_report_chart: { label: "Adding a chart", Icon: BarChart3 },
   build_report_file: { label: "Building your Power BI file", Icon: PackageCheck },
+  // Which model is answering. Shown as its own row once, and again only when it changes,
+  // rather than repeated against every step — the answer to "which model built this"
+  // needs to be visible, not restated nine times.
+  model: { label: "Using", Icon: Cpu },
   // Not work on the report, but the reason a conversation has gone quiet. A wait with
   // an explanation reads as the system coping; the same wait unexplained reads as
   // broken, which is what it looked like before these were shown.
@@ -42,27 +50,47 @@ const STEPS: Record<string, { label: string; Icon: typeof Search }> = {
 };
 
 /** A finished report, handed straight to the customer in the conversation. */
-type Report = { storage_path: string; title: string };
+type Report = { storage_path: string; title: string; file_id?: string };
 
-type Step = { tool: string; detail?: string; done: boolean; notice?: boolean };
+type Step = {
+  tool: string;
+  detail?: string;
+  done: boolean;
+  notice?: boolean;
+  /** How the step went. A refusal is the software declining something and Lumina
+   *  trying again — normal, and not a failure; "broken" is ours to answer for. Shown
+   *  identically once, which reported four finished reports where none existed. */
+  outcome?: "ok" | "refused" | "broken";
+  /** Which model decided this step. Free models differ enough that comparing them
+   *  matters, and that is only possible if you can see which one replied. */
+  model?: string;
+};
 
 type Entry =
-  | { kind: "said"; role: "you" | "lumina"; text: string; report?: Report }
+  | { kind: "said"; role: "you" | "lumina"; text: string; report?: Report; model?: string }
   | { kind: "steps"; steps: Step[] };
 
 interface ConversationViewProps {
   session: Session | null;
+  /** False when the customer has asked for a new report and wants a blank page. */
+  resume?: boolean;
+  /** A particular past conversation to open. Null means whichever was most recent. */
+  conversationId?: string | null;
   /** Fires when the agent changes the report, so a preview can redraw (Decision 2). */
   onReportChanged?: () => void;
+  /** Fires when a turn ends, so the Chats list can show what was last said. */
+  onTurnFinished?: () => void;
+  /** Open a finished report on screen, rather than only offering the file. */
+  onOpenReport?: (fileId: string) => void;
 }
 
-export function ConversationView({ session, onReportChanged }: ConversationViewProps) {
+export function ConversationView({ session, resume = true, conversationId: openId = null, onReportChanged, onTurnFinished, onOpenReport }: ConversationViewProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [workbook, setWorkbook] = useState<string | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [thinking, setThinking] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [restoring, setRestoring] = useState(true);
+  const [restoring, setRestoring] = useState(resume);
   const [stale, setStale] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -83,19 +111,26 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
   // as the page was concerned it had been. The record now lives on the server, so this
   // component holding no memory of its own stops mattering.
   useEffect(() => {
-    if (!token) { setRestoring(false); return; }
+    if (!token || !resume) { setRestoring(false); return; }
     let current = true;
     (async () => {
       try {
-        const res = await fetch(`${BACKEND}/conversation/latest`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // A named conversation when one was picked from the Chats list, otherwise
+        // whichever was most recent.
+        const res = await fetch(
+          openId ? `${BACKEND}/conversation/${openId}` : `${BACKEND}/conversation/latest`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
         if (!res.ok) return;
         const saved = await res.json();
         if (!current || !saved.conversation_id) return;
         setConversationId(saved.conversation_id);
         setWorkbook(saved.workbook ?? null);
         setEntries(saved.entries ?? []);
+        // So a follow-up does not re-announce a model the restored transcript already names.
+        const steps = (saved.entries ?? []).flatMap((e: Entry) => e.kind === "steps" ? e.steps : []);
+        const announced = steps.filter((st: Step) => st.tool === "model").pop();
+        shownModel.current = announced?.detail ?? null;
         // The uploaded spreadsheet lives in temporary storage and does not last for
         // ever. Saying so beats letting a follow-up fail for reasons nobody can see.
         setStale(!saved.workbook_available);
@@ -106,17 +141,29 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
       }
     })();
     return () => { current = false; };
-  }, [token]);
+  }, [token, resume, openId]);
+
+  /** The model last announced, so it is named once rather than on every step. */
+  const shownModel = useRef<string | null>(null);
+
+  /** Announce the model when it first answers, and whenever it changes. A change means a
+   *  supplier ran out and another took over, which is worth seeing in the transcript. */
+  function noteModel(model?: string) {
+    if (!model || shownModel.current === model) return;
+    shownModel.current = model;
+    addNotice("model", model);
+  }
 
   /** Add a step to the run in progress, starting a new run if the last thing said was
    *  a message rather than a step. */
   function beginStep(tool: string) {
     setEntries((list) => {
       const last = list[list.length - 1];
+      const step: Step = { tool, done: false };
       if (last?.kind === "steps") {
-        return [...list.slice(0, -1), { ...last, steps: [...last.steps, { tool, done: false }] }];
+        return [...list.slice(0, -1), { ...last, steps: [...last.steps, step] }];
       }
-      return [...list, { kind: "steps", steps: [{ tool, done: false }] }];
+      return [...list, { kind: "steps", steps: [step] }];
     });
   }
 
@@ -134,14 +181,14 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
     });
   }
 
-  function finishStep(tool: string, detail?: string) {
+  function finishStep(tool: string, detail?: string, outcome?: Step["outcome"]) {
     setEntries((list) => {
       const last = list[list.length - 1];
       if (last?.kind !== "steps") return list;
       const steps = [...last.steps];
       for (let i = steps.length - 1; i >= 0; i--) {
         if (steps[i].tool === tool && !steps[i].done) {
-          steps[i] = { ...steps[i], done: true, detail };
+          steps[i] = { ...steps[i], done: true, detail, outcome };
           break;
         }
       }
@@ -164,6 +211,7 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
       setConversationId(started.conversation_id);
       setWorkbook(started.workbook);
       setEntries([{ kind: "said", role: "lumina", text: started.greeting }]);
+      onTurnFinished?.();  // so it appears in the Chats list immediately
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not upload that file.");
     } finally {
@@ -209,13 +257,18 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
           const event = JSON.parse(line.slice(6));
 
           if (event.type === "message") {
+            noteModel(event.model);
             setThinking(null);
-            setEntries((list) => [...list, { kind: "said", role: "lumina", text: event.text }]);
+            setEntries((list) => [
+              ...list,
+              { kind: "said", role: "lumina", text: event.text, model: event.model },
+            ]);
           } else if (event.type === "tool_started") {
+            noteModel(event.model);
             setThinking(null);
             beginStep(event.tool);
           } else if (event.type === "tool_finished") {
-            finishStep(event.tool, event.detail ?? undefined);
+            finishStep(event.tool, event.detail ?? undefined, event.outcome);
             // A finished report is offered here rather than only landing in Recent
             // Files — the customer asked for it in this conversation, so this is
             // where they should be able to take it away.
@@ -236,6 +289,10 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
     } finally {
       setBusy(false);
       setThinking(null);
+      // The Chats list shows the last thing said, and until now it was only refreshed
+      // when a report changed — so a conversation sat in the list quoting its opening
+      // greeting no matter how long it had gone on.
+      onTurnFinished?.();
     }
   }
 
@@ -349,13 +406,25 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
                 const known = STEPS[step.tool];
                 const Icon = known?.Icon ?? Sparkles;
                 return (
-                  <div key={j} className={`ll-step${step.done ? " ll-step-done" : ""}${step.notice ? " ll-step-notice" : ""}`}>
+                  <div key={j} className={`ll-step${step.done ? " ll-step-done" : ""}${step.notice ? " ll-step-notice" : ""}${step.outcome === "broken" ? " ll-step-failed" : ""}${step.outcome === "refused" ? " ll-step-notice" : ""}`}>
                     <span className="ll-step-icon"><Icon size={16} /></span>
                     <span className="ll-step-text">
-                      <strong>{known?.label ?? "Working on it"}</strong>
-                      {step.detail && <small>{step.detail}</small>}
+                      {/* The model row says everything on one line; every other row
+                          has a name above and a detail beneath. */}
+                      {step.tool === "model" ? (
+                        <strong>Using {step.detail}</strong>
+                      ) : (
+                        <>
+                          <strong>{known?.label ?? "Working on it"}</strong>
+                          {step.detail && <small>{step.detail}</small>}
+                        </>
+                      )}
                     </span>
-                    {step.notice ? null : step.done ? (
+                    {step.notice ? null : step.outcome === "broken" ? (
+                      <span className="ll-step-cross"><X size={13} strokeWidth={3} /></span>
+                    ) : step.outcome === "refused" ? (
+                      <span className="ll-step-retry"><RotateCcw size={12} strokeWidth={2.5} /></span>
+                    ) : step.done ? (
                       <span className="ll-step-tick"><Check size={13} strokeWidth={3} /></span>
                     ) : (
                       <span className="ll-step-spinner" />
@@ -371,15 +440,29 @@ export function ConversationView({ session, onReportChanged }: ConversationViewP
                   produced a table when describing figures. Unrendered, a customer sees
                   stray asterisks. */}
               {entry.role === "you" ? entry.text : <Markdown remarkPlugins={[remarkGfm]}>{entry.text}</Markdown>}
+
               {entry.report && (
-                <button className="ll-report-card" onClick={() => download(entry.report!)}>
+                <div className="ll-report-card">
                   <FileSpreadsheet size={20} color="var(--emerald)" />
                   <span style={{ flex: 1, textAlign: "left" }}>
                     <strong style={{ display: "block", color: "var(--forest)" }}>{entry.report.title}</strong>
-                    <small style={{ opacity: 0.7 }}>Power BI project · ready to download</small>
+                    <small style={{ opacity: 0.7 }}>Power BI project</small>
                   </span>
-                  <Download size={16} />
-                </button>
+                  {/* Two ways to have it: on screen now, or as a file. Downloading and
+                      opening Power BI Desktop to check a figure is a lot of work for a
+                      manager who only wanted to look. */}
+                  {entry.report.file_id && onOpenReport && (
+                    <button
+                      className="ll-report-action"
+                      onClick={() => onOpenReport(entry.report!.file_id!)}
+                    >
+                      <Eye size={14} /> Preview
+                    </button>
+                  )}
+                  <button className="ll-report-action" onClick={() => download(entry.report!)}>
+                    <Download size={14} /> Download
+                  </button>
+                </div>
               )}
             </div>
           )

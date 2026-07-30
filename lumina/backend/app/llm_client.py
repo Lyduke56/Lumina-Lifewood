@@ -94,12 +94,19 @@ class Supplier:
 # working one — which is what made a conversation feel like it had hung: the allowances
 # reset daily, but the software kept hopefully asking, several times a minute.
 EXHAUSTED_FOR_SECONDS = 15 * 60
+
+# A supplier that failed for some other reason — a withdrawn model, a rejected key, a
+# network blip — is set aside for much less time. Long enough that a conversation stops
+# paying for the same failure at every step, short enough that a passing problem does not
+# cost us a working supplier for a quarter of an hour.
+FAILED_FOR_SECONDS = 2 * 60
+
 _exhausted: dict[str, float] = {}
 
 
-def mark_exhausted(name: str) -> None:
-    """Remember that this supplier has nothing left, so we stop asking for a while."""
-    _exhausted[name] = time.time() + EXHAUSTED_FOR_SECONDS
+def mark_exhausted(name: str, seconds: float = EXHAUSTED_FOR_SECONDS) -> None:
+    """Remember that this supplier is not worth asking for a while."""
+    _exhausted[name] = time.time() + seconds
 
 
 def available_suppliers() -> list[Supplier]:

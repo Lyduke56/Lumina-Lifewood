@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pbib_generator as pbi
-from summariser import Summary
+from summariser import ORDER_KEY, Summary
 
 CHART_KINDS = {"line": "lineChart", "bar": "clusteredColumnChart", "table": "tableEx"}
 
@@ -185,6 +185,20 @@ PERIOD_LABEL = {"day": "Date", "week": "Week", "month": "Month", "quarter": "Qua
 # Sorted on the readable text alone, a year of months reads Apr, Aug, Dec, Feb.
 ORDER_COLUMN = "period_order"
 
+# Colours a headline figure takes when thresholds are set. Green when it is meeting the
+# target, amber when it is close, red when it is not.
+STATUS_COLOURS = (pbi.CASTLETON_GREEN, "#B7791F", "#B3261E")
+
+
+def _status_measure(kpi: Kpi) -> str:
+    """A measure returning a colour, for a headline figure with thresholds set.
+
+    Returns hex rather than words. The older flow wrote a measure returning "good",
+    "neutral" and "bad" and bound a font colour to it — none of which are colours, so
+    nothing could have come of it.
+    """
+    return f"{kpi.title} Colour"
+
 
 def _project_name(title: str) -> str:
     """A folder name for this report, from its title.
@@ -276,7 +290,7 @@ def build_powerbi(
     stem = _name_project(root, spec.title)
 
     rows, columns, types = _model_columns(summary)
-    _write_model(root, stem, summary, rows, columns, types)
+    _write_model(root, stem, summary, rows, columns, types, spec.kpis)
     _write_page(root, stem, spec, summary)
 
     pbi.apply_theme(root, spec.palette, spec.heading_font, spec.body_font)
@@ -317,16 +331,25 @@ def _model_columns(summary: Summary) -> tuple[list[dict], list[str], dict]:
     form.
     """
     axis = _axis_name(summary)
+    ordered = summary.group_by[0] if summary.group_by else None
+
     rows: list[dict] = []
     for row in summary.rows:
-        copy = dict(row)
+        copy = {k: v for k, v in row.items() if k != ORDER_KEY}
         if "period" in copy:
+            # The sortable form of the timeline, kept beside the readable one.
             copy[ORDER_COLUMN] = str(copy["period"])
             copy[axis] = _format_period(copy.pop("period"), summary.period)
+        elif ordered and row.get(ORDER_KEY) is not None:
+            # Grouped by a label rather than a timeline. Ordered by when each group first
+            # appeared, because a chart of month *names* otherwise runs April, August,
+            # July, June, May, September — the alphabet's idea of a year, which reads as
+            # though production collapsed in the second month instead of the fifth.
+            copy[ORDER_COLUMN] = str(row[ORDER_KEY])
         rows.append(copy)
 
     columns = [axis if c == "period" else c for c in summary.group_by]
-    if "period" in summary.group_by:
+    if rows and ORDER_COLUMN in rows[0]:
         columns.append(ORDER_COLUMN)
     columns += summary.measures
 
@@ -341,6 +364,7 @@ def _write_model(
     rows: list[dict],
     columns: list[str],
     types: dict,
+    kpis: list[Kpi],
 ) -> None:
     """Generate the table from whatever the summary holds, rather than a fixed six."""
     lines = [f"table {ENTITY}", f"\tlineageTag: {uuid.uuid4()}", ""]
@@ -354,7 +378,34 @@ def _write_model(
             "",
         ]
 
+    # A colour for each headline figure given thresholds. Its own measure, so the number
+    # and its colour come from one expression and cannot disagree — and returning hex,
+    # unlike the older attempt, which returned the words "good", "neutral" and "bad" and
+    # bound a font colour to them. None of those are colours.
+    for kpi in kpis:
+        if kpi.good is None or kpi.neutral is None:
+            continue
+        lines += [
+            f"\tmeasure '{_status_measure(kpi)}' = ```",
+            f"\t\t\tVAR Rate = {_measure_dax(kpi.measure)[0]}",
+            "\t\t\tRETURN",
+            "\t\t\t    SWITCH(",
+            "\t\t\t        TRUE(),",
+            f'\t\t\t        Rate >= {kpi.good}, "{STATUS_COLOURS[0]}",',
+            f'\t\t\t        Rate >= {kpi.neutral}, "{STATUS_COLOURS[1]}",',
+            f'\t\t\t        "{STATUS_COLOURS[2]}"',
+            "\t\t\t    )",
+            "\t\t\t```",
+            f"\t\tlineageTag: {uuid.uuid4()}",
+            "",
+        ]
+
     axis = _axis_name(summary)
+    # Whichever column the report is grouped by is the one that needs ordering — the
+    # readable timeline when there is one, otherwise the label that replaced it.
+    sorted_column = axis if "period" in summary.group_by else (
+        summary.group_by[0] if summary.group_by else None
+    )
     for column in columns:
         kind = types[column]
         lines += [
@@ -366,7 +417,7 @@ def _write_model(
             "\t\tsummarizeBy: none",
             f"\t\tsourceColumn: {column}",
         ]
-        if column == axis and ORDER_COLUMN in columns:
+        if column == sorted_column and ORDER_COLUMN in columns:
             # 'Apr 2025' comes before 'Aug 2025' in the alphabet but not in a year, so
             # the readable column is ordered by the sortable one beside it.
             lines.append(f"\t\tsortByColumn: {ORDER_COLUMN}")
@@ -508,7 +559,23 @@ def _write_visual(visuals: Path, content: dict) -> None:
 def _kpi_json(kpi: Kpi, position: dict, spec: ReportSpec) -> dict:
     title = _measure_dax(kpi.measure)[2]
     value_props = pbi._text_style(spec.heading_font)
-    value_props["fontColor"] = {"solid": {"color": pbi._literal(pbi.CASTLETON_GREEN)}}
+    if kpi.good is not None and kpi.neutral is not None:
+        # Bound to the colour measure written alongside the figure. Thresholds were being
+        # stored and then ignored here: every card was painted green whatever it said.
+        value_props["fontColor"] = {
+            "solid": {
+                "color": {
+                    "expr": {
+                        "Measure": {
+                            "Expression": {"SourceRef": {"Entity": ENTITY}},
+                            "Property": _status_measure(kpi),
+                        }
+                    }
+                }
+            }
+        }
+    else:
+        value_props["fontColor"] = {"solid": {"color": pbi._literal(pbi.CASTLETON_GREEN)}}
     name = uuid.uuid4().hex[:20]
     return {
         "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
@@ -591,4 +658,63 @@ def _chart_json(chart: Chart, position: dict, palette: list[str], axis: str) -> 
         "name": name,
         "position": position,
         "visual": visual,
+    }
+
+
+# ── The same report, drawn in the website beside the conversation ────────────
+
+
+def web_preview(spec: ReportSpec, summary: Summary) -> dict:
+    """The report described for the website to draw, as Decision 2 intended.
+
+    A separate shape from the one the older flow produces, and deliberately so. That one
+    names six fixed figures — target_quantity, actual_hours and the rest — which is the
+    limitation Decision 3 exists to remove; a customer counting videos or revenue has
+    none of them. This carries its own labels and whatever figures the report actually
+    has, so the preview can describe a workbook nobody has seen yet.
+
+    Marked with `kind` so the website can tell the two apart and keep drawing existing
+    reports exactly as it does now.
+    """
+    axis = _axis_name(summary) if "period" in summary.group_by else (
+        summary.group_by[0] if summary.group_by else "Group"
+    )
+    rows, _, _ = _model_columns(summary)
+
+    # Which totals a rate is made of, so the preview divides the same way the report's
+    # own DAX does rather than averaging percentages — the mistake that once reported
+    # 129% for a plan that delivered 100%.
+    rates: dict[str, list[str]] = {}
+    for measure in summary.measures:
+        if measure.startswith("completion_rate_"):
+            unit = measure[len("completion_rate_") :]
+            rates[measure] = [f"actual_{unit}", f"target_{unit}"]
+
+    return {
+        "kind": "flexible",
+        "title": spec.title,
+        "group_by": {"key": axis, "label": axis},
+        "measures": [
+            {
+                "key": m,
+                "label": _measure_dax(m)[2],
+                "format": "percent" if m.startswith("completion_rate_") else "number",
+                "aggregate": "max" if m.startswith("cumulative_") else "sum",
+            }
+            for m in summary.measures
+        ],
+        "rates": rates,
+        "headline_figures": [
+            {"measure": k.measure, "label": _measure_dax(k.measure)[2]} for k in spec.kpis
+        ],
+        "charts": [
+            {"kind": c.kind, "title": c.title, "measures": c.measures} for c in spec.charts
+        ],
+        "rows": [
+            {k: v for k, v in row.items() if k not in (ORDER_COLUMN, ORDER_KEY)}
+            for row in rows
+        ],
+        "data_colors": pbi._valid_data_colors(spec.palette),
+        "heading_font": spec.heading_font,
+        "body_font": spec.body_font,
     }

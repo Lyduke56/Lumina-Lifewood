@@ -5,10 +5,10 @@ gsap.registerPlugin(useGSAP);
 import {
   LayoutDashboard, Settings, Plus,
   ChevronLeft, ChevronRight, CircleDot, LogOut,
-  Pencil, FolderOpen, Sparkles,
+  Pencil, MessageSquare, Sparkles, Trash2,
 } from "lucide-react";
 import { User } from "@supabase/supabase-js";
-import type { GeneratedFile } from "@/lib/types";
+import type { ChatSummary } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/format";
 
 type ViewMode = "talk" | "studio" | "files" | "dashboard";
@@ -19,9 +19,13 @@ interface SidebarProps {
   setView: (view: ViewMode) => void;
   collapsed: boolean;
   setCollapsed: (val: boolean | ((prev: boolean) => boolean)) => void;
-  files: GeneratedFile[];
-  activeFileId: string | null;
-  onSelectFile: (id: string) => void;
+  /** Past conversations, newest first. Was a list of finished reports, which merely
+   *  repeated the Files tab and gave no way back into a conversation. */
+  chats: ChatSummary[];
+  activeChatId: string | null;
+  onSelectChat: (id: string) => void;
+  /** Ask to delete a conversation; the shell confirms it first. */
+  onDeleteChat: (chat: ChatSummary) => void;
   onNewReport: () => void;
   onRequireAuth: () => boolean;
   onSignOut: () => void;
@@ -29,7 +33,7 @@ interface SidebarProps {
 
 export function Sidebar({
   user, view, setView, collapsed, setCollapsed,
-  files, activeFileId, onSelectFile,
+  chats, activeChatId, onSelectChat, onDeleteChat,
   onNewReport, onRequireAuth, onSignOut,
 }: SidebarProps) {
   const isLoggedOut = !user;
@@ -138,55 +142,53 @@ export function Sidebar({
         </div>
       </nav>
 
-      {/* Recent Files */}
+      {/* Past conversations, the way a messaging app lists them. */}
       {!collapsed && (
         <div className="ll-sidebar-section" style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--tan-muted)", padding: "6px 10px", textTransform: "uppercase" }}>
-            Recent Files
+            Chats
           </div>
           {user ? (
-            files.length === 0 ? (
+            chats.length === 0 ? (
               <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>
-                No files yet. Generate a report to get started.
+                No conversations yet. Start one with New report.
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {files.slice(0, 12).map((f) => {
-                  const name = f.conversation_title && f.conversation_title !== "WhatsApp"
-                    ? f.conversation_title
-                    : f.storage_path.split("/").pop()?.replace(/\.zip$/, "") ?? "Report";
-                  const isWhatsapp = f.conversation_title === "WhatsApp";
-
-                  return (
-                    <div
-                      key={f.id}
-                      className={`ll-convo ${f.id === activeFileId ? "active" : ""}`}
-                      onClick={() => onSelectFile(f.id)}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <FolderOpen size={12} color={f.id === activeFileId ? "var(--amber)" : "var(--tan-muted)"} style={{ flexShrink: 0 }} />
-                        <div className="ll-convo-title">{name}</div>
-                        {isWhatsapp && (
-                          <span style={{
-                            fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999,
-                            background: "rgba(4,98,65,0.2)", color: "var(--emerald)",
-                            flexShrink: 0, textTransform: "uppercase", letterSpacing: ".04em",
-                          }}>
-                            WA
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--tan-muted)", paddingLeft: 18 }}>
-                        {formatRelativeTime(f.created_at)}
-                      </div>
+                {chats.map((chat) => (
+                  <div
+                    key={chat.id}
+                    className={`ll-convo ${chat.id === activeChatId ? "active" : ""}`}
+                    onClick={() => onSelectChat(chat.id)}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <MessageSquare size={12} color={chat.id === activeChatId ? "var(--amber)" : "var(--tan-muted)"} style={{ flexShrink: 0 }} />
+                      <div className="ll-convo-title">{chat.title}</div>
                     </div>
-                  );
-                })}
+                    {/* The last thing said, so a chat is recognisable unopened. */}
+                    <div className="ll-convo-preview">{chat.preview}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                      <div style={{ fontSize: 11, color: "var(--tan-muted)", paddingLeft: 18 }}>
+                        {formatRelativeTime(chat.last_at)}
+                      </div>
+                      {/* Hidden until the row is hovered: these rows are a few pixels
+                          apart, and a delete button always on show beside the one
+                          somebody meant to open is asking for trouble. */}
+                      <button
+                        className="ll-convo-delete"
+                        title="Delete this conversation"
+                        onClick={(e) => { e.stopPropagation(); onDeleteChat(chat); }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )
           ) : (
             <div style={{ padding: "8px 10px", fontSize: 12, color: "var(--tan-muted)", lineHeight: 1.5 }}>
-              Log in to see your recent files.
+              Log in to see your conversations.
             </div>
           )}
         </div>

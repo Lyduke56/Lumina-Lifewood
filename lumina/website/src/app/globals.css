@@ -530,3 +530,177 @@ body {
    reads as "here is where the time went" rather than as progress on the report. */
 .ll-step-notice .ll-step-icon { background: rgba(214, 158, 46, 0.14); color: #B7791F; }
 .ll-step-notice .ll-step-text strong { font-weight: 500; opacity: 0.85; }
+
+/* A report built by conversation, drawn on screen. Its own styles rather than the
+   Studio dashboard's, because it is a different component for a different shape of
+   report — see ReportPreview.tsx. */
+.ll-kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid rgba(19, 48, 32, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+.ll-kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.62;
+  color: var(--forest);
+}
+.ll-kpi-value { font-size: 34px; line-height: 1.1; color: var(--emerald); }
+.ll-kpi-foot { font-size: 11.5px; opacity: 0.55; color: var(--forest); }
+
+.ll-preview-chart {
+  padding: 18px 20px;
+  border: 1px solid rgba(19, 48, 32, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.ll-preview-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ll-preview-table th,
+.ll-preview-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(19, 48, 32, 0.08);
+  color: var(--forest);
+  white-space: nowrap;
+}
+.ll-preview-table th {
+  text-align: left;
+  font-weight: 600;
+  opacity: 0.7;
+  font-size: 11.5px;
+}
+.ll-preview-table th:not(:first-child) { text-align: right; }
+.ll-preview-table tfoot td {
+  border-top: 2px solid rgba(19, 48, 32, 0.18);
+  border-bottom: none;
+}
+
+/* Deleting a report. Kept quiet until wanted: in the sidebar these rows are a few
+   pixels apart, and a delete button competing for attention beside the row somebody
+   actually meant to open is how accidents happen. */
+.ll-convo-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tan-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.ll-convo:hover .ll-convo-delete { opacity: 0.75; }
+.ll-convo-delete:hover {
+  opacity: 1;
+  background: rgba(179, 38, 30, 0.18);
+  color: #FF9A93;
+}
+/* Always visible in the Files view, where there is room and the rows are cards. */
+.ll-file-action-btn--danger { color: #B3261E; border-color: rgba(179, 38, 30, 0.28); }
+.ll-file-action-btn--danger:hover { background: rgba(179, 38, 30, 0.08); }
+
+/* The last thing said in a conversation, under its title in the Chats list. Clipped to
+   two lines: enough to recognise a chat, not enough to push the list off the screen. */
+.ll-convo-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 2px 0 3px 18px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--tan-muted);
+  opacity: 0.8;
+}
+
+/* Preview and Download, side by side on the report handed over in the conversation. */
+.ll-report-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border: 1px solid var(--emerald);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--emerald);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ll-report-action:hover { background: var(--emerald); color: #fff; }
+/* No longer a button itself, so it must not look pressable. */
+.ll-report-card { cursor: default; flex-wrap: wrap; }
+.ll-report-card:hover { background: rgba(19, 110, 74, 0.05); }
+
+/* Which model produced a step or a reply. Quiet enough to ignore while reading the
+   conversation, present enough to compare models afterwards — free ones differ
+   noticeably in quality and there was no way to tell which had answered. */
+.ll-model-badge {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(19, 48, 32, 0.07);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--forest);
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+.ll-model-credit {
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--forest);
+  opacity: 0.4;
+}
+
+/* A step the tool refused. Previously indistinguishable from success: four failed
+   attempts to build a report showed four green ticks and no file. */
+.ll-step-failed .ll-step-icon { background: rgba(179, 38, 30, 0.12); color: #B3261E; }
+.ll-step-failed .ll-step-text small { color: #B3261E; opacity: 0.9; }
+.ll-step-cross {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #B3261E;
+  color: #fff;
+}
+
+/* A step the software declined and Lumina then retried. Amber like the other notices,
+   because it is the guardrails working rather than anything going wrong. */
+.ll-step-retry {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(214, 158, 46, 0.22);
+  color: #B7791F;
+}
+
+/* A chart's own legend, in the order its series are drawn. */
+.ll-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  color: var(--forest);
+}
+.ll-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ll-chart-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }

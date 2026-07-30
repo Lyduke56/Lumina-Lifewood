@@ -2030,7 +2030,363 @@ lesson of Section 19, applied without needing to find it the hard way again.
 
 ---
 
-## 31. Still to be decided
+## 31. Making the flow make sense, and a preview that tells the truth
+
+John Peter said he was getting confused about when a conversation is new and when it is
+continued. He was right to be: the flow did not hold together, and two of the four faults were
+ours from the same day.
+
+**"+ New report" opened Studio.** The orange button — the most prominent action on the page — led
+to the older form, not to a conversation. So there was no way to *begin* a conversation at all,
+except attaching a different file inside an existing one. Once conversations began being
+remembered (Section 29), that became worse: there was no way back to a blank page either. The
+button now starts a new conversation. Studio is still in the sidebar, untouched, for the older
+flow.
+
+**Restoring picked a conversation nobody had spoken in.** Building a report through the tools
+directly creates a conversation record without a word being said in it, and the restore took the
+newest record regardless. The result was a page showing nothing but a warning that the spreadsheet
+had expired — indistinguishable from a fault. It now looks for the most recent conversation that
+somebody actually said something in.
+
+### The preview was showing invented numbers
+
+The more serious one. Opening a finished report from Recent Files showed a dashboard reading
+*1.3k*, *1.2k* and *92.0%* over dates in January — none of them from the report. The customer's
+figures are 352,626 and 100.0% over April to September. The panel carried a small "MOCK PREVIEW"
+badge, which is not nearly enough: a manager glancing at that screen would take those numbers away
+with them.
+
+The cause was ours, and known: the report was saved with no preview data, and the website fills
+that gap with sample numbers so the page looks alive before anything has been generated. Sensible
+for an empty state. Actively misleading for a real report.
+
+Offered the choice of admitting the gap or closing it, John Peter chose to **close it**.
+
+**Reports built by conversation now describe themselves** — what their figures are called, how each
+should be shown, which of them are headline figures, which charts were chosen, and every row of
+summarised data. The preview reads that description, so it shows the same figures as the Power BI
+file rather than a fixed set of six.
+
+That mattered for how it was built. The existing dashboard component names six figures —
+`target_quantity`, `actual_hours` and the rest — and its filters, its brush and its table sorting
+are all keyed to a `date` field. Reports built this way have none of those, which is precisely what
+Decision 3 exists to remove. Retrofitting it would have meant changing every one of those things
+inside a component **the Studio and WhatsApp flows also draw with** — and John Peter had asked
+specifically that those two not be disturbed.
+
+**So the new flow was given its own preview component and the shared one was not opened at all.**
+The guarantee that Studio and WhatsApp are unaffected is therefore not an argument to be reviewed;
+it is a file that was never edited. The preview also totals figures the same way the report's own
+formulas do — a rate recomputed from its underlying totals rather than averaged, a running total
+taking its largest value — so the screen and the file can never disagree.
+
+**One honest gap:** the two reports built earlier today were saved before this existed, so they
+have no description to read and will still show the sample numbers. Anything built from now on
+shows real ones.
+
+---
+
+## 32. Deleting reports
+
+John Peter asked for this directly: there were forty-seven reports, many produced by code that has
+since been rewritten several times over, and no way to remove any of them. A list that cannot be
+cleared out stops being useful — the two reports worth looking at were buried among the wreckage of
+a day's debugging.
+
+Deleting is offered in both places reports appear: the Recent Files list in the sidebar and the
+Files tab.
+
+**What a delete actually removes:** the Power BI file from storage, the record of the report, and
+the summarised figures that fed it. Those figures serve only that one report and nothing points at
+them afterwards — left behind they accumulate invisibly, and there were already fifty of them
+against forty-seven reports.
+
+**What it deliberately keeps: the conversation.** Deleting it would take the chat with it, because
+everything hangs off the conversation record in the database. Somebody tidying away an old report is
+not asking to lose what they said to get it.
+
+**Confirmation is asked for**, because the file is genuinely gone afterwards rather than hidden, and
+because both lists are rows of near-identical entries a few pixels apart. In the sidebar the button
+stays hidden until the row is hovered, and in the Files view it is placed apart from Preview and
+Download — a delete button competing for attention beside the one somebody meant to press is how
+accidents happen.
+
+**Ownership is checked on the server**, not in the browser. The check was tested rather than
+assumed, including against a report genuinely belonging to a teammate's account and against a path
+dressed up to escape the customer's own folder:
+
+```
+allow   72bbb724…/abc/Report.zip                          OK
+refuse  9e7fd88f…/x/production_plan_reference.zip         OK
+refuse  ../72bbb724…/x.zip                                OK
+```
+
+Storage is emptied before the record is deleted, and in that order on purpose: a record pointing at
+a file that has already gone can be cleared up later, while a file with no record is invisible and
+can never be found again.
+
+---
+
+## 33. The sidebar lists conversations, not files
+
+John Peter's observation: the sidebar's list of finished reports **duplicated the Files tab** and
+gave no way back into a past conversation. He asked for it to work the way a messaging app does
+instead — a history you can return to.
+
+He was pointing at the gap recorded at the end of Section 32. Conversations were being kept, and the
+delete confirmation said so, but only the most recent one could ever be reached. Everything older
+sat in the database and could not be opened. The promise was true and useless at the same time.
+
+**The sidebar now lists conversations.** Each shows its title, the last thing said in it, and when.
+Clicking one opens it. Reports stay in the Files tab, where they were already listed.
+
+**Conversations nobody spoke in are left out.** Building a report through the tools directly creates
+one, and a list of blank rows would be worse than no list — it is the same fault that once restored
+a conversation containing nothing but an expiry warning.
+
+**Deleting a conversation says what it costs.** It takes any report built during it, and that cannot
+be avoided: everything hangs off the conversation record, so the reports cascade away with it. The
+confirmation now says so plainly rather than deleting more than somebody expected. Deleting a
+*report* still leaves its conversation alone — the two are different actions with different
+consequences, and each says which it is.
+
+Verified with three conversations, one of them never spoken in: the list showed two, opening one
+returned its messages and steps in order, another account asking for it got a 404 rather than a
+refusal that would confirm it exists, and deleting one removed it and left the other.
+
+**The test account was also emptied**, at John Peter's request, to work from a blank state: 19
+conversations, 4 orphaned datasets and 4 leftover files in storage, all from the day's debugging.
+Other accounts were untouched — the 30 reports belonging to a teammate are still there.
+
+---
+
+## 34. Eight switches in one conversation, and a preview a click away
+
+John Peter noticed the AI service being switched eight times in a single conversation and asked
+whether that was normal. **Nothing was broken — the fallback did exactly its job and the report was
+built — but eight is far more than it should be, and the honest first answer was that we could not
+tell him why.** The server had recorded that requests happened and nothing whatsoever about them
+failing.
+
+That gap is closed: every refusal is now written to the log with the supplier's name and its reason.
+
+**The fault it was hiding.** A supplier that ran out of allowance was remembered and set aside for
+fifteen minutes. A supplier that failed for *any other* reason — a withdrawn model, a rejected key, a
+momentary network problem — was not remembered at all, so it was asked again at the start of every
+single step, refused again, and announced another switch. One broken supplier could therefore
+produce a switch notice per step for the length of a conversation, which is precisely the pattern he
+saw.
+
+Any failure is now remembered, and a plain failure is set aside for two minutes rather than fifteen:
+long enough that a conversation stops paying for the same refusal repeatedly, short enough that a
+passing problem does not cost a working supplier for a quarter of an hour. Verified by breaking a
+supplier deliberately — announced once, then silently skipped.
+
+The lesson is a general one and worth stating. Fallback made the failure invisible, which is what
+fallback is for; but with nothing recorded, *invisible became unexplainable*. A quiet recovery still
+needs to leave a trace.
+
+### The report can be opened, not only downloaded
+
+Also raised by John Peter: the finished report was offered as a file and nowhere else, while the
+preview built in Section 31 was two navigations away in the Files tab. Downloading a project and
+opening Power BI Desktop is a great deal of work for a manager who only wanted to look at a number.
+
+The report handed over in the conversation now carries **Preview** beside **Download**. Preview opens
+the on-screen version of the same report; Download gives the Power BI project. The card had to stop
+being a single button to hold two actions, which also fixed something quietly wrong — the whole card
+looked pressable and behaved as one enormous download button.
+
+---
+
+## 35. A satisfying report with the months in the wrong order
+
+John Peter opened a finished report, was pleased with it, and said he felt conflicted — because the
+conversation had never happened. The AI had gone from spreadsheet to Power BI file without asking
+him anything.
+
+He was right to be uneasy, and the report was less correct than it looked. Its axis read:
+
+```
+April, August, July, June, May, September
+```
+
+**That is the alphabet's idea of a year.** The chart showed August's collapse in second place when it
+happened fifth, so the story it tells — a decline, a recovery, a decline — is not the story of the
+project. And the axis was headed `column_2`, our name for it, on every chart.
+
+**Why the earlier fix did not cover this.** Section 30 gave the *timeline* a readable name and a
+hidden sortable companion. This report was not grouped by the timeline: it was grouped by the
+customer's own "Month" text column, which that fix never touched. A month name has no inherent
+order, and nothing was carrying the dates any more.
+
+Both are fixed, and generally rather than for months. A grouping column now takes **its own heading**
+from the spreadsheet, and every group carries **the earliest date that fell into it**, hidden, for the
+report to sort by. So any label that follows the calendar comes out in calendar order, whatever it is
+called — and a workbook grouped by something that is not a timeline at all still gets a stable order
+rather than an accidental one.
+
+### Which model answered is now visible
+
+John Peter's suggestion, and a good one: some free models are noticeably better at this than others,
+and there was no way to tell which had replied. The choice between them is a real decision for
+Lifewood — Section 26 alone changed its mind about it twice — and it was being made without evidence.
+
+The model is named in **its own row, once** — and again only when it changes. The first attempt put a
+badge against every step, which John Peter rejected: nine rows repeating the same name is noise, and
+the thing worth seeing is not "which model did this step" but "which model did this work, and where
+did that change".
+
+A change means a supplier ran out and another took over, so the handover now appears in the
+transcript at the exact step it happened. It is saved with the conversation, and a chat read back
+later shows the same rows in the same places, because the rule — name it when it differs from the one
+last named — is applied identically live and on restore.
+
+This costs nothing and turns an opinion into an observation. It should have been there from the point
+the supplier became a setting.
+
+### The conversation is now required, not requested
+
+The instructions have always said to explain the columns and ask before going further. Decision 3
+attached it as a **condition**, not a preference, for a specific reason: pairing the planned and
+achieved figures wrongly produces a confident, wrong dashboard that nobody can identify as wrong by
+looking at it.
+
+A model skipped it anyway. Instructions ask; they do not enforce. So it is a guardrail now, in the
+spirit of Decision 6: once the column meanings are recorded, **the only thing the AI is permitted to
+do is tell the customer and wait.** Judged by position, so it asks once — after the customer answers,
+the work carries on normally.
+
+This is the third time this pattern has resolved the same way. Where behaviour matters, the tools
+have to make it impossible to skip; the instructions are a description of what the guardrails already
+require, not the mechanism.
+
+---
+
+## 36. Four ticks, four failures, and no file
+
+The worst kind of bug: John Peter's conversation showed **four "Building your Power BI file" rows,
+every one of them ticked green, and no report at the end.** The database confirmed it — that
+conversation produced nothing at all.
+
+Three faults, and the first one is mine from earlier the same day.
+
+**The build was failing on the fix from Section 35.** Ordering months chronologically meant carrying
+the earliest date of each group on every row. That value is a date, and those rows are stored as
+JSON, which a date cannot be. Every build refused with *"Object of type datetime is not JSON
+serializable"*. It is text now.
+
+**Why the verification missed it.** Section 35 was checked by building a report, and the build
+succeeded — because that test ran without an owner, and without an owner the code skips saving to the
+database entirely. **The one line that broke was the one line the test could not reach.** Delivery has
+now been verified twice by counting rows in the database and twice by a test that never touched it;
+the difference is not subtle and should not need learning again.
+
+**A tick against a failure is worse than no tick.** The step display marked every finished tool as
+done, whether the tool had agreed or refused. Four refusals therefore read as four completed reports.
+Every refusal is now written to the log, which is what made this diagnosable at all — previously one
+went to the AI and nowhere else.
+
+### Two different things, shown identically
+
+John Peter said he would rather the customer did not see technical wording, and asked whether
+softening it would make the AI less stable. A fair worry, and the answer is no — because there are two
+readers and they were being given the same text.
+
+**The AI's copy is unchanged, deliberately.** Decision 7 built the guardrails on refusals a model can
+act on, and Section 26 recorded it reading one and correcting itself unprompted. Vague refusals would
+make it worse at that. Only the customer's view is simplified.
+
+Asking the question exposed something better, though. **A refusal and a fault are not the same event.**
+Every tool declines by raising the same kind of error, deliberately; the AI then adjusts and carries
+on, which is the design working. Anything else is our software breaking. Presenting a routine
+correction as a red failure is its own kind of lie — and so is presenting a genuine fault as routine.
+
+They are now told apart with no extra bookkeeping, because a deliberate refusal is always a
+`ValueError` and a fault never is. On screen: a refusal reads *"Adjusting and trying again"* in amber,
+a fault reads *"Something went wrong at this step"* in red, and the technical wording goes to the log
+with a full traceback rather than to the customer. Both are saved with the conversation, so reopening
+it shows the same thing.
+
+**And the guardrail was bypassed without being broken.** Section 33 established that once a file is
+built the only permitted action is to speak. That is checked when the tool definitions are chosen —
+once per reply from the model. But a model can put *several* tool calls in one reply, and did: four
+requests to build arrived together, so nothing was consulted between them. The check now runs before
+every individual call, not once per reply.
+
+That last one is the general lesson, and it is the fourth time this pattern has appeared today. A
+guardrail is only as good as the moment it is checked. "Once X has happened, only Y is allowed" has to
+be enforced where the action is taken, not where the options are offered.
+
+---
+
+## 37. Four rows nobody was told about
+
+The report was right and looked professional, which is precisely when this sort of thing survives
+review. Reviewing it against the workbook found one correctness problem and one cosmetic one.
+
+**180 of 184 rows were used, and nobody said so.** Four rows carry a date but no figures, so they were
+left out — correctly. But the summarising step reported only *"from 180 rows"*, which reads as a fact
+about the sheet rather than a decision about it, and the AI never mentioned it. A customer's own rows
+being dropped is not a detail to leave implicit.
+
+The cause was not the AI being unhelpful: **it was never told**. The examining step had warned several
+exchanges earlier, and nothing restated it at the moment it mattered.
+
+Fixed in two places on purpose. The step row now reads *"6 periods · 180 of 184 rows used, 4
+skipped"* — read from what the tool did, so it appears whatever the AI says. And the tool now tells the
+AI the count and instructs it to pass it on, so the conversation can explain *why*. The step row is the
+guarantee; the AI's copy is the explanation. Today has shown repeatedly that anything relying on the
+model choosing to mention something eventually will not happen.
+
+The examining step now also says how many things it found worth checking — the `-` placeholders in the
+customer's own target column were being described only in text nobody sees.
+
+**And the preview's legend disagreed with its own chart**, listing Actual before Target while the bars
+were drawn the other way round. Small, but it is the kind of thing that makes a report look careless.
+The chart library would not accept an explicit order, so the legend is now drawn from the chart's own
+list of figures and cannot disagree with them. The Power BI file was always correct; this was the
+on-screen copy only.
+
+---
+
+## 38. Colour thresholds, ruled out
+
+A short section about an idea that was proposed, examined and dropped — recorded because the
+reasoning matters more than the outcome.
+
+The report shows a large green **100.0%**. Production collapsed to 15% in August and 41% in
+September; the contract was met only because the earlier months over-delivered. A manager glancing at
+that card would take away that everything went well.
+
+The proposal was to colour the figure against thresholds — green above 90%, amber above 75%, red
+below. **John Peter challenged the premise**: a threshold is a second baseline, and *the target is
+already the baseline*. If you hit 100% you met the plan; if you are under, you did not. Why invent a
+softer line on the customer's behalf?
+
+He is right, and the 90% and 75% figures were never anybody's decision — they are defaults the
+previous developer put in the Studio form.
+
+**More importantly, it would not have worked.** The overall figure *is* 100%, which beats any sensible
+threshold, so the card would have stayed exactly as green as before. The idea addressed the symptom
+and missed the cause.
+
+**The cause is that one number summarises six very different months, and no single number can fix
+that.** The chart and the table beneath it already tell the truth. Making the collapse unmissable is a
+question of layout — which visual leads the page — not of calculation. Left open deliberately rather
+than solved badly.
+
+**What was kept:** thresholds were being stored and then silently ignored, so the feature never worked
+at all. That is fixed, and the colour now comes from the same expression as the number so the two
+cannot disagree. **But it is out of the agent's reach**, for two reasons: nobody has decided what
+counts as acceptable, and the DAX that colours a card has never been opened in Power BI Desktop.
+Letting the agent reach untested output would put a report in front of a customer that nobody has
+checked — which is the mistake this log has recorded several times today in other forms.
+
+---
+
+## 39. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -2050,7 +2406,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 32. Change history
+## 40. Change history
 
 | Date | Change |
 |------|--------|
@@ -2079,6 +2435,15 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 38: **colour thresholds proposed, examined and dropped.** The suggestion was to colour the 100% headline against a 90%/75% threshold so a project that collapsed in August would not look healthy. **John Peter challenged the premise — the target is already the baseline** — and he was right; the 90% and 75% were never anybody's decision, only the previous developer's form defaults. It also would not have worked: the overall figure *is* 100%, so the card would have stayed green. The real cause is that one number summarises six very different months, which no single number can fix; the chart and table already tell the truth, and making the collapse unmissable is a layout question, left open deliberately rather than solved badly. Kept: thresholds were stored and silently ignored, which is fixed — but placed **out of the agent's reach**, since nobody has decided what counts as acceptable and the colouring DAX has never been opened in Power BI Desktop. |
+| 30 July 2026 | Added Section 37: **four of the customer's rows were dropped and nobody was told.** 180 of 184 rows were summarised — correctly, since four carry a date and no figures — but the step said only "from 180 rows" and the AI never mentioned it. **The AI was never told**: the warning came several exchanges earlier and nothing restated it when it mattered. The step row now reads "180 of 184 rows used, 4 skipped", read from what the tool did so it shows whatever the AI says, and the tool tells the AI to pass it on so the conversation can explain why. The examining step also now says how many things it found worth checking. Separately, the on-screen legend listed Actual before Target while the bars were drawn the other way; it is now built from the chart's own list of figures. |
+| 30 July 2026 | Added Section 36: **four ticked "Building your Power BI file" rows and no report.** The build was failing on that morning's own month-ordering fix — the hidden ordering value was a date, and those rows are stored as JSON, which a date cannot be. **The verification missed it because the test built without an owner, and without an owner the code skips saving entirely: the one line that broke was the one line the test could not reach.** Two further faults: the step display ticked refusals as though they had succeeded, so four failures read as four finished reports (refusals now show in red, with the reason, and are logged); refusals and faults are now told apart on screen (amber "Adjusting and trying again" against red "Something went wrong") with the technical wording going to the log rather than the customer, while the AI's own copy is left exactly as it was so it can still correct itself; and the "only speak once a file is built" guardrail was checked once per model reply, while the model put four build calls in a single reply — it is checked before every individual call now. **Fourth time today the same lesson: a guardrail is only as good as the moment it is checked.** |
+| 30 July 2026 | **Made the model visible**, at John Peter's suggestion: the model is named in its own row, once, and again only when it changes. A first attempt badged every single step, which he rejected — nine rows repeating one name is noise, and the useful question is not which model did a step but which did the work and where that changed. A change marks the point a supplier ran out and another took over, so a handover is now visible in the transcript at the step it happened, and is saved with the conversation. Some free models are markedly better at this work than others, the choice between them is a real decision for Lifewood, and it was being made without evidence — Section 26 changed its mind about it twice. Where a supplier runs out mid-conversation the badge changes partway down the page, so a handover is visible rather than only logged. |
+| 30 July 2026 | Added Section 35: **a report John Peter was pleased with had its months in the wrong order** — April, August, July, June, May, September, which is the alphabet's idea of a year and shows August's collapse in second place when it happened fifth. Section 30's fix had given the *timeline* a readable name and a hidden sortable companion, but this report was grouped by the customer's own "Month" text column, which that never touched. Fixed generally: a grouping column now takes its own heading from the spreadsheet, and every group carries the earliest date that fell into it, hidden, for the report to sort by. Also **made the conversation required rather than requested** — the AI had gone from spreadsheet to finished file without asking anything, which Decision 3 attached as a condition precisely because a wrong pairing of planned to achieved is invisible in the output. Once the column meanings are recorded the only permitted action is to tell the customer and wait. **Third time this has resolved the same way: instructions ask, tools enforce.** |
+| 30 July 2026 | Added Section 34: **found why the AI service switched eight times in one conversation**, after John Peter asked whether that was normal. Nothing was broken and the report was built, but the honest first answer was that we could not tell him why — nothing about a refusal was ever recorded. Now it is. The fault behind it: a supplier that ran out of *allowance* was set aside, but one that failed for any other reason was not remembered at all, so it was asked again at every step, refused again, and announced another switch each time. Any failure is now remembered, briefly. **The general lesson: fallback made the failure invisible, which is its job — but with nothing logged, invisible became unexplainable.** Also added **Preview beside Download** on the report handed over in the conversation, so a manager who only wants to look at a figure need not download a project and open Power BI Desktop. |
+| 30 July 2026 | Added Section 33: **the sidebar lists conversations rather than files**, at John Peter's request — the old list duplicated the Files tab and offered no way back into a past conversation. It now works like a messaging app: title, the last thing said, and when, with clicking one reopening it. This closes the gap recorded at the end of Section 32, where conversations were being kept but only the most recent could ever be reached — a promise that was true and useless at once. Conversations nobody spoke in are left out. Deleting a conversation now states that it takes any report built during it, which is unavoidable since everything hangs off the conversation record; deleting a report still leaves its conversation alone. Verified including that another account asking for a conversation gets a 404 rather than a refusal confirming it exists. **The test account was also emptied to a blank state**, as asked: 19 conversations, 4 orphaned datasets and 4 leftover files, with other accounts untouched. |
+| 30 July 2026 | Added Section 32: **reports can now be deleted**, from both the sidebar list and the Files tab, at John Peter's request — forty-seven had accumulated, most from code since rewritten, with no way to remove any. A delete removes the Power BI file, its record, and the summarised figures behind it, which serve only that report and had already reached fifty rows against forty-seven reports. It deliberately **keeps the conversation**, since deleting that would cascade the chat away too. Confirmation is asked for, the sidebar button stays hidden until hover, and ownership is checked on the server — tested against a teammate's genuine report and against a path dressed up to escape the customer's folder, both refused. |
+| 30 July 2026 | Added Section 31: **made the flow coherent, and made the preview tell the truth.** John Peter reported being confused about when a conversation is new and when it continues — correctly, since "+ New report" opened Studio rather than starting a conversation, leaving no way to begin one or to get back to a blank page. Fixed, with Studio untouched in the sidebar. Our restore was also picking conversations nobody had spoken in, showing a page containing only an expiry warning. **The serious one was the preview**, which showed *1.3k* and *92.0%* over January dates for a report whose real figures are *352,626* and *100.0%* over April to September — sample numbers, behind a badge far too quiet for how wrong they were. Reports built by conversation now describe their own figures and the preview reads that description. Given the shared dashboard component is keyed to six fixed column names and to a `date` field, and that John Peter asked for Studio and WhatsApp to be left alone, **the new flow was given its own preview component and the shared one was never opened** — so that guarantee is a fact about the diff rather than a claim to be checked. |
 | 30 July 2026 | Renamed the *Shortfall* figure to **Balance**, John Peter's decision. It is achieved minus planned, so it read −114,561 for the month production collapsed — a shortfall that goes negative when you fall short. Given the choice between renaming it and flipping the sign, he kept the word his own workbook uses. Worth recording as a principle beyond this one label: **the customer's vocabulary wins over ours.** The arithmetic is unchanged. |
 | 30 July 2026 | Added Section 30: **the report stops showing its own plumbing.** John Peter opened a finished report and found five things wrong, none of them the figures and all of them the words: every report was named after the template rather than itself, the saved date was the template's, the tab said "Page 1", the timeline axis was headed `period` with values like `2025-04`, and the y-axis repeated what the title and legend already said. All five fixed. Renaming the project turned out to reach further than expected — **five places in the code spelled the template's name out by hand, including the one that writes the Lifewood branding**, so a renamed report would have shipped unbranded. Readable months needed a hidden sortable column beside them, since Apr, Aug, Dec is the alphabet's idea of a year. This is Decision 3 reaching the labels: the software already knew it was counting images by month and simply was not saying so. |
 | 30 July 2026 | Added Section 29: **conversations are now remembered.** John Peter noticed that leaving "Talk to Lumina" and coming back showed an empty page. Nothing had ever been saved — and the database's `messages` table, which is exactly the right shape for it, had existed since before this work began without a single row ever being written. Three things are now kept: what was said, which spreadsheet it was about, and — the part that makes it a real fix rather than a convincing one — **the agent's own working memory**, so a follow-up still knows what was agreed instead of asking the customer to explain their spreadsheet again. Also removed a trap: each conversation carried two identities and the browser only held the throwaway one, so it had nothing durable to ask to be resumed. Verified by wiping the server's memory as a restart would and reading everything back. |

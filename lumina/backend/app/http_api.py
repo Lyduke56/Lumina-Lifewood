@@ -98,48 +98,50 @@ def _caller(authorization: str) -> str:
         raise HTTPException(403, str(e))
 
 
-@app.get("/conversation/latest")
-async def latest_conversation(authorization: str = Header(...)) -> dict:
-    """The conversation this customer was last having, ready to put back on screen.
+def _shaped(conversation_id: str) -> list[dict]:
+    """A saved conversation, arranged the way the browser draws it.
 
-    Exists because a conversation used to vanish the moment they looked at anything
-    else. The shaping is done here rather than in the browser so that both know one
-    arrangement of a conversation, not two.
+    Shaped here rather than in the website so that both know one arrangement of a
+    conversation, not two. Consecutive steps are grouped into a single run of work,
+    which is how they appeared and how they read afterwards.
     """
-    owner = _caller(authorization)
-    found = (
-        get_client()
-        .table("conversations")
-        .select("id, title, workbook_path")
-        .eq("user_id", owner)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    if not found.data:
-        return {"conversation_id": None}
-
-    row = found.data[0]
     said = (
         get_client()
         .table("messages")
         .select("role, content, payload")
-        .eq("conversation_id", row["id"])
+        .eq("conversation_id", conversation_id)
         .order("seq")
         .execute()
     )
 
-    # Consecutive steps belong together as one run of work, which is how they were shown
-    # and how they read afterwards.
     entries: list[dict] = []
+    # Which model was last named. The model is stored against every row, but shown as its
+    # own row once and again only when it changes — the same rule the live conversation
+    # applies, so a chat looks the same whether it is being watched or read back.
+    announced: str | None = None
+
+    def announce(model: str | None) -> None:
+        nonlocal announced
+        if not model or model == announced:
+            return
+        announced = model
+        row = {"tool": "model", "detail": model, "done": True, "notice": True}
+        if entries and entries[-1]["kind"] == "steps":
+            entries[-1]["steps"].append(row)
+        else:
+            entries.append({"kind": "steps", "steps": [row]})
+
     for m in said.data:
         payload = m.get("payload") or {}
+        if not payload.get("notice"):
+            announce(payload.get("model"))
         if m["role"] == "step":
             step = {
                 "tool": m["content"],
                 "detail": payload.get("detail"),
                 "done": True,
                 "notice": payload.get("notice", False),
+                "outcome": payload.get("outcome", "ok"),
             }
             if entries and entries[-1]["kind"] == "steps":
                 entries[-1]["steps"].append(step)
@@ -154,10 +156,14 @@ async def latest_conversation(authorization: str = Header(...)) -> dict:
                     "report": payload.get("report"),
                 }
             )
+    return entries
 
+
+def _described(row: dict, entries: list[dict]) -> dict:
     workbook = Path(row["workbook_path"]).name if row.get("workbook_path") else None
     return {
         "conversation_id": row["id"],
+        "title": row.get("title"),
         "workbook": workbook,
         # A conversation can be read back long after the uploaded spreadsheet has gone
         # from temporary storage. Better to say so than to let a follow-up fail obscurely.
@@ -166,6 +172,134 @@ async def latest_conversation(authorization: str = Header(...)) -> dict:
         ),
         "entries": entries,
     }
+
+
+def _owned(conversation_id: str, owner: str) -> dict:
+    """The conversation row, or a 404 that does not reveal whose it is."""
+    found = (
+        get_client()
+        .table("conversations")
+        .select("id, title, workbook_path, user_id")
+        .eq("id", conversation_id)
+        .limit(1)
+        .execute()
+    )
+    if not found.data or found.data[0]["user_id"] != owner:
+        raise HTTPException(404, "No conversation with that id.")
+    return found.data[0]
+
+
+@app.get("/conversations")
+async def list_conversations(authorization: str = Header(...)) -> dict:
+    """Every conversation this customer has had, newest first.
+
+    The sidebar used to list finished reports, which duplicated the Files tab and gave no
+    way back into a past conversation. It lists these instead.
+
+    Conversations nobody spoke in are left out. Building a report through the tools
+    directly creates one, and a list of empty rows is worse than no list.
+    """
+    owner = _caller(authorization)
+    rows = (
+        get_client()
+        .table("conversations")
+        .select("id, title, workbook_path, created_at")
+        .eq("user_id", owner)
+        .order("created_at", desc=True)
+        .limit(60)
+        .execute()
+    )
+
+    chats = []
+    for row in rows.data:
+        said = (
+            get_client()
+            .table("messages")
+            .select("role, content, created_at")
+            .eq("conversation_id", row["id"])
+            .order("seq", desc=True)
+            .limit(30)
+            .execute()
+        )
+        spoken = [m for m in said.data if m["role"] in ("you", "lumina") and m["content"]]
+        if not spoken:
+            continue
+        chats.append(
+            {
+                "id": row["id"],
+                "title": row.get("title") or "Untitled",
+                "created_at": row["created_at"],
+                "last_at": said.data[0]["created_at"],
+                # The most recent thing said, so a customer recognises which chat this is
+                # without opening it — the same reason a messaging app shows one.
+                "preview": spoken[0]["content"][:120],
+                "messages": len(spoken),
+            }
+        )
+    return {"chats": chats}
+
+
+@app.get("/conversation/latest")
+async def latest_conversation(authorization: str = Header(...)) -> dict:
+    """The conversation this customer was last having, ready to put back on screen."""
+    owner = _caller(authorization)
+    # Several recent ones, because the newest is not necessarily one anybody spoke in.
+    # Building a report through the tools directly creates a conversation row without a
+    # word being said in it, and restoring one of those showed a customer nothing but a
+    # warning that their spreadsheet had expired — which looked exactly like a fault.
+    recent = (
+        get_client()
+        .table("conversations")
+        .select("id, title, workbook_path")
+        .eq("user_id", owner)
+        .order("created_at", desc=True)
+        .limit(10)
+        .execute()
+    )
+    for row in recent.data:
+        entries = _shaped(row["id"])
+        if entries:
+            return _described(row, entries)
+    return {"conversation_id": None}
+
+
+@app.get("/conversation/{conversation_id}")
+async def read_conversation(
+    conversation_id: str, authorization: str = Header(...)
+) -> dict:
+    """One particular conversation, so a customer can go back into it."""
+    owner = _caller(authorization)
+    row = _owned(conversation_id, owner)
+    return _described(row, _shaped(conversation_id))
+
+
+@app.delete("/conversation/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str, authorization: str = Header(...)
+) -> dict:
+    """Delete a conversation, and with it any report built during it.
+
+    The reports go too, and unavoidably: everything in the database hangs off the
+    conversation, so removing it cascades them away. Their files are cleared from storage
+    first, because a file with no record left pointing at it can never be found again.
+    """
+    owner = _caller(authorization)
+    _owned(conversation_id, owner)
+
+    reports = (
+        get_client()
+        .table("generated_files")
+        .select("storage_path")
+        .eq("conversation_id", conversation_id)
+        .execute()
+    )
+    paths = [r["storage_path"] for r in reports.data if r.get("storage_path")]
+    if paths:
+        get_client().storage.from_("generated-files").remove(paths)
+
+    get_client().table("conversations").delete().eq("id", conversation_id).execute()
+    conversations._conversations.pop(conversation_id, None)
+    return {"deleted": conversation_id, "reports_removed": len(paths)}
 
 
 @app.post("/conversation")
@@ -243,13 +377,33 @@ async def send_message(
         try:
             for event in agent.respond(conversation.history, opening, owner_context):
                 if event["type"] == "message":
-                    seen.append({"role": "lumina", "content": event["text"]})
+                    seen.append(
+                        {
+                            "role": "lumina",
+                            "content": event["text"],
+                            "payload": {
+                                "supplier": event.get("supplier"),
+                                "model": event.get("model"),
+                            },
+                        }
+                    )
                 elif event["type"] == "tool_finished":
                     seen.append(
                         {
                             "role": "step",
                             "content": event["tool"],
-                            "payload": {"detail": event.get("detail")},
+                            "payload": {
+                                "detail": event.get("detail"),
+                                # Kept, so a step that failed still reads as failed when
+                                # the conversation is reopened. Without it a reload turned
+                                # every refusal back into a tick — the exact confusion the
+                                # red cross exists to prevent.
+                                "outcome": event.get("outcome", "ok"),
+                                # Which model decided this step, so comparing them is
+                                # possible after the fact and not only while watching.
+                                "supplier": event.get("supplier"),
+                                "model": event.get("model"),
+                            },
                         }
                     )
                     if event.get("report"):

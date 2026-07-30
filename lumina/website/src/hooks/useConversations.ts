@@ -1,59 +1,59 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Conversation } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
+import type { ChatSummary } from "@/lib/types";
 
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
+/**
+ * The customer's past conversations, for the sidebar to list.
+ *
+ * Read from the backend rather than straight from the database, unlike useGeneratedFiles
+ * beside it. Deciding what a conversation looks like in a list means reading its messages
+ * for the last thing said and leaving out the ones nobody spoke in — judgement that
+ * already exists on the server and should not be written a second time here.
+ *
+ * Replaces an earlier hook of this name that nothing imported: it listed conversations
+ * straight from the table and could also create empty ones, which is not how a
+ * conversation begins any more — uploading a workbook is.
+ */
 export function useConversations() {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   const refresh = useCallback(async () => {
     if (!user) {
-      setConversations([]);
+      setChats([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("conversations")
-      .select("id, title, created_at, messages(count)")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setConversations(
-        data.map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          created_at: c.created_at,
-          message_count: c.messages?.[0]?.count ?? 0,
-        }))
-      );
+    try {
+      const { data } = await createClient().auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setChats([]);
+        return;
+      }
+      const res = await fetch(`${BACKEND}/conversations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const body = await res.json();
+      setChats(body.chats ?? []);
+    } catch {
+      // An empty list is a poor outcome, not a broken page.
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  async function createConversation(): Promise<Conversation | null> {
-    if (!user) return null;
-    const { data, error } = await supabase
-      .from("conversations")
-      .insert({ user_id: user.id, title: null })
-      .select("id, title, created_at")
-      .single();
-
-    if (error || !data) return null;
-    const created: Conversation = { ...data, message_count: 0 };
-    setConversations((prev) => [created, ...prev]);
-    return created;
-  }
-
-  return { conversations, loading, refresh, createConversation };
+  return { chats, loading, refresh };
 }

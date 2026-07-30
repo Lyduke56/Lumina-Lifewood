@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import workbench
 from column_roles import Assignment, Role, RoleError, describe, set_column_roles
-from report_builder import ReportError, add_chart, add_kpi, build_powerbi
+from report_builder import ReportError, add_chart, add_kpi, build_powerbi, web_preview
 from sheet_profiler import list_sheets, profile_sheet
 from supabase_client import (
     save_dataset,
     save_generated_file,
     upload_generated_file,
 )
-from summariser import SummaryError, summarise
+from summariser import ORDER_KEY, SummaryError, summarise
 
 
 def reply_to_customer(message: str) -> str:
@@ -194,12 +194,21 @@ def summarise_figures(
     session.spec.charts.clear()
     session.spec.kpis.clear()
 
+    total = summary.source_rows_used + summary.source_rows_skipped
     lines = [
         f"Summarised into {summary.group_count} rows from "
-        f"{summary.source_rows_used:,} rows of the sheet.",
-        "",
-        f"Figures available: {', '.join(summary.measures)}",
+        f"{summary.source_rows_used:,} of {total:,} rows in the sheet.",
     ]
+    if summary.source_rows_skipped:
+        # Said here as well as at the examining step, because this is the moment it
+        # matters and a warning given several exchanges earlier does not get passed on.
+        lines += [
+            "",
+            f"{summary.source_rows_skipped:,} row(s) were left out — they had no usable "
+            f"figures, or no date to place them on. TELL THE CUSTOMER this, and how many: "
+            f"they are entitled to know their own rows were not all counted.",
+        ]
+    lines += ["", f"Figures available: {', '.join(summary.measures)}"]
     preview = summary.rows[:6]
     if preview:
         lines += ["", "First rows:"]
@@ -208,7 +217,8 @@ def summarise_figures(
                 "  "
                 + ", ".join(
                     f"{k}={'-' if v is None else (f'{v:,.2f}'.rstrip('0').rstrip('.') if isinstance(v, (int, float)) else v)}"
-                    for k, v in row.items()
+                    # The ordering value is for the finished report, not for reading.
+                    for k, v in row.items() if k != ORDER_KEY
                 )
             )
         if summary.group_count > len(preview):
@@ -221,25 +231,24 @@ def summarise_figures(
     return "\n".join(lines)
 
 
-def add_headline_figure(
-    session_id: str,
-    measure: str,
-    title: str | None = None,
-    good_threshold: float | None = None,
-    neutral_threshold: float | None = None,
-) -> str:
+def add_headline_figure(session_id: str, measure: str, title: str | None = None) -> str:
     """Put a single large number on the report.
+
+    Deliberately does not offer colour thresholds, though add_kpi supports them. Two
+    reasons. They are a second baseline — a judgement about how much shortfall counts as
+    acceptable — and nobody at Lifewood has made it; the 90% and 75% in the older flow are
+    the previous developer's defaults. And the DAX that colours a card has never been
+    opened in Power BI Desktop, so letting the agent reach it would ship output nobody has
+    checked. Available in code for whoever decides to use it on purpose.
 
     Args:
         session_id: From open_workbook.
         measure: One of the figures listed by summarise_figures.
         title: What to call it. Defaults to a readable version of the figure's name.
-        good_threshold: At or above this it is shown green, e.g. 0.9 for 90%.
-        neutral_threshold: At or above this, amber; below it, red.
     """
     session = workbench.get(session_id)
     summary = workbench.require_summary(session)
-    add_kpi(session.spec, summary, measure, title, good_threshold, neutral_threshold)
+    add_kpi(session.spec, summary, measure, title)
     return (
         f"Added headline figure '{session.spec.kpis[-1].title}'. "
         f"The report now has {len(session.spec.kpis)} headline figure(s) and "
@@ -310,15 +319,16 @@ def build_report_file(session_id: str, dataset_id: str) -> str:
         dataset_id=dataset["id"],
         report_name=session.spec.title,
     )
-    save_generated_file(
+    record = save_generated_file(
         dataset_id=dataset["id"],
         layout_json={
             "headline_figures": [k.title for k in session.spec.kpis],
             "charts": [c.title for c in session.spec.charts],
         },
-        # The website's preview expects the older fixed column names and cannot read
-        # these yet; that is the next piece of work, not something to fake here.
-        chart_preview_json=None,
+        # The report described for the website to draw beside the conversation. Until
+        # now this was left empty, and the website filled the gap with invented numbers —
+        # a preview showing 1.3k and 92% for a report that says 352,626 and 100%.
+        chart_preview_json=web_preview(session.spec, summary),
         conversation_id=session.owner["conversation_id"],
         storage_path=storage_path,
     )
@@ -326,7 +336,13 @@ def build_report_file(session_id: str, dataset_id: str) -> str:
     # offered the customer a download and told the step it had succeeded — which is how
     # a broken save presented itself as a finished report, and why the agent, seeing the
     # refusal it was actually given, went round again adding charts and rebuilding.
-    session.last_report = {"storage_path": storage_path, "title": session.spec.title}
+    session.last_report = {
+        # The record's own id, so the conversation can offer to open the report on screen
+        # as well as download it — the preview is drawn from this row.
+        "file_id": record["id"],
+        "storage_path": storage_path,
+        "title": session.spec.title,
+    }
     return (
         f"Built the report ({built}) and saved it to the customer's account, where it is "
         f"ready to download. The job is finished: tell them it is ready and stop there. "
@@ -468,7 +484,7 @@ _STAGE_TOOLS = {
     "start": ["reply_to_customer", "open_workbook"],
     "opened": ["reply_to_customer", "examine_sheet", "open_workbook"],
     "examined": ["reply_to_customer", "record_column_meanings", "examine_sheet"],
-    "agreed": ["reply_to_customer", "summarise_figures", "record_column_meanings"],
+    "confirmed": ["reply_to_customer", "summarise_figures", "record_column_meanings"],
     "summarised": [
         "reply_to_customer",
         "add_headline_figure",
@@ -476,6 +492,13 @@ _STAGE_TOOLS = {
         "build_report_file",
         "summarise_figures",
     ],
+    # Column meanings have been recorded but not put to the customer. Decision 3
+    # attached this as a condition rather than a preference: the target-to-actual
+    # matching must be confirmed, because getting it wrong produces a confident, wrong
+    # dashboard that nobody can tell is wrong by looking. Asked for in the instructions
+    # too, but a model that skipped it went from spreadsheet to finished file without a
+    # word — so it is a guardrail now, in the spirit of Decision 6.
+    "agreed": ["reply_to_customer"],
     # Once a file exists there is nothing left to do but hand it over. Without this
     # stage the agent would add another chart, rebuild, add another chart, rebuild —
     # producing a file per step until the step limit stopped it, because nothing in the
@@ -484,14 +507,18 @@ _STAGE_TOOLS = {
 }
 
 
-def _stage(history: list[dict]) -> str:
-    """How far along we are, judged by which tools have already succeeded."""
-    order: list[str] = [
+def _called(history: list[dict]) -> list[str]:
+    """Every tool asked for so far, in order."""
+    return [
         call["function"]["name"]
         for message in history
         if isinstance(message, dict)
         for call in (message.get("tool_calls") or [])
     ]
+
+
+def stage_of(order: list[str]) -> str:
+    """How far along we are, judged by which tools have already been used."""
     done = set(order)
 
     # A file built since the last thing we said to the customer means the customer has
@@ -500,13 +527,18 @@ def _stage(history: list[dict]) -> str:
     def last(name: str) -> int:
         return max((i for i, n in enumerate(order) if n == name), default=-1)
 
-    if last("build_report_file") > last("reply_to_customer"):
+    spoke = last("reply_to_customer")
+    if last("build_report_file") > spoke:
         return "built"
+    # Judged by position, so this asks once: after the customer has been told and has
+    # answered, the full set is available again and the work carries on.
+    if last("record_column_meanings") > spoke and "summarise_figures" not in done:
+        return "agreed"
 
     if "summarise_figures" in done:
         return "summarised"
     if "record_column_meanings" in done:
-        return "agreed"
+        return "confirmed"
     if "examine_sheet" in done:
         return "examined"
     if "open_workbook" in done:
@@ -514,7 +546,23 @@ def _stage(history: list[dict]) -> str:
     return "start"
 
 
+def _stage(history: list[dict]) -> str:
+    return stage_of(_called(history))
+
+
+def permitted(order: list[str]) -> set[str]:
+    """Which tools may be used next, given everything used so far.
+
+    Separate from schemas_for because the two are asked at different moments. The
+    definitions are chosen once per reply, but a model can put several tool calls in one
+    reply — and did: four requests to build the report arrived together, so the stage was
+    never consulted between them and a guardrail that reads "once a file exists, only
+    speak" was bypassed without being broken.
+    """
+    return set(_STAGE_TOOLS[stage_of(order)])
+
+
 def schemas_for(history: list[dict]) -> list[dict]:
     """Tool definitions worth sending, given where the conversation has got to."""
-    allowed = set(_STAGE_TOOLS[_stage(history)])
+    allowed = permitted(_called(history))
     return [d for d in schemas() if d["function"]["name"] in allowed]

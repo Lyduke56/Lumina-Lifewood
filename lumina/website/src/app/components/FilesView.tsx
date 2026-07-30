@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { FolderOpen, CircleDot, Download, Clock, Eye } from "lucide-react";
+import { FolderOpen, CircleDot, Download, Clock, Eye, Trash2 } from "lucide-react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 gsap.registerPlugin(useGSAP);
@@ -16,9 +16,11 @@ interface FilesViewProps {
   regenCounts: Record<string, number>;
   onRegenerate: (file: GeneratedFile) => void;
   onSelectFile: (id: string) => void;
+  /** Ask to delete a report; the shell confirms it first. */
+  onDeleteFile: (file: GeneratedFile) => void;
 }
 
-export function FilesView({ user, files, regenCounts, onRegenerate, onSelectFile }: FilesViewProps) {
+export function FilesView({ user, files, regenCounts, onRegenerate, onSelectFile, onDeleteFile }: FilesViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
@@ -142,6 +144,16 @@ export function FilesView({ user, files, regenCounts, onRegenerate, onSelectFile
                     {f.status === "ready" && (
                       <DownloadButton storagePath={f.storage_path} />
                     )}
+                    {/* Last, and set apart, so it is never the button somebody means to
+                        press. The shell asks for confirmation before anything happens. */}
+                    <button
+                      className="ll-file-action-btn ll-file-action-btn--danger"
+                      title="Delete this report"
+                      onClick={(e) => { e.stopPropagation(); onDeleteFile(f); }}
+                      style={{ marginLeft: "auto" }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
               );

@@ -14,6 +14,8 @@ and any disagreement is reported back to them rather than silently overwritten.
 
 from __future__ import annotations
 
+import re
+
 import datetime as dt
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -29,6 +31,35 @@ from sheet_profiler import SheetProfile
 MAX_GROUPS = 60
 
 PERIODS = ("day", "week", "month", "quarter", "none")
+
+# Carried on every row and never shown: the earliest date that fell into that group.
+# Grouping by a label loses the timeline, and a report grouped by a month *name* then
+# ordered its axis April, August, July, June, May, September — the alphabet's idea of a
+# year, which reads as though production collapsed in the second month rather than the
+# fifth. This is what the finished report sorts by.
+ORDER_KEY = "__first_seen"
+
+
+def _iso(value) -> str:
+    """A sortable text form of a date, whatever shape the spreadsheet gave us."""
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def _column_name(profile, position: int, taken: set[str]) -> str:
+    """What to call a grouping column in the report: its own heading.
+
+    Was `column_2`, which is our name for it and appeared on the axis of every chart
+    grouped that way. Falls back to the old form when a heading is missing or would
+    collide with something else in the table.
+    """
+    heading = next(
+        (c.heading for c in profile.columns if c.position == position), None
+    )
+    cleaned = re.sub(r"[^0-9A-Za-z _-]+", "", str(heading or "")).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    if not cleaned or cleaned in taken or cleaned.lower() == "period":
+        return f"column_{position}"
+    return cleaned
 
 
 @dataclass
@@ -126,6 +157,9 @@ def summarise(
         # per-row, so they can only be compared where a bucket holds exactly one row —
         # comparing a day's completion rate against a month's would always "disagree".
         bucket_rows: dict[tuple, int] = {}
+        # The earliest date in each group, so a report grouped by label can still be
+        # put in chronological order rather than alphabetical.
+        first_seen: dict[tuple, object] = {}
         used = skipped = 0
         checks: dict[int, list[tuple]] = {c: [] for c in schema.cross_checks}
 
@@ -157,6 +191,10 @@ def summarise(
             )
             bucket = buckets.setdefault(key, {c: None for c in measure_columns})
             bucket_rows[key] = bucket_rows.get(key, 0) + 1
+            if date_value is not None:
+                seen = first_seen.get(key)
+                if seen is None or date_value < seen:
+                    first_seen[key] = date_value
             for c, v in figures.items():
                 if v is not None:
                     bucket[c] = (bucket[c] or 0) + v
@@ -169,8 +207,15 @@ def summarise(
     finally:
         wb.close()
 
+    names: set[str] = {"period"}
+    label_names = []
+    for g in group_by:
+        name = _column_name(profile, g, names)
+        names.add(name)
+        label_names.append(name)
+
     summary = Summary(
-        group_by=(["period"] if period != "none" else []) + [f"column_{g}" for g in group_by],
+        group_by=(["period"] if period != "none" else []) + label_names,
         measures=[],
         period=period,
         source_rows_used=used,
@@ -190,6 +235,11 @@ def summarise(
         out: dict = {}
         for i, name in enumerate(summary.group_by):
             out[name] = key[i]
+        if key in first_seen:
+            # As text, not a date. These rows are stored as JSON and handed to the
+            # website, and a datetime cannot be either — which is what broke four
+            # attempts to build a report while every step still showed a tick.
+            out[ORDER_KEY] = _iso(first_seen[key])
         for pair in schema.pairs:
             unit = pair.unit or "units"
             planned = sums.get(pair.target)
@@ -211,7 +261,9 @@ def summarise(
                 out[f"cumulative_actual_{unit}"] = acc["a"]
         summary.rows.append(out)
 
-    summary.measures = [k for k in summary.rows[0] if k not in summary.group_by]
+    summary.measures = [
+        k for k in summary.rows[0] if k not in summary.group_by and k != ORDER_KEY
+    ]
     summary.reconciliation = _reconcile(schema, summary, checks, bucket_rows, group_by)
 
     if skipped:

@@ -16,6 +16,7 @@ the work happening instead of a spinner.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from collections.abc import Iterator
@@ -25,7 +26,17 @@ from openai import RateLimitError
 
 import agent_tools
 import workbench
-from llm_client import DEFAULT_MODEL, available_suppliers, mark_exhausted
+from llm_client import (
+    DEFAULT_MODEL,
+    FAILED_FOR_SECONDS,
+    available_suppliers,
+    mark_exhausted,
+)
+
+# Which supplier refused and why. Absent this, a customer reported eight switches in
+# one conversation and there was no way to answer the obvious question — the server
+# had recorded that requests happened and nothing about them failing.
+log = logging.getLogger("lumina.agent")
 
 AGENT_MODEL = DEFAULT_MODEL
 
@@ -110,6 +121,9 @@ def _complete(history: list[dict], tools: list[dict]):
     Both of those take time, and a customer watching a conversation that has gone quiet
     deserves to know why rather than assuming it has broken. So this yields notices as
     it goes and returns the answer at the end — a generator rather than a plain call.
+
+    Returns the supplier alongside the answer, so what appears on screen can name the
+    model that produced it.
     """
     suppliers = available_suppliers()
     last: Exception | None = None
@@ -123,7 +137,10 @@ def _complete(history: list[dict], tools: list[dict]):
             }
         for attempt in range(RATE_LIMIT_ATTEMPTS):
             try:
-                return supplier.client.chat.completions.create(
+                # Returned with the answer, because the caller has to be able to say
+                # which model produced it — free models differ enough in quality that
+                # comparing them is only possible if you can see which one replied.
+                return supplier, supplier.client.chat.completions.create(
                     model=supplier.model,
                     messages=history,
                     tools=tools,
@@ -142,6 +159,11 @@ def _complete(history: list[dict], tools: list[dict]):
                 pause = _retry_after(e)
                 # No delay offered means the allowance is spent, not merely busy.
                 if pause is None or attempt == RATE_LIMIT_ATTEMPTS - 1:
+                    log.warning(
+                        "%s is out of allowance (%s); setting it aside",
+                        supplier.name,
+                        str(e).splitlines()[0][:160],
+                    )
                     mark_exhausted(supplier.name)
                     break
                 yield {
@@ -152,6 +174,17 @@ def _complete(history: list[dict], tools: list[dict]):
                 time.sleep(pause)
             except Exception as e:  # a bad key or a withdrawn model: try the next one
                 last = e
+                # Set aside as well. Previously only rate limits were remembered, so a
+                # supplier failing for any other reason was asked again at every step of
+                # every conversation — each refusal announcing another switch, which is
+                # exactly what a customer saw eight times in one sitting.
+                log.warning(
+                    "%s failed (%s: %s); setting it aside briefly",
+                    supplier.name,
+                    type(e).__name__,
+                    str(e).splitlines()[0][:160],
+                )
+                mark_exhausted(supplier.name, FAILED_FOR_SECONDS)
                 break
 
     raise last or RuntimeError("No AI supplier is configured.")
@@ -203,8 +236,20 @@ def _trim(history: list[dict]) -> list[dict]:
     ]
 
 
-def _tool_result(name: str, arguments: dict, owner: dict | None) -> str:
+def _tool_result(name: str, arguments: dict, owner: dict | None) -> tuple[str, str]:
     """Run one tool. A refusal is an answer, not a crash — the model has to see it.
+
+    Returns what the model reads and how it went: "ok", "refused" or "broken".
+
+    Those last two are different things and were being shown identically. Every tool
+    raises a ValueError to *refuse* — that is Decision 7 working as designed, and the
+    model reads the reason and corrects itself, which it has been observed doing
+    unprompted. Anything else is our software failing. Presenting a normal correction as
+    a red failure is its own kind of lie; so is presenting a genuine fault as routine.
+
+    What the model reads is unchanged either way. It needs the exact wording to put
+    things right, and softening that would make it worse at doing so — only the customer's
+    view is simplified.
 
     Who the report belongs to is set here, immediately before the call, rather than
     once for the whole reply. A streamed reply is resumed step by step and each step
@@ -214,11 +259,23 @@ def _tool_result(name: str, arguments: dict, owner: dict | None) -> str:
     """
     token = workbench.CURRENT_OWNER.set(owner)
     try:
-        return str(agent_tools.BY_NAME[name](**arguments))
+        return str(agent_tools.BY_NAME[name](**arguments)), "ok"
     except KeyError:
-        return f"There is no tool called {name!r}. Available: {', '.join(agent_tools.BY_NAME)}."
-    except Exception as e:  # tools raise deliberately, with messages meant to be read
-        return f"That did not work: {e}"
+        log.warning("the model asked for a tool that does not exist: %s", name)
+        return (
+            f"There is no tool called {name!r}. Available: "
+            f"{', '.join(agent_tools.BY_NAME)}.",
+            "refused",
+        )
+    except ValueError as e:  # every tool refuses by raising one of these
+        log.info("%s refused: %s", name, e)
+        return f"That did not work: {e}", "refused"
+    except Exception as e:
+        # Not a refusal — a fault. Recorded, because a broken tool used to report itself
+        # only to the model: four failed attempts to build a report showed four ticks on
+        # screen and left nothing anywhere saying what had gone wrong.
+        log.warning("%s broke: %s: %s", name, type(e).__name__, e, exc_info=True)
+        return f"That did not work: {e}", "broken"
     finally:
         workbench.CURRENT_OWNER.reset(token)
 
@@ -238,7 +295,13 @@ def _detail(name: str, session) -> str | None:
             p = list(session.profiles.values())[-1]
             rows = "row" if p.data_row_count == 1 else "rows"
             cols = "column" if len(p.columns) == 1 else "columns"
-            return f"{p.data_row_count:,} {rows} · {len(p.columns)} {cols}"
+            detail = f"{p.data_row_count:,} {rows} · {len(p.columns)} {cols}"
+            # Placeholder text, total rows and padding were being found and described
+            # only in text the customer never sees. At least say how many there are.
+            if p.warnings:
+                thing = "thing" if len(p.warnings) == 1 else "things"
+                detail += f" · {len(p.warnings)} {thing} to check"
+            return detail
         if name == "record_column_meanings" and session.schema:
             measures = sum(1 + len(p.actuals) for p in session.schema.pairs)
             breakdowns = len(session.schema.labels)
@@ -247,7 +310,17 @@ def _detail(name: str, session) -> str | None:
         if name == "summarise_figures" and session.summary:
             s = session.summary
             periods = "period" if len(s.rows) == 1 else "periods"
-            return f"{len(s.rows)} {periods} from {s.source_rows_used:,} rows"
+            total = s.source_rows_used + s.source_rows_skipped
+            detail = f"{len(s.rows)} {periods} from {s.source_rows_used:,} rows"
+            # Rows left out of a customer's own figures should never be silent. This
+            # report used 180 of 184 and said only "from 180 rows", so nobody could tell
+            # that four had been dropped, let alone why.
+            if s.source_rows_skipped:
+                detail = (
+                    f"{len(s.rows)} {periods} · {s.source_rows_used:,} of {total:,} rows "
+                    f"used, {s.source_rows_skipped:,} skipped"
+                )
+            return detail
         if name == "add_headline_figure" and session.spec.kpis:
             return session.spec.kpis[-1].title
         if name == "add_report_chart" and session.spec.charts:
@@ -271,8 +344,18 @@ def respond(
         history.append({"role": "system", "content": SYSTEM_PROMPT})
     history.append({"role": "user", "content": message})
 
+    # Every tool used so far. Kept as we go rather than read back from the conversation,
+    # because the model's whole reply — all of its tool calls at once — is added to the
+    # conversation before any of them runs.
+    used: list[str] = agent_tools._called(history)
+
     for _ in range(MAX_STEPS):
-        completion = yield from _complete(_trim(history), agent_tools.schemas_for(history))
+        supplier, completion = yield from _complete(
+            _trim(history), agent_tools.schemas_for(history)
+        )
+        # Short enough for a badge: 'openai/gpt-oss-120b' reads as 'gpt-oss-120b'.
+        model = supplier.model.rsplit("/", 1)[-1].removesuffix(":free")
+        credit = {"supplier": supplier.name, "model": model}
         choice = completion.choices[0].message
         history.append(choice.model_dump(exclude_none=True))
 
@@ -302,8 +385,27 @@ def respond(
             except json.JSONDecodeError:
                 arguments = {}
 
+            # Checked per call, not per reply. A batch of calls that arrives together
+            # must still respect the stage it is in, or a guardrail is only advice.
+            if name not in agent_tools.permitted(used):
+                history.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": (
+                            f"Not now. {name} is not available at this point — tell the "
+                            f"customer what you have done and wait for their reply."
+                        ),
+                    }
+                )
+                continue
+
             if name == "reply_to_customer":
-                yield {"type": "message", "text": arguments.get("message", "")}
+                yield {
+                    "type": "message",
+                    "text": arguments.get("message", ""),
+                    **credit,
+                }
                 history.append(
                     {
                         "role": "tool",
@@ -311,11 +413,13 @@ def respond(
                         "content": agent_tools.reply_to_customer(**arguments),
                     }
                 )
+                used.append(name)
                 yield {"type": "done"}
                 return
 
-            yield {"type": "tool_started", "tool": name}
-            result = _tool_result(name, arguments, owner)
+            yield {"type": "tool_started", "tool": name, **credit}
+            result, outcome = _tool_result(name, arguments, owner)
+            used.append(name)
             history.append(
                 {"role": "tool", "tool_call_id": call.id, "content": result}
             )
@@ -333,7 +437,16 @@ def respond(
                 "type": "tool_finished",
                 "tool": name,
                 "report": report,
-                "detail": _detail(name, session),
+                # In the customer's terms. A refusal is the software declining
+                # something and the AI trying again, which is normal; a fault is ours to
+                # answer for. Neither needs the wording the AI was given.
+                "detail": {
+                    "ok": _detail(name, session),
+                    "refused": "Adjusting and trying again",
+                    "broken": "Something went wrong at this step",
+                }[outcome],
+                "outcome": outcome,
+                **credit,
                 # The website watches for these to know when to redraw the preview.
                 "session_id": arguments.get("session_id"),
                 "changed_report": name
