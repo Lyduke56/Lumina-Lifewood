@@ -2425,13 +2425,139 @@ the trimming cost a suggestion, not a safeguard.
 
 ---
 
-## 40. Still to be decided
+## 40. A dashboard announced but never built
+
+The clearest failure of the day to describe, and the shortest to explain. Lumina said *"Your
+dashboard is ready"* and had built nothing at all: two headline figures had been added, no charts, no
+file, no download.
+
+**It was not the AI overstating things.** It asked for everything correctly — three figures, two
+charts, the build, and a reply — all in one go. But the reply sat in the middle of that list, and our
+loop stopped the moment it reached one. Everything after it was thrown away silently: the third
+figure, both charts and the build.
+
+So the message was true when the model composed it and false by the time it was shown.
+
+**Work is now done first and the reply sent last**, whatever order they arrive in. The model's
+intention — do these things, then say this — is honoured rather than truncated.
+
+**A second fault was hiding underneath.** Abandoning those calls also left them with no results in
+the conversation. A model's request and its answer must come in pairs; a request with nothing against
+it is a malformed conversation, and the next message would have been built on one. Nothing had gone
+wrong *yet*, which is the only reason it went unnoticed.
+
+This is the fourth time today that handling a batch of requests as though it were one request has
+caused a problem: the report built four times over, the confirmation step skipped, the "only speak
+once built" rule bypassed, and now the work discarded entirely. **The lesson is not about any one
+guardrail. A model asking for six things at once is ordinary, and every part of the loop has to treat
+that list as a list.**
+
+---
+
+## 41. A rate and a count cannot share an axis
+
+Reviewing a finished report found a chart that was not merely wrong but unreadable. Asked for a
+"monthly summary", the AI put Target, Actual, Balance **and Completion Rate** on one bar chart. The
+first three run into the hundreds of thousands; a completion rate runs between 1.07 and 1.96. On a
+single axis the rate is a flat line on the floor — invisible.
+
+**The tool now refuses it**, and says what to do instead:
+
+> A rate and a count cannot share an axis — completion_rate_Images runs around 1 while target_Images
+> runs into the thousands, so the rate would be invisible. Put the rate on its own chart, or use a
+> table to show them together.
+
+A table is still allowed to hold both, because a table has no axis to disagree about. This is Decision
+6 again, and the important part is that it protects the **Power BI file**, not only the on-screen copy
+— nothing previously stopped this reaching a customer's dashboard.
+
+**Two smaller corrections in the preview.**
+
+A table visual was being drawn as bars. That is how the unreadable chart appeared on screen at all: the
+customer had asked for a table, the Power BI file correctly contains a table, and only the preview
+turned it into a chart — while claiming to show "the same figures as the Power BI file". Tables are now
+drawn as tables, using the same renderer as the full listing beneath them.
+
+And the line chart was smoothing between points. Six monthly readings were being joined by curves,
+which implies a journey through values nobody measured. The lines are straight now. A chart of
+sparse readings should not invent the spaces between them.
+
+**One thing worth keeping from this report.** The chart of Balance by month — a single enormous
+negative bar for August — tells the story of the collapse more plainly than any headline figure could.
+That is the open question from Section 38 answering itself: the way to make a failure unmissable is to
+chart the shortfall, not to colour a total.
+
+---
+
+## 42. A report Power BI would not open
+
+The most serious kind of defect, and it reached a customer. John Peter opened a delivered report and
+Power BI refused it outright:
+
+> TMDL objects cannot be merged because both declare the same property: dataType
+> 1st object: type=Column, name='Month' — 2nd object: type=Column, name='Month'
+
+**Two columns called Month in one table.** His workbook has its own "Month" text column. Summarised by
+month *and* grouped by that column, the timeline is renamed to "Month" (Section 30) and the label keeps
+its own heading (Section 35) — and the two collide. Each change was right on its own; together they
+produce a file that cannot be opened.
+
+The collision check existed and looked for the wrong name. It guarded against a column clashing with
+`period`, which is the *internal* name — by the time Power BI sees it, that column is called Month. The
+check was comparing against a name that never reaches the file.
+
+There is now one definition of what the timeline is called, shared by the code that names it and the
+code that must avoid it. A heading that would still collide is **distinguished rather than discarded** —
+"Month (2)" — because falling back to "column_2" would put our word for it back on the customer's axis,
+which Section 30 exists to prevent.
+
+**And a net underneath it.** Duplicate column names are now refused before a file is written, whatever
+the cause:
+
+> Two columns would be called Month, which Power BI cannot open. Summarise without grouping by a column
+> that shares its name with the timeline.
+
+That check is deliberately about the *symptom* rather than this particular cause. A report that will not
+open is worse than one that is never built: the failure surfaces days later, in front of somebody who
+cannot do anything about it, and nothing in the conversation gave any warning.
+
+**Why it was not caught.** Every verification summarised by period *or* by a label, never both at once.
+The two fixes were each tested in isolation and were each correct. The combination was never tried, and
+the combination is what a real conversation produced on the first attempt.
+
+### The first fix broke it differently
+
+Naming the second column "Month (2)" produced a file Power BI also refused, this time for a parsing
+error. One unopenable file traded for another.
+
+**And that exposed the deeper fault.** Measure names had always been written in quotes — `'Target
+(Images)'` — and column names never were. That held only because every column name so far happened to
+be a single word. **Any customer heading containing a space would have broken the file**: a report
+grouped by a column called "Participant ID" could never have opened.
+
+Column names are now escaped properly, and the two languages in a Power BI project escape differently —
+single quotes in TMDL, `#"..."` in Power Query. The collision name is `Month_2`, chosen so that the one
+case we control needs no escaping at all rather than depending on escaping that cannot be tested here.
+
+**A note on the verification.** The check written to confirm this reported a failure, and the failure was
+in the check — a pattern that matched across line breaks. It was rewritten rather than explained away.
+Two of three attempts at this fix produced a broken file, and each time the thing that settled it was
+John Peter opening Power BI Desktop. **Nothing in this environment can open a Power BI file, so for this
+one class of defect there is no substitute for a person trying it.** Worth stating plainly: the
+guardrails, the tests and the logs cannot close that gap.
+
+Also corrected while here: chart titles read *"by Date"* while the axis beneath them read *"Month"* —
+written before the timeline had a proper name and left disagreeing with it since.
+
+---
+
+## 43. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
-1. **How to make a collapse unmissable** without inventing figures — see Section 38. A single
-   headline cannot show that August failed; the chart and table can. This is a question of which
-   visual leads the page, and nobody has decided it.
+1. **How to make a collapse unmissable** without inventing figures — see Sections 38 and 41. A single
+   headline cannot show that August failed. A chart of the shortfall does, plainly, and one appeared by
+   accident in testing; whether Lumina should propose that chart by default is the remaining question.
 2. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
    warns about them — but building detection that works across many different spreadsheets is a
    genuine problem still to be solved.
@@ -2448,7 +2574,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 41. Change history
+## 44. Change history
 
 | Date | Change |
 |------|--------|
@@ -2477,6 +2603,9 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 42: **a delivered report that Power BI refused to open.** Two columns called Month in one table: John Peter's workbook has its own Month column, and when the figures are summarised by month *and* grouped by that column, the renamed timeline collides with it. Each of the two earlier fixes was right alone; together they broke the file. The collision check was comparing against `period`, the internal name, which never reaches Power BI. There is now one shared definition of what the timeline is called, and a colliding heading is distinguished — "Month (2)" — rather than falling back to "column_2", which would undo Section 30. **A net was added underneath: duplicate column names are refused before a file is written at all**, because a report that will not open is worse than one never built — the failure appears days later in front of somebody who cannot act on it. Not caught because every test summarised by period *or* by a label, never both; the combination is what a real conversation produced first time. |
+| 30 July 2026 | Added Section 41: **a rate and a count on one axis.** A "monthly summary" chart put Target, Actual and Balance — in the hundreds of thousands — beside a completion rate of 1.07 to 1.96, so the rate was an invisible line on the floor. The tool now refuses it and names the alternatives, which protects the **Power BI file** and not just the preview: nothing previously stopped this reaching a customer's dashboard. Two smaller corrections: a table visual was being drawn as bars in the preview, which is how the unreadable chart appeared at all — the file correctly contained a table — and the line chart was smoothing between six monthly readings, implying values nobody measured. **And a finding worth keeping:** the chart of Balance by month, one huge negative bar for August, tells the story of the collapse better than any headline figure, which is the open question from Section 38 partly answering itself. |
+| 30 July 2026 | Added Section 40: **"Your dashboard is ready" — and nothing had been built.** The AI asked for three figures, two charts, a build and a reply all at once, correctly; but the reply sat in the middle of that list and our loop stopped at the first reply it found, discarding the third figure, both charts and the build in silence. Work is now done first and the reply sent last, whatever order they arrive in. A second fault underneath: the abandoned calls were left with no results in the conversation, which is malformed — a model's request and its answer must come in pairs, and the next message would have been built on a broken one. **Fourth time today that treating a batch of requests as one request has caused a fault** — the report built four times, the confirmation skipped, the guardrail bypassed, and now the work discarded. A model asking for six things at once is ordinary; every part of the loop has to treat that list as a list. |
 | 30 July 2026 | Added Section 39: **the last open baseline defect, examined and found smaller than recorded.** Section 15 worried that charts were chosen without the sheet description; in fact the summarising tool already refuses a grouping that no chart could show, naming the workable alternative — Decision 6 working as intended, and the defect had sat on the open list for two days as though nothing protected against it. The real remaining gap was smaller: because the sheet description is dropped from the conversation to save re-sending 500 tokens, the AI could no longer *offer* the other breakdowns available, which Decision 6 asks it to propose. Those are now restated at the summarising step, with unsuitable columns left out and high-cardinality ones marked "ask for a top ten". |
 | 30 July 2026 | Added Section 38: **colour thresholds proposed, examined and dropped.** The suggestion was to colour the 100% headline against a 90%/75% threshold so a project that collapsed in August would not look healthy. **John Peter challenged the premise — the target is already the baseline** — and he was right; the 90% and 75% were never anybody's decision, only the previous developer's form defaults. It also would not have worked: the overall figure *is* 100%, so the card would have stayed green. The real cause is that one number summarises six very different months, which no single number can fix; the chart and table already tell the truth, and making the collapse unmissable is a layout question, left open deliberately rather than solved badly. Kept: thresholds were stored and silently ignored, which is fixed — but placed **out of the agent's reach**, since nobody has decided what counts as acceptable and the colouring DAX has never been opened in Power BI Desktop. |
 | 30 July 2026 | Added Section 37: **four of the customer's rows were dropped and nobody was told.** 180 of 184 rows were summarised — correctly, since four carry a date and no figures — but the step said only "from 180 rows" and the AI never mentioned it. **The AI was never told**: the warning came several exchanges earlier and nothing restated it when it mattered. The step row now reads "180 of 184 rows used, 4 skipped", read from what the tool did so it shows whatever the AI says, and the tool tells the AI to pass it on so the conversation can explain why. The examining step also now says how many things it found worth checking. Separately, the on-screen legend listed Actual before Target while the bars were drawn the other way; it is now built from the chart's own list of figures. |

@@ -378,7 +378,15 @@ def respond(
             )
             continue
 
-        for call in choice.tool_calls:
+        # Work first, speak last. A model can ask for several things at once, and one
+        # put a reply in the middle of its list — three figures, two charts and a build
+        # came after it. Returning at the reply abandoned all of them, so it announced a
+        # finished dashboard that had never been built, and left those calls with no
+        # results in the conversation, which is malformed for the next request.
+        speaking = [c for c in choice.tool_calls if c.function.name == "reply_to_customer"]
+        working = [c for c in choice.tool_calls if c.function.name != "reply_to_customer"]
+
+        for call in working + speaking:
             name = call.function.name
             try:
                 arguments = json.loads(call.function.arguments or "{}")
@@ -415,7 +423,7 @@ def respond(
                 )
                 used.append(name)
                 yield {"type": "done"}
-                return
+                return  # nothing is left: replies are handled last
 
             yield {"type": "tool_started", "tool": name, **credit}
             result, outcome = _tool_result(name, arguments, owner)

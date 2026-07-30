@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pbib_generator as pbi
-from summariser import ORDER_KEY, Summary
+from summariser import ORDER_KEY, PERIOD_LABEL, Summary
 
 CHART_KINDS = {"line": "lineChart", "bar": "clusteredColumnChart", "table": "tableEx"}
 
@@ -124,6 +124,21 @@ def add_chart(
     for measure in measures:
         _check_measure(summary, measure)
 
+    # A rate and a count cannot share an axis. Asked to chart a completion rate of 1.5
+    # beside a target of 135,000, no axis can show both: the rate collapses to an
+    # invisible line along the bottom. A table can hold them together; a chart cannot, so
+    # the tool declines rather than producing something unreadable.
+    if kind != "table":
+        rates = [m for m in measures if m.startswith("completion_rate")]
+        counts = [m for m in measures if not m.startswith("completion_rate")]
+        if rates and counts:
+            raise ReportError(
+                f"A rate and a count cannot share an axis — {rates[0]} runs around 1 "
+                f"while {counts[0]} runs into the thousands, so the rate would be "
+                f"invisible. Put the rate on its own chart, or use a table to show them "
+                f"together."
+            )
+
     group_by = group_by or (summary.group_by[0] if summary.group_by else None)
     if group_by not in summary.group_by:
         raise ReportError(
@@ -135,7 +150,7 @@ def add_chart(
             kind,
             list(measures),
             group_by,
-            title or _chart_title(kind, measures, group_by),
+            title or _chart_title(kind, measures, group_by, summary.period),
         )
     )
     return spec
@@ -161,8 +176,13 @@ def _pretty(name: str) -> str:
     return name.replace("_", " ").title()
 
 
-def _chart_title(kind: str, measures: list[str], group_by: str) -> str:
-    axis = "Date" if group_by == "period" else _pretty(group_by)
+def _chart_title(kind: str, measures: list[str], group_by: str, period: str = "day") -> str:
+    """A title for a chart, naming the axis as the finished report labels it.
+
+    Titles said "by Date" while the axis beneath them said "Month" — written before the
+    timeline had a proper name, and left disagreeing with it afterwards.
+    """
+    axis = PERIOD_LABEL.get(period, "Date") if group_by == "period" else _pretty(group_by)
     if kind == "table":
         # Listing every column would give a table a title longer than its heading row.
         return f"Detail by {axis}"
@@ -175,10 +195,6 @@ ENTITY = "report_data"
 
 # What the template's folders are called before we name them after the report.
 TEMPLATE_STEM = "production_plan_reference"
-
-# What the timeline should be called on a chart. "period" is our word for it; a
-# production manager reading the report has never heard it.
-PERIOD_LABEL = {"day": "Date", "week": "Week", "month": "Month", "quarter": "Quarter"}
 
 # The ISO values are kept in a hidden companion column and the visible one is sorted by
 # it, which is how Power BI is meant to be told that "Apr 2025" comes before "May 2025".
@@ -235,6 +251,31 @@ def _format_period(value, period: str) -> str:
 
 
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+# A name safe to write unquoted, in either language. Anything else has to be escaped,
+# and the two languages escape differently.
+_SIMPLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _tmdl_name(name: str) -> str:
+    """A column name as TMDL needs it written.
+
+    Measures were always quoted — 'Target (Images)' — and those files opened. Columns were
+    not, which held only because every column name so far happened to be a single word. A
+    column called 'Month (2)' produced a file Power BI refused to parse, and any customer
+    heading with a space in it would have done the same.
+    """
+    if _SIMPLE_NAME.match(name):
+        return name
+    return "'" + name.replace("'", "''") + "'"
+
+
+def _m_name(name: str) -> str:
+    """The same name as Power Query needs it written, which is not the same escaping."""
+    if _SIMPLE_NAME.match(name):
+        return name
+    return '#"' + name.replace('"', '""') + '"'
 
 
 def _tmdl_type(values: list) -> str:
@@ -353,6 +394,19 @@ def _model_columns(summary: Summary) -> tuple[list[dict], list[str], dict]:
         columns.append(ORDER_COLUMN)
     columns += summary.measures
 
+    # Two columns of the same name make a file Power BI refuses to open outright, with
+    # an error about TMDL objects that cannot be merged. It happened, and it reached a
+    # customer. Caught here rather than trusted not to happen: a report that will not open
+    # is worse than one that is never built, because the failure surfaces days later in
+    # front of somebody who cannot act on it.
+    duplicates = {c for c in columns if columns.count(c) > 1}
+    if duplicates:
+        raise ReportError(
+            f"Two columns would be called {', '.join(sorted(duplicates))}, which Power BI "
+            f"cannot open. Summarise without grouping by a column that shares its name "
+            f"with the timeline."
+        )
+
     types = {c: _tmdl_type([r.get(c) for r in rows]) for c in columns}
     return rows, columns, types
 
@@ -425,7 +479,7 @@ def _write_model(
             lines.append("\t\tisHidden")  # it exists only to put the other in order
         lines += ["", "\t\tannotation SummarizationSetBy = User", ""]
 
-    signature = ", ".join(f"{c}={_m_type(types[c])}" for c in columns)
+    signature = ", ".join(f"{_m_name(c)}={_m_type(types[c])}" for c in columns)
     literals = ",\n".join(
         "\t\t\t\t\t{" + ", ".join(_m_literal(r.get(c), types[c]) for c in columns) + "}"
         for r in rows

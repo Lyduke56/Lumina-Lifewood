@@ -32,6 +32,12 @@ MAX_GROUPS = 60
 
 PERIODS = ("day", "week", "month", "quarter", "none")
 
+# What the timeline is called in the finished report. Defined here rather than in
+# report_builder because the naming of the *other* grouping columns has to avoid it: a
+# workbook with its own "Month" column, summarised by month, produced two columns called
+# Month in one table and Power BI refused to open the file at all.
+PERIOD_LABEL = {"day": "Date", "week": "Week", "month": "Month", "quarter": "Quarter"}
+
 # Carried on every row and never shown: the earliest date that fell into that group.
 # Grouping by a label loses the timeline, and a report grouped by a month *name* then
 # ordered its axis April, August, July, June, May, September — the alphabet's idea of a
@@ -57,8 +63,14 @@ def _column_name(profile, position: int, taken: set[str]) -> str:
     )
     cleaned = re.sub(r"[^0-9A-Za-z _-]+", "", str(heading or "")).strip()
     cleaned = re.sub(r"\s+", " ", cleaned)
-    if not cleaned or cleaned in taken or cleaned.lower() == "period":
+    if not cleaned or cleaned.lower() == "period":
         return f"column_{position}"
+    # Distinguished rather than discarded: the heading is still the most useful name, and
+    # falling back to "column_2" puts our word for it on the customer's axis. Underscored
+    # rather than "Month (2)" so it needs no escaping in either Power BI language — the
+    # bracketed form produced a file Power BI would not parse.
+    if cleaned in taken:
+        return f"{cleaned.replace(' ', '_')}_{position}"
     return cleaned
 
 
@@ -207,7 +219,11 @@ def summarise(
     finally:
         wb.close()
 
+    # Seeded with whatever the timeline column will end up being called, not with
+    # "period" — that is the internal name, and it is renamed before Power BI sees it.
     names: set[str] = {"period"}
+    if period != "none":
+        names.add(PERIOD_LABEL.get(period, "Date"))
     label_names = []
     for g in group_by:
         name = _column_name(profile, g, names)

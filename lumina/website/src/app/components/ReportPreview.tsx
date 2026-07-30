@@ -68,6 +68,50 @@ function total(preview: FlexiblePreview, key: string): number | null {
   return values.reduce((s, v) => s + v, 0);
 }
 
+/** The figures as a table. Used for a table visual and for the full listing below. */
+function FigureTable({
+  preview,
+  measures,
+}: {
+  preview: FlexiblePreview;
+  measures: FlexiblePreview["measures"];
+}) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table className="ll-preview-table">
+        <thead>
+          <tr>
+            <th>{preview.group_by.label}</th>
+            {measures.map((m) => <th key={m.key}>{m.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {preview.rows.map((row, i) => (
+            <tr key={i}>
+              <td>{String(row[preview.group_by.key] ?? "")}</td>
+              {measures.map((m) => (
+                <td key={m.key} style={{ textAlign: "right" }}>
+                  {formatValue(typeof row[m.key] === "number" ? (row[m.key] as number) : null, m.format)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            {measures.map((m) => (
+              <td key={m.key} style={{ textAlign: "right", fontWeight: 600 }}>
+                {formatValue(total(preview, m.key), m.format)}
+              </td>
+            ))}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 export function ReportPreview({ preview, onDownload, downloadable = true }: ReportPreviewProps) {
   const colors = preview.data_colors?.length ? preview.data_colors : ["#046241", "#FFB347"];
   const labelOf = (key: string) =>
@@ -126,6 +170,14 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
               </span>
             ))}
           </div>
+          {chart.kind === "table" ? (
+            <FigureTable
+              preview={preview}
+              measures={chart.measures
+                .map((k) => preview.measures.find((m) => m.key === k))
+                .filter((m): m is FlexiblePreview["measures"][number] => !!m)}
+            />
+          ) : (
           <div style={{ width: "100%", height: 300 }}>
             <ResponsiveContainer>
               <ComposedChart data={preview.rows} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
@@ -140,7 +192,7 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
                 />
                 {chart.measures.map((measure, i) =>
                   chart.kind === "line" ? (
-                    <Line key={measure} type="monotone" dataKey={measure} stroke={colors[i % colors.length]} strokeWidth={2} dot={false} />
+                    <Line key={measure} type="linear" dataKey={measure} stroke={colors[i % colors.length]} strokeWidth={2} dot={false} />
                   ) : (
                     <Bar key={measure} dataKey={measure} fill={colors[i % colors.length]} radius={[3, 3, 0, 0]} />
                   )
@@ -148,44 +200,16 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
               </ComposedChart>
             </ResponsiveContainer>
           </div>
+          )}
         </div>
       ))}
 
       {/* Every figure, so nothing in the report is only visible in Power BI. */}
-      <div className="ll-preview-chart" style={{ overflowX: "auto" }}>
+      <div className="ll-preview-chart">
         <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "var(--forest)" }}>
           Every figure by {preview.group_by.label.toLowerCase()}
         </h3>
-        <table className="ll-preview-table">
-          <thead>
-            <tr>
-              <th>{preview.group_by.label}</th>
-              {preview.measures.map((m) => <th key={m.key}>{m.label}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {preview.rows.map((row, i) => (
-              <tr key={i}>
-                <td>{String(row[preview.group_by.key] ?? "")}</td>
-                {preview.measures.map((m) => (
-                  <td key={m.key} style={{ textAlign: "right" }}>
-                    {formatValue(typeof row[m.key] === "number" ? (row[m.key] as number) : null, m.format)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              {preview.measures.map((m) => (
-                <td key={m.key} style={{ textAlign: "right", fontWeight: 600 }}>
-                  {formatValue(total(preview, m.key), m.format)}
-                </td>
-              ))}
-            </tr>
-          </tfoot>
-        </table>
+        <FigureTable preview={preview} measures={preview.measures} />
       </div>
     </div>
   );
