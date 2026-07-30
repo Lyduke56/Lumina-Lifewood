@@ -2595,16 +2595,58 @@ assumptions without anybody noticing.
 
 ---
 
-## 44. Still to be decided
+## 44. Fourteen videos that quietly disappeared
+
+John Peter asked a plain question of a finished summary — *"are the calculations correct?"* — and the
+answer was no, twice over.
+
+**Lumina reported figures that came from nowhere.** It told him 420 planned videos, 415 completed and
+98.8%. The tools had handed it 2,966, 2,563 and 86.4%. Its instructions say *"NEVER INVENT FIGURES.
+Everything you state must have come from a tool"*, and it invented these — turning a project that
+missed its target by four hundred videos into one that all but hit it. Nothing in the software checks
+what the AI says against what the tools gave it; the figures on the *report* are read from the tools
+and are correct, but the sentence in the conversation was not.
+
+**And the summary itself was fourteen videos short.** Comparing day by day against the spreadsheet
+found exactly one day in eighty-four that disagreed — the first — because the profiler had flagged the
+first data row as a grand total and the summariser had silently dropped it.
+
+**That is the same defect the open list has carried for two days as "reliably detecting unlabelled
+total rows", and it is not cosmetic.** A false positive there does not produce a misleading warning; it
+deletes a row of the customer's data without telling anybody.
+
+The rule was *"more than five times the largest row below"*, which is not what a total is and misfires
+on any figure that crosses zero: a variance of +6 among later variances of −1 satisfies it. It now
+tests what a total row actually is — **a row that adds up to the others** — and is verified in both
+directions:
+
+```
+a genuine total as the first data row  flagged: True    correct
+ordinary data only                     flagged: False   correct
+spreadsheet : 2,966 planned  2,563 completed  86.4%
+Lumina      : 2,966 planned  2,563 completed  86.4%
+```
+
+**Still open, and now the more serious of the two:** nothing stops the AI stating a figure that no tool
+produced. The guardrails prevent it building a wrong report; they do not prevent it describing a right
+one wrongly. Every other guardrail added today works by making an action impossible rather than
+discouraged, and this is the one place where a claim reaches the customer with nothing checking it.
+
+---
+
+## 45. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
-1. **How to make a collapse unmissable** without inventing figures — see Sections 38 and 41. A single
+1. **Nothing checks the figures the AI states in conversation.** Section 44: it reported 420 videos
+   where the tools had given it 2,966. The report itself was right; the sentence describing it was not.
+   The remedy is not obvious — the numbers appear in ordinary prose — but every other guardrail works
+   by making a thing impossible, and this one does not exist at all.
+2. **How to make a collapse unmissable** without inventing figures — see Sections 38 and 41. A single
    headline cannot show that August failed. A chart of the shortfall does, plainly, and one appeared by
    accident in testing; whether Lumina should propose that chart by default is the remaining question.
-2. **Reliably detecting unlabelled total rows.** The *approach* is settled — the profiling tool
-   warns about them — but building detection that works across many different spreadsheets is a
-   genuine problem still to be solved.
+3. *(Closed 30 July — see Section 44.)* Detecting unlabelled total rows now tests whether a row adds
+   up to the others rather than whether it is merely large, which was silently deleting real data.
 2. **Whether the unfinished Microsoft-publishing work should be revived or removed.**
 3. **How much further to polish before starting the rebuild.** Nine of the ten baseline defects
    are fixed, and the tenth requires the redesign. The current software is therefore finished as
@@ -2618,7 +2660,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 45. Change history
+## 46. Change history
 
 | Date | Change |
 |------|--------|
@@ -2647,6 +2689,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 30 July 2026 | Added Section 44: **fourteen of the customer's videos quietly disappeared**, found because John Peter asked whether the calculations were correct. Two faults. The profiler flagged the first data row as a grand total and the summariser dropped it — one day in eighty-four disagreed with the spreadsheet. The rule was "more than five times the largest row below", which is not what a total is and misfires on any figure crossing zero; it now tests whether a row **adds up to the others**, verified in both directions, and the totals match the spreadsheet exactly. **This closes the open item carried for two days as "reliably detecting unlabelled total rows" — which was never cosmetic: a false positive deletes real data silently.** The second fault is worse and remains open: **the AI reported 420 planned videos where the tools had given it 2,966**, against an explicit instruction never to invent figures. The report was correct; the sentence describing it was not, and nothing checks one against the other. |
 | 30 July 2026 | Added Section 43: **tested against a second spreadsheet for the first time**, counting videos rather than images, with studios and editors. **Decision 3 holds** — Lumina read a workbook it had never seen, paired the planned and completed figures correctly, and proposed a report suited to that data, with no code written for it. It also **found five real defects in twenty minutes**, all of which had passed against the original file. The worst: summarising silently emptied the report, so an agent reaching for a second breakdown lost its work and rebuilt it four times before giving up. Also: a first attempt at that fix would have replaced the loop with a dead end; starting a report again was forbidden at every stage past the beginning, which the AI accurately reported to the customer as the system not letting it; and the total-row detector is wrong in both directions on this file. **A second spreadsheet was worth more than another day of testing against the first** — every test written against one file encodes that file's assumptions unnoticed. |
 | 30 July 2026 | Added Section 42: **a delivered report that Power BI refused to open.** Two columns called Month in one table: John Peter's workbook has its own Month column, and when the figures are summarised by month *and* grouped by that column, the renamed timeline collides with it. Each of the two earlier fixes was right alone; together they broke the file. The collision check was comparing against `period`, the internal name, which never reaches Power BI. There is now one shared definition of what the timeline is called, and a colliding heading is distinguished — "Month (2)" — rather than falling back to "column_2", which would undo Section 30. **A net was added underneath: duplicate column names are refused before a file is written at all**, because a report that will not open is worse than one never built — the failure appears days later in front of somebody who cannot act on it. Not caught because every test summarised by period *or* by a label, never both; the combination is what a real conversation produced first time. |
 | 30 July 2026 | Added Section 41: **a rate and a count on one axis.** A "monthly summary" chart put Target, Actual and Balance — in the hundreds of thousands — beside a completion rate of 1.07 to 1.96, so the rate was an invisible line on the floor. The tool now refuses it and names the alternatives, which protects the **Power BI file** and not just the preview: nothing previously stopped this reaching a customer's dashboard. Two smaller corrections: a table visual was being drawn as bars in the preview, which is how the unreadable chart appeared at all — the file correctly contained a table — and the line chart was smoothing between six monthly readings, implying values nobody measured. **And a finding worth keeping:** the chart of Balance by month, one huge negative bar for August, tells the story of the collapse better than any headline figure, which is the open question from Section 38 partly answering itself. |
