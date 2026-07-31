@@ -611,11 +611,14 @@ export function ConversationView({ session, resume = true, conversationId: openI
           const finished = entry.steps.every((st) => st.done);
           const wrong = entry.steps.filter((st) => st.outcome === "broken").length;
           const retried = entry.steps.filter((st) => st.outcome === "refused").length;
-          const worthFolding = finished && entry.steps.length > 3 && !wrong;
+          // Every finished run folds, including a run of one. Folding only the long ones
+          // left the page alternating between folded and unfolded blocks, which reads as
+          // though the short ones are still doing something.
+          const named = entry.steps.filter((st) => st.tool !== "model" && !st.notice);
+          const worthFolding = finished && !wrong && named.length > 0;
           const folded = worthFolding && !openSteps.has(i);
 
           if (folded) {
-            const named = entry.steps.filter((st) => st.tool !== "model" && !st.notice);
             return (
               <button
                 key={i}
