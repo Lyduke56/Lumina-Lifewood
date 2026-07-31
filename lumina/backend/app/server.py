@@ -175,7 +175,7 @@ if __name__ == "__main__":
         mcp.run(
             transport="streamable-http",
             host=os.environ.get("MCP_HOST", "0.0.0.0"),
-            port=int(os.environ.get("MCP_PORT", "8001")),
+            port=int(os.environ.get("MCP_PORT", os.environ.get("PORT", "8001"))),
             path=os.environ.get("MCP_PATH", "/mcp"),
         )
     else:
