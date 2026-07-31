@@ -31,7 +31,8 @@ Lumina | Lifewood is an end-to-end AI agent integrated with WhatsApp via OpenCla
 - **Immersive Glassmorphism UI**: Built with Next.js, Vanilla CSS, and GSAP, the frontend provides a breathtaking, highly interactive, frosted-glass dashboard that rivals native applications.
 - **Live Data Syncing**: The dashboard offers deep cross-filtering. Selecting any chart element or table row instantly updates KPI cards and other visuals to reflect the filtered data.
 
-## Dashboard Output Modes
-There are two primary ways a dashboard file is generated and presented to the user:
-1. **Conversational Output (Talk with Lumina)**: As the user chats with the AI, the AI agent dynamically builds and refines the report inline within the chat interface. The user can see live, interactive previews of their data evolving as they ask questions, complete with dynamic filtering and premium hover physics.
-2. **Studio View Output**: A dedicated workspace mode that allows users to quickly generate a fixed, highly-polished dashboard preview outside of a conversational flow. This mode provides a focused, immediate visual confirmation of the dataset before exporting to Power BI.
+## Dashboard Output Modes & Generation
+Lumina provides three distinct avenues for processing data and rendering dashboards:
+1. **Native Website Chatbot (Talk with Lumina)**: A highly iterative, conversational workflow. Rather than a one-shot output, the native web agent dynamically builds and refines the report inline within the chat interface. Users see live, interactive previews evolve as they ask questions or request tweaks, complete with dynamic cross-filtering and premium hover physics.
+2. **WhatsApp Chatbot (via OpenClaw)**: A streamlined "in-and-out" workflow. Users send their Excel plans via WhatsApp, and the system processes it efficiently. The resulting output relies on the rigid, highly-polished aesthetic of the Studio view, ensuring rapid delivery without the need for iterative back-and-forth on a mobile device.
+3. **Studio View Output**: A dedicated workspace mode on the website. It serves as a rapid "in-and-out" generation tool outside of a conversational flow. It provides a focused, immediate visual confirmation of the dataset, which can then be further customized within the website environment before exporting to Power BI.
