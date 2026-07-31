@@ -24,6 +24,19 @@ load_dotenv(_backend_root / ".env")
 load_dotenv(_backend_root / ".env.local", override=True)
 
 
+# Which model to use when the customer has attached a screenshot. Most of the models we
+# run on cannot see at all — Groq's entire catalogue is text and audio, so a screenshot
+# does not merely change the model there, it rules the supplier out. Each of these was
+# established by sending a real image and checking the answer, not by reading a table:
+# both named below read the word out of the Lifewood logo correctly, and two other
+# advertised candidates did not answer at all.
+SEEING_MODELS = {
+    "openrouter": "nvidia/nemotron-nano-12b-v2-vl:free",
+    "gemini": "gemini-3-flash-preview",
+    # groq and cerebras deliberately absent: neither offers a model that can see.
+}
+
+
 # name -> (base URL, environment variable holding the key, a sensible free model)
 PROVIDERS = {
     "openrouter": (
@@ -87,6 +100,9 @@ class Supplier:
     name: str
     client: OpenAI
     model: str
+    #: What this supplier should be asked when there is a screenshot to look at, or None
+    #: when it cannot see one at all.
+    seeing_model: str | None = None
 
 
 # A supplier that has run out stays out for a while. Without this, every step of
@@ -109,7 +125,7 @@ def mark_exhausted(name: str, seconds: float = EXHAUSTED_FOR_SECONDS) -> None:
     _exhausted[name] = time.time() + seconds
 
 
-def available_suppliers() -> list[Supplier]:
+def available_suppliers(seeing: bool = False) -> list[Supplier]:
     """Every supplier we hold a key for, preferred one first.
 
     Free tiers run out — of requests, of tokens, of patience — and each supplier runs
@@ -118,6 +134,11 @@ def available_suppliers() -> list[Supplier]:
     allowance, so the agent works down this list rather than needing somebody to edit a
     setting and restart, which is what happened the first time Groq's daily tokens ran
     dry mid-sentence.
+
+    When `seeing` is set the customer has attached a screenshot, and only suppliers with
+    a model that can look at one are offered. That is a real narrowing rather than a
+    preference: asking a text-only model about an image either fails outright or, worse,
+    has it answer confidently about a picture it never received.
     """
     order = [PROVIDER] + [p for p in PROVIDERS if p != PROVIDER]
     suppliers: list[Supplier] = []
@@ -134,8 +155,11 @@ def available_suppliers() -> list[Supplier]:
             continue
         if _exhausted.get(name, 0) > time.time():
             continue
+        looking = SEEING_MODELS.get(name)
+        if seeing and not looking:
+            continue
         suppliers.append(
-            Supplier(name, OpenAI(base_url=base, api_key=key), default_model)
+            Supplier(name, OpenAI(base_url=base, api_key=key), default_model, looking)
         )
     return suppliers
 
