@@ -341,6 +341,53 @@ async def begin_conversation(
     }
 
 
+@app.get("/conversation/{conversation_id}/reports")
+async def conversation_reports(
+    conversation_id: str, authorization: str = Header(...)
+) -> dict:
+    """Every report built during this conversation, newest first.
+
+    A conversation can build a report several times — one already holds eighteen — and
+    until now the only place they all appeared was the Files tab, mixed in with every
+    report from every other conversation. Which of those eighteen came from asking to
+    take a chart off, and which came before, was not answerable.
+    """
+    owner = _caller(authorization)
+    try:
+        conversation = conversations.get(conversation_id, owner)
+    except conversations.ConversationError as e:
+        raise HTTPException(404, str(e))
+
+    rows = (
+        get_client()
+        .table("generated_files")
+        .select("id, created_at, storage_path, layout_json, status")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    reports = []
+    for index, row in enumerate(rows):
+        layout = row.get("layout_json") or {}
+        reports.append({
+            "file_id": row["id"],
+            "storage_path": row.get("storage_path") or "",
+            "title": layout.get("title") or "Report",
+            "created_at": row["created_at"],
+            "headline_figures": layout.get("headline_figures") or [],
+            "charts": layout.get("charts") or [],
+            # Counting up from the first, so the oldest is version 1 however many
+            # there are — a number that changes meaning as the list grows is worse
+            # than none.
+            "version": len(rows) - index,
+            "latest": index == 0,
+            "downloadable": not str(row.get("storage_path", "")).startswith("stub://"),
+        })
+    return {"reports": reports}
+
+
 @app.post("/conversation/{conversation_id}/take-back")
 async def take_back(conversation_id: str, authorization: str = Header(...)) -> dict:
     """Forget the last thing the customer said, and what Lumina did about it.

@@ -490,6 +490,10 @@ def build_report_file(
     record = save_generated_file(
         dataset_id=dataset["id"],
         layout_json={
+            # The title belongs on the record, not only inside the preview: a list of a
+            # conversation's reports has to name each one without unpacking a preview it
+            # is not going to draw.
+            "title": session.spec.title,
             "headline_figures": [k.title for k in session.spec.kpis],
             "charts": [c.title for c in session.spec.charts],
         },

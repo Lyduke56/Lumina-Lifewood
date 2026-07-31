@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BarChart3,
   Calculator,
@@ -26,6 +26,8 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { tidyMarkdown } from "@/lib/tidy-markdown";
+import { ReportHistory } from "./ReportHistory";
+import type { ConversationReport } from "@/lib/types";
 import type { Session } from "@supabase/supabase-js";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
@@ -120,6 +122,9 @@ export function ConversationView({ session, resume = true, conversationId: openI
   // describe it.
   const [attached, setAttached] = useState<string[]>([]);
   const imageInput = useRef<HTMLInputElement>(null);
+  // Every report this conversation has built, so a customer can go back to an earlier
+  // one rather than scrolling the transcript for the card that offered it.
+  const [reports, setReports] = useState<ConversationReport[]>([]);
 
   // Keep the newest entry in view; a reply can arrive a while after it was asked for.
   useEffect(() => {
@@ -129,6 +134,30 @@ export function ConversationView({ session, resume = true, conversationId: openI
 
   const auth = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined;
   const token = session?.access_token;
+
+  const loadReports = useCallback(async () => {
+    // Nothing set here: the list is only ever replaced by what the server returns, so
+    // that switching conversations does not flash an empty panel before the real one
+    // arrives. "New report" remounts this component, which clears it anyway.
+    if (!conversationId || !token) return;
+    try {
+      const res = await fetch(`${BACKEND}/conversation/${conversationId}/reports`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setReports((await res.json()).reports ?? []);
+    } catch {
+      // The reports are still offered in the transcript; a missing list is not worth
+      // interrupting the conversation over.
+    }
+  }, [conversationId, token]);
+
+  useEffect(() => {
+    // Called through a promise rather than directly: the linter cannot see that the
+    // state it sets is only reached after an await, and reads a direct call as a
+    // synchronous setState inside an effect.
+    void Promise.resolve().then(loadReports);
+  }, [loadReports]);
+
 
   // Put the last conversation back. Without this it began empty every time — switching
   // to Files and back read as the conversation having been thrown away, because as far
@@ -350,6 +379,7 @@ export function ConversationView({ session, resume = true, conversationId: openI
               setEntries((list) => [...list, { kind: "said", role: "lumina", text: "", report: event.report }]);
             }
             if (event.changed_report) onReportChanged?.();
+            if (event.report) loadReports();
             setThinking("Thinking");
           } else if (event.type === "notice") {
             addNotice(event.key, event.detail ?? undefined);
@@ -461,7 +491,8 @@ export function ConversationView({ session, resume = true, conversationId: openI
 
   // ── The conversation ───────────────────────────────────────────────────────
   return (
-    <main className="ll-chat">
+    <main className="ll-chat-with-history">
+    <div className="ll-chat">
       <div className="ll-chat-header">
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--forest)" }}>
           <Sparkles size={18} color="var(--emerald)" /> Talk to Lumina
@@ -659,6 +690,17 @@ export function ConversationView({ session, resume = true, conversationId: openI
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) { setConversationId(null); setEntries([]); startFrom(file); }
+        }}
+      />
+    </div>
+
+      <ReportHistory
+        reports={reports}
+        openFileId={null}
+        onPreview={(fileId) => onOpenReport?.(fileId)}
+        onDownload={(fileId) => {
+          const at = reports.find((r) => r.file_id === fileId);
+          if (at) download({ storage_path: at.storage_path, title: at.title, file_id: fileId });
         }}
       />
 
