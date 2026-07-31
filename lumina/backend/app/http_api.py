@@ -392,7 +392,7 @@ async def conversation_reports(
     rows = (
         get_client()
         .table("generated_files")
-        .select("id, created_at, storage_path, layout_json, status")
+        .select("id, created_at, storage_path, layout_json, chart_preview_json, status")
         .eq("conversation_id", conversation.id)
         .order("created_at", desc=True)
         .execute()
@@ -411,7 +411,14 @@ async def conversation_reports(
             "changes": _what_changed(older, layout),
             "file_id": row["id"],
             "storage_path": row.get("storage_path") or "",
-            "title": layout.get("title") or "Report",
+            # The preview has always carried the report's name; the record itself only
+            # started to. Read from both, so reports built before that still show their
+            # own name rather than the word "Report".
+            "title": (
+                layout.get("title")
+                or (row.get("chart_preview_json") or {}).get("title")
+                or "Report"
+            ),
             "created_at": row["created_at"],
             "headline_figures": layout.get("headline_figures") or [],
             "charts": layout.get("charts") or [],
