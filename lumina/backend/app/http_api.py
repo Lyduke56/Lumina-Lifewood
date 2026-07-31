@@ -337,6 +337,22 @@ async def begin_conversation(
     }
 
 
+@app.post("/conversation/{conversation_id}/take-back")
+async def take_back(conversation_id: str, authorization: str = Header(...)) -> dict:
+    """Forget the last thing the customer said, and what Lumina did about it.
+
+    Stopping a reply on screen is not enough on its own: the message stays in the agent's
+    memory and is reasoned about for the rest of the conversation. A stray keystroke
+    became an instruction that way.
+    """
+    owner = _caller(authorization)
+    try:
+        conversation = conversations.get(conversation_id, owner)
+    except conversations.ConversationError as e:
+        raise HTTPException(404, str(e))
+    return {"restored": conversations.take_back(conversation)}
+
+
 @app.post("/conversation/{conversation_id}/message")
 async def send_message(
     conversation_id: str,
@@ -368,6 +384,12 @@ async def send_message(
     # Saved before the reply is attempted, so a turn that fails halfway still leaves the
     # customer's own words in the record rather than losing the question they asked.
     conversations.record(conversation.id, [{"role": "you", "content": message}])
+
+    # Where the agent's memory stood before this turn, so taking the turn back can put it
+    # exactly there. Measured here rather than trusted to the take-back itself, which may
+    # run while the agent is still adding to it.
+    memory_before = len(conversation.history)
+    conversation.taken_back = False
 
     def stream():
         # What appeared on screen, kept so that coming back to this conversation shows
@@ -430,11 +452,20 @@ async def send_message(
             yield f"data: {json.dumps({'type': 'error', 'text': str(e)})}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         finally:
-            conversations.record(conversation.id, seen)
-            # The agent's own working memory, so a follow-up after a restart or a day
-            # later still knows what was agreed rather than only looking as though it
-            # does.
-            conversations.remember(conversation)
+            if conversation.taken_back:
+                # The customer stopped this turn and took back what caused it. Recording
+                # it now would put back what they just removed, so the memory goes to
+                # where it stood before they spoke and nothing is written to the
+                # transcript — the take-back has already cleared that.
+                del conversation.history[memory_before:]
+                conversation.taken_back = False
+                conversations.remember(conversation)
+            else:
+                conversations.record(conversation.id, seen)
+                # The agent's own working memory, so a follow-up after a restart or a day
+                # later still knows what was agreed rather than only looking as though it
+                # does.
+                conversations.remember(conversation)
 
     return StreamingResponse(
         stream(),

@@ -50,6 +50,11 @@ export type FlexiblePreview = {
   kind: "flexible";
   title: string;
   group_by: { key: string; label: string };
+  /** Every column the figures are grouped by, in order. A chart may run along any of them. */
+  groupings?: Array<{ key: string; label: string }>;
+  /** How much of the customer's sheet went into this, for the subtitle. */
+  rows_used?: number;
+  rows_seen?: number;
   measures: Array<{
     key: string;
     label: string;
@@ -59,7 +64,7 @@ export type FlexiblePreview = {
   /** A rate, and the achieved/planned totals it is made of, so it is never averaged. */
   rates?: Record<string, [string, string]>;
   headline_figures: Array<{ measure: string; label: string }>;
-  charts: Array<{ kind: string; title: string; measures: string[] }>;
+  charts: Array<{ kind: string; title: string; measures: string[]; group_by?: string }>;
   rows: Array<Record<string, string | number | null>>;
   data_colors?: string[];
   heading_font?: string;

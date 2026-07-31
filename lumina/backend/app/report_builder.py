@@ -995,10 +995,23 @@ def web_preview(spec: ReportSpec, summary: Summary) -> dict:
             unit = measure[len("completion_rate_") :]
             rates[measure] = [f"actual_{unit}", f"target_{unit}"]
 
+    # Every column the figures are grouped by, not only the first. The website was given
+    # one grouping for the whole report and each chart's own was dropped, so a chart of
+    # achievement *by studio* was drawn against the month, and a report grouped by month
+    # and studio plotted sixteen points labelled "Jan 2026" four times over. Power BI had
+    # it right all along; the preview beside it did not.
+    groupings = [
+        {"key": axis if c == "period" else c, "label": axis if c == "period" else _pretty(c)}
+        for c in summary.group_by
+    ] or [{"key": axis, "label": axis}]
+
     return {
         "kind": "flexible",
         "title": spec.title,
         "group_by": {"key": axis, "label": axis},
+        "groupings": groupings,
+        "rows_used": summary.source_rows_used,
+        "rows_seen": summary.source_rows_used + summary.source_rows_skipped,
         "measures": [
             {
                 "key": m,
@@ -1013,7 +1026,15 @@ def web_preview(spec: ReportSpec, summary: Summary) -> dict:
             {"measure": k.measure, "label": _measure_dax(k.measure)[2]} for k in spec.kpis
         ],
         "charts": [
-            {"kind": c.kind, "title": c.title, "measures": c.measures} for c in spec.charts
+            {
+                "kind": c.kind,
+                "title": c.title,
+                "measures": c.measures,
+                # What this particular chart runs along. The report already knew; only the
+                # preview did not.
+                "group_by": axis if c.group_by == "period" else c.group_by,
+            }
+            for c in spec.charts
         ],
         "rows": [
             {k: v for k, v in row.items() if k not in (ORDER_COLUMN, ORDER_KEY)}
@@ -1038,7 +1059,10 @@ def web_preview(spec: ReportSpec, summary: Summary) -> dict:
 
 CARD_WHITE = "#FFFFFF"
 CARD_RADIUS = 10
-HEADER_HEIGHT = 64
+# A 20pt title over a 10pt line needs more than 64 once the textbox's own padding is
+# counted: at 64 the text overflowed by a few pixels and Power BI drew a scrollbar down
+# the side of the title band.
+HEADER_HEIGHT = 80
 INSIGHT_SHARE = 0.34  # how much of the content width the written insights take
 
 

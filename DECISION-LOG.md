@@ -3036,7 +3036,73 @@ this time by a script rather than by John Peter opening a file.
 
 ---
 
-## 53. Still to be decided
+## 53. A stray keystroke was an instruction
+
+John Peter mis-hit Enter with a single letter in the box. Lumina answered it. He was clear
+that this was not a small thing, and he is right: the letter itself is harmless, but it stays
+in the record, so **every later turn is reasoned about with a meaningless message in the
+middle of it** — and it costs a request on a free allowance that runs out.
+
+The obvious fix was to refuse messages that look accidental. Rejected: a rule guessing at
+which of a customer's words they meant costs more than it saves, and "v" is indistinguishable
+from a deliberate abbreviation without reading minds.
+
+What went in instead is **Stop, which takes the message back**. While Lumina is working the
+send button becomes a stop button; pressing it halts the reply, removes the message and
+everything done about it, and **puts the words back in the box** — the usual reason to stop
+being that they were half-typed.
+
+The part that makes it a real take-back rather than a picture of one: **the agent's own memory
+forgets too.** Clearing the transcript alone would have left the message in the working memory
+that decides what happens next, which is precisely the harm being undone. The cut is made at
+the customer's own words, which removes a tool call and its result together — they come in
+pairs, and a half-pair is a malformed conversation (Section 40).
+
+One race had to be closed. Stopping a reply and the reply finishing are not ordered: the
+take-back could remove the turn and the abandoned reply could write it straight back a moment
+later. A turn that has been taken back is now marked as such, and when the reply finally
+unwinds it restores the memory to where it stood before the customer spoke and writes nothing.
+Verified by running the two in that order deliberately — the settled turn before it survived
+untouched and the stopped turn left nothing behind.
+
+---
+
+## 54. The preview was not showing the report
+
+Found by John Peter running the whole thing himself in the browser. The Power BI file was
+correct — logo, headings, cards, and an insights panel agreeing with the charts beside it. The
+preview on the web page, which is what a manager looks at first, was not.
+
+| | Power BI | the preview |
+|---|---|---|
+| Planned vs Completed | four points, one per month | sixteen, "Jan 2026" four times |
+| Achievement Rate **by Studio** | Cebu, Davao, Iloilo, Manila | months again, no studios |
+| the table | — | sixteen rows, no Studio column to tell them apart |
+| the subtitle | 336 of 343 rows, by Month and Studio | "16 months" |
+
+One cause underneath all four: the preview was handed **one grouping for the whole report**,
+and each chart's own was dropped on the way. So every chart was drawn against the month, every
+raw row was plotted without being totalled, and a chart of achievement by studio could not know
+it was about studios. Power BI never had this problem because a visual there carries one column
+and the engine totals the rest.
+
+The preview now receives every grouping and each chart's own, and rolls the rows up the way
+Power BI does — rates rebuilt from the totals they are made of, never averaged (Section 41).
+
+**This is the second time the preview has misrepresented a correct report** (Section 31, where
+it showed sample figures). Worth stating plainly: the file being right is not the same as the
+customer being shown something right, and only one of those two had a checker.
+
+Two smaller things from the same run. A model writing *"I recommend: • a line chart • a bar
+chart"* on one line renders as a paragraph, and a question written straight after a list is
+swallowed into its last item — a customer saw "Notes (any comments) Does that sound right?" as
+one bullet. Instructing the model was the alternative and would have been the fourth time that
+answer was tried; the text is tidied before rendering instead. And the Power BI title band drew
+a scrollbar down its side, because two lines of 20pt and 10pt do not fit in 64 pixels.
+
+---
+
+## 55. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -3064,7 +3130,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 54. Change history
+## 56. Change history
 
 | Date | Change |
 |------|--------|
@@ -3093,6 +3159,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 31 July 2026 | Added Sections 53 and 54, both from John Peter running the whole thing in the browser himself. **A stray keystroke was an instruction**: a mis-hit Enter sent a single letter and Lumina answered it, and the letter then sat in the agent's memory shaping every later turn. Stop now takes the message back — the reply halts, the turn is removed from both the transcript and the agent's own memory, and the words go back in the box. Refusing messages that "look accidental" was rejected as guessing at what a customer meant. **And the preview was not showing the report**: the Power BI file was correct while the page beside it drew sixteen points labelled "Jan 2026" four times, and a chart of achievement *by studio* came out as months. One cause — the preview was handed a single grouping for the whole report and each chart's own was dropped — and it is the **second time a correct report has been misrepresented by the thing the customer actually looks at**. Also: markdown from the model is tidied before rendering, since it strings bullets along one line and lets a question be swallowed into a list. |
 | 31 July 2026 | Added Section 51: **made the report look like a dashboard**, working from a real Lifewood report and the published examples John Peter sent — explicitly as standards to meet rather than a layout to copy, since what a report contains depends on the conversation. Visuals now sit in white cards with soft borders, a title band names the report and says how much of the sheet went into it, and a **written panel explains what the figures say** in sentences, the feature he singled out. **The Lifewood logo is now on every page**, extracted from inside the website's own SVG rather than redrawn. Looking at the result found three faults that every automated check had passed: a card height that clipped the caption under the number, a header claiming "238 months", and an insights panel naming the best *row* as the best month. **A fourth was found by the unattended harness rather than by a person** — a workbook's grand-total row was being counted as data whenever the figures were not placed on a timeline, roughly doubling every figure on the page. The rule skipping undated rows had only ever applied to timelines. **Third total-row fault in two days, and the first the harness caught before a customer could.** |
 | 30 July 2026 | Added Section 48: **Microsoft's validator, and the colours that never applied.** Chasing one cosmetic defect — 2,966 and 2,563 both displayed as "3K" — led to Microsoft's report-authoring CLI, which is the source of truth for property names and also validates a PBIR report. The abbreviation fix needed an enum value, not a new property: the name had been right and 0 means *Auto*, so it asked for the default. **Run against a report we had just shipped, the validator found seven errors** — six of them `fontColor` on chart axes and legends, where the property is `labelColor`, meaning every axis and legend in both flows had been Microsoft's default grey rather than Lifewood green since the code was written, with nothing ever complaining; and a theme registered without its `.json` extension, which Microsoft say makes a published report apply the theme incorrectly. Both fixed, both flows validate clean, and **the validator now runs on every build**. This supersedes Section 46's claim that only a person could check the visuals. **Third time in two days that a published capability was found only because a customer pushed back on "there is no way to check this from here".** |
 | 30 July 2026 | Added Section 47: **a figure no tool produced can no longer be said to a customer.** The last serious fault: Lumina reported 420 planned videos and 98.8% where the tools had given 2,966 and 86.4% — the report right, the sentence wrong, which is worse than a broken file because a broken file gets noticed. The instruction forbidding it had been in place all along; for the fourth time in a day, only the tools enforced. Every number in a message is now checked against the figures that exist and the message is not sent otherwise. Two deliberate limits: counts below twenty are unchecked, since policing "four months" would refuse ordinary English, and arithmetic is refused rather than recomputed. **Also recorded a near miss: the first verification appeared to show the guardrail failing, and the fault was in the test** — an empty conversation meant no report was attached to check against. A test reporting failure deserves the same scrutiny as one reporting success. |

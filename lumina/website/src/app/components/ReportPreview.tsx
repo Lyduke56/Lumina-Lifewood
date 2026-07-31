@@ -68,27 +68,86 @@ function total(preview: FlexiblePreview, key: string): number | null {
   return values.reduce((s, v) => s + v, 0);
 }
 
+type Row = Record<string, string | number | null>;
+
+/**
+ * Roll the rows up to one per value of `key`, the way Power BI does.
+ *
+ * A visual in Power BI carries one column and its figures, and the engine totals
+ * everything else — so a report grouped by month *and* studio still draws four monthly
+ * points. This drew all sixteen rows instead, four of them labelled "Jan 2026", and a
+ * chart of achievement by studio came out as months because the chart's own column was
+ * never sent. The Power BI file was right both times; only the preview beside it was not.
+ *
+ * Rates are rebuilt from the totals they are made of rather than averaged — averaging
+ * percentages is what once reported 129% for a plan that delivered exactly 100%.
+ */
+function rollUp(preview: FlexiblePreview, key: string): Row[] {
+  const order: string[] = [];
+  const buckets = new Map<string, Row[]>();
+  for (const row of preview.rows) {
+    const at = row[key];
+    if (at == null) continue;
+    const label = String(at);
+    if (!buckets.has(label)) {
+      buckets.set(label, []);
+      order.push(label);
+    }
+    buckets.get(label)!.push(row);
+  }
+
+  return order.map((label) => {
+    const group = buckets.get(label)!;
+    const out: Row = { [key]: label };
+    for (const measure of preview.measures) {
+      const pair = preview.rates?.[measure.key];
+      if (pair) {
+        const [actualKey, plannedKey] = pair;
+        const sum = (k: string) =>
+          group.reduce((s, r) => s + (typeof r[k] === "number" ? (r[k] as number) : 0), 0);
+        const planned = sum(plannedKey);
+        out[measure.key] = planned === 0 ? null : sum(actualKey) / planned;
+        continue;
+      }
+      const values = group
+        .map((r) => r[measure.key])
+        .filter((v): v is number => typeof v === "number");
+      out[measure.key] = !values.length
+        ? null
+        : measure.aggregate === "max"
+          ? Math.max(...values)
+          : values.reduce((s, v) => s + v, 0);
+    }
+    return out;
+  });
+}
+
 /** The figures as a table. Used for a table visual and for the full listing below. */
 function FigureTable({
   preview,
   measures,
+  columns,
+  rows,
 }: {
   preview: FlexiblePreview;
   measures: FlexiblePreview["measures"];
+  /** The grouping columns to show. More than one when the figures are split more than one way. */
+  columns: Array<{ key: string; label: string }>;
+  rows: Row[];
 }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table className="ll-preview-table">
         <thead>
           <tr>
-            <th>{preview.group_by.label}</th>
+            {columns.map((c) => <th key={c.key}>{c.label}</th>)}
             {measures.map((m) => <th key={m.key}>{m.label}</th>)}
           </tr>
         </thead>
         <tbody>
-          {preview.rows.map((row, i) => (
+          {rows.map((row, i) => (
             <tr key={i}>
-              <td>{String(row[preview.group_by.key] ?? "")}</td>
+              {columns.map((c) => <td key={c.key}>{String(row[c.key] ?? "")}</td>)}
               {measures.map((m) => (
                 <td key={m.key} style={{ textAlign: "right" }}>
                   {formatValue(typeof row[m.key] === "number" ? (row[m.key] as number) : null, m.format)}
@@ -99,7 +158,7 @@ function FigureTable({
         </tbody>
         <tfoot>
           <tr>
-            <td>Total</td>
+            <td colSpan={columns.length}>Total</td>
             {measures.map((m) => (
               <td key={m.key} style={{ textAlign: "right", fontWeight: 600 }}>
                 {formatValue(total(preview, m.key), m.format)}
@@ -118,6 +177,9 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
     preview.measures.find((m) => m.key === key)?.label ?? key;
   const formatOf = (key: string) =>
     preview.measures.find((m) => m.key === key)?.format ?? "number";
+  // Reports built before the preview knew about more than one grouping still carry just
+  // the one, so fall back to it rather than showing nothing.
+  const groupings = preview.groupings?.length ? preview.groupings : [preview.group_by];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -127,8 +189,14 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
             {preview.title}
           </h2>
           <p style={{ margin: "4px 0 0", fontSize: 13, opacity: 0.7, color: "var(--forest)" }}>
-            {preview.rows.length} {preview.group_by.label.toLowerCase()}
-            {preview.rows.length === 1 ? "" : "s"} · the same figures as the Power BI file
+            {/* Sixteen rows grouped by month and studio are not sixteen months. Say what is
+                true of any grouping, as the Power BI title band does. */}
+            {preview.rows_seen
+              ? `Built from ${preview.rows_used?.toLocaleString()} of ${preview.rows_seen.toLocaleString()} rows, grouped by ${groupings
+                  .map((g) => g.label)
+                  .join(", ")}`
+              : `${preview.rows.length} rows, grouped by ${groupings.map((g) => g.label).join(", ")}`}
+            {" · the same figures as the Power BI file"}
           </p>
         </div>
         {downloadable && (
@@ -154,7 +222,11 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
         </div>
       )}
 
-      {preview.charts.map((chart, index) => (
+      {preview.charts.map((chart, index) => {
+        const axis = chart.group_by ?? preview.group_by.key;
+        const axisLabel = groupings.find((g) => g.key === axis)?.label ?? axis;
+        const rows = rollUp(preview, axis);
+        return (
         <div key={index} className="ll-preview-chart">
           <h3 style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 600, color: "var(--forest)" }}>
             {chart.title}
@@ -173,6 +245,8 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
           {chart.kind === "table" ? (
             <FigureTable
               preview={preview}
+              columns={[{ key: axis, label: axisLabel }]}
+              rows={rows}
               measures={chart.measures
                 .map((k) => preview.measures.find((m) => m.key === k))
                 .filter((m): m is FlexiblePreview["measures"][number] => !!m)}
@@ -180,9 +254,9 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
           ) : (
           <div style={{ width: "100%", height: 300 }}>
             <ResponsiveContainer>
-              <ComposedChart data={preview.rows} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+              <ComposedChart data={rows} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(19,48,32,0.12)" vertical={false} />
-                <XAxis dataKey={preview.group_by.key} tick={{ fontSize: 11, fill: "#133020" }} />
+                <XAxis dataKey={axis} tick={{ fontSize: 11, fill: "#133020" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#133020" }} tickFormatter={(v) => formatValue(v, formatOf(chart.measures[0]))} />
                 <Tooltip
                   formatter={(value, name) => [
@@ -202,14 +276,20 @@ export function ReportPreview({ preview, onDownload, downloadable = true }: Repo
           </div>
           )}
         </div>
-      ))}
+        );
+      })}
 
       {/* Every figure, so nothing in the report is only visible in Power BI. */}
       <div className="ll-preview-chart">
         <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "var(--forest)" }}>
-          Every figure by {preview.group_by.label.toLowerCase()}
+          Every figure by {groupings.map((g) => g.label.toLowerCase()).join(" and ")}
         </h3>
-        <FigureTable preview={preview} measures={preview.measures} />
+        <FigureTable
+          preview={preview}
+          columns={groupings}
+          rows={preview.rows}
+          measures={preview.measures}
+        />
       </div>
     </div>
   );

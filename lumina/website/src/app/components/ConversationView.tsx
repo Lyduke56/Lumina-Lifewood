@@ -18,11 +18,13 @@ import {
   RotateCcw,
   Search,
   Send,
+  Square,
   X,
   Sparkles,
 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { tidyMarkdown } from "@/lib/tidy-markdown";
 import type { Session } from "@supabase/supabase-js";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
@@ -97,9 +99,18 @@ export function ConversationView({ session, resume = true, conversationId: openI
 
   const fileInput = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  // A reply in flight, and where on screen this turn started, so stopping can put the
+  // page back exactly as it was rather than leaving half a turn behind.
+  const inFlight = useRef<AbortController | null>(null);
+  const turnBeganAt = useRef(0);
+  // The transcript as a ref as well as state, so a turn can note where it began without
+  // reading a value that has not been applied yet.
+  const entriesRef = useRef<Entry[]>([]);
+  const [stopping, setStopping] = useState(false);
 
   // Keep the newest entry in view; a reply can arrive a while after it was asked for.
   useEffect(() => {
+    entriesRef.current = entries;
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries, thinking]);
 
@@ -220,19 +231,53 @@ export function ConversationView({ session, resume = true, conversationId: openI
     }
   }
 
+  /**
+   * Stop the reply, and take back what caused it.
+   *
+   * A stray keystroke sent a single letter and Lumina answered it as an instruction.
+   * Stopping the stream alone would not have been enough: the message stays in the
+   * agent's memory and is reasoned about for the rest of the conversation, so the server
+   * is asked to forget it too. The words go back in the box, because the usual reason to
+   * stop is that they were half-typed.
+   */
+  async function stopAndTakeBack() {
+    if (!conversationId || !auth) return;
+    setStopping(true);
+    inFlight.current?.abort();
+    try {
+      const res = await fetch(`${BACKEND}/conversation/${conversationId}/take-back`, {
+        method: "POST",
+        headers: auth,
+      });
+      const said = res.ok ? (await res.json()).restored : null;
+      setEntries((list) => list.slice(0, turnBeganAt.current));
+      if (said) setDraft(said);
+    } catch {
+      // The stream is already stopped; leaving the transcript alone beats guessing.
+    } finally {
+      setStopping(false);
+      setBusy(false);
+      setThinking(null);
+    }
+  }
+
   async function send(text: string) {
     if (!conversationId || !auth || !text.trim()) return;
     setError(null);
     setDraft("");
+    turnBeganAt.current = entriesRef.current.length;
     setEntries((list) => [...list, { kind: "said", role: "you", text }]);
     setBusy(true);
     setThinking("Thinking");
 
+    const controller = new AbortController();
+    inFlight.current = controller;
     try {
       const res = await fetch(`${BACKEND}/conversation/${conversationId}/message`, {
         method: "POST",
         headers: { ...auth, "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         throw new Error((await res.json().catch(() => null))?.detail ?? `Something went wrong (${res.status}).`);
@@ -285,8 +330,12 @@ export function ConversationView({ session, resume = true, conversationId: openI
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lost the connection. Please try again.");
+      // Stopping on purpose is not a fault worth alarming anybody about.
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError(e instanceof Error ? e.message : "Lost the connection. Please try again.");
+      }
     } finally {
+      inFlight.current = null;
       setBusy(false);
       setThinking(null);
       // The Chats list shows the last thing said, and until now it was only refreshed
@@ -438,8 +487,9 @@ export function ConversationView({ session, resume = true, conversationId: openI
               {/* Models write in markdown by habit. Rendering it beats forbidding it —
                   a list of columns genuinely reads better as a list, and it has already
                   produced a table when describing figures. Unrendered, a customer sees
-                  stray asterisks. */}
-              {entry.role === "you" ? entry.text : <Markdown remarkPlugins={[remarkGfm]}>{entry.text}</Markdown>}
+                  stray asterisks. Tidied first, because they also write it wrongly: bullets
+                  strung along one line, and a question absorbed into the last item. */}
+              {entry.role === "you" ? entry.text : <Markdown remarkPlugins={[remarkGfm]}>{tidyMarkdown(entry.text)}</Markdown>}
 
               {entry.report && (
                 <div className="ll-report-card">
@@ -510,9 +560,20 @@ export function ConversationView({ session, resume = true, conversationId: openI
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !busy) send(draft); }}
           />
-          <button className="ll-send-btn" onClick={() => send(draft)} disabled={busy || !draft.trim()}>
-            <Send size={15} />
-          </button>
+          {busy ? (
+            <button
+              className="ll-send-btn"
+              onClick={stopAndTakeBack}
+              disabled={stopping}
+              title="Stop, and take back what I said"
+            >
+              <Square size={13} fill="currentColor" />
+            </button>
+          ) : (
+            <button className="ll-send-btn" onClick={() => send(draft)} disabled={!draft.trim()}>
+              <Send size={15} />
+            </button>
+          )}
         </div>
       </div>
 
