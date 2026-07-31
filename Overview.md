@@ -22,20 +22,13 @@ Lumina | Lifewood is an end-to-end AI agent integrated with WhatsApp via OpenCla
 - **OpenClaw**: Handles the WhatsApp channel gateway and AI conversational interface. Rather than running a local AI model, it routes requests by shuffling between various free-tier external AI models to process conversations efficiently without local overhead.
 - **Power BI REST API**: Used to sync the generated PBIP datasets for live organization-wide reporting.
 
-## Pipeline Workflow
+## Key Features
+- **WhatsApp Integration via OpenClaw**: Users can upload Excel-based production plans directly via WhatsApp. The system leverages OpenClaw to handle the conversational flow and process user requests efficiently by utilizing various free-tier external AI models.
+- **Automated ETL & PBIP Generation**: The Python backend instantly processes uploaded spreadsheets, performs ETL, calculates KPIs, and packages the data into deployable Power BI (.pbip) datasets.
+- **Immersive Glassmorphism UI**: Built with Next.js, Vanilla CSS, and GSAP, the frontend provides a breathtaking, highly interactive, frosted-glass dashboard that rivals native applications.
+- **Live Data Syncing**: The dashboard offers deep cross-filtering. Selecting any chart element or table row instantly updates KPI cards and other visuals to reflect the filtered data.
 
-```mermaid
-graph TD
-    A[WhatsApp User] -->|Sends .xlsx Production Plan| B(OpenClaw Gateway)
-    B -->|Routes to Free-Tier AI| AI[External AI Models]
-    AI -->|Returns AI Response| B
-    B -->|Calls MCP Tool| C{FastMCP Backend Server}
-    C -->|Stores File & Parses Data| D[(Supabase Database)]
-    C -->|Calculates KPIs & Formats| E[Data Transformation]
-    E -->|Generates Dashboard| F[Power BI .pbip File]
-    F -->|Saved to Storage| D
-    D -->|Instantly Reflected| G[Next.js Web Dashboard]
-    F -->|Export/Sync| H[Power BI Workspace]
-    C -->|Confirmation Reply| B
-    B -->|WhatsApp Message| A
-```
+## Dashboard Output Modes
+There are two primary ways a dashboard file is generated and presented to the user:
+1. **Conversational Output (Talk with Lumina)**: As the user chats with the AI, the AI agent dynamically builds and refines the report inline within the chat interface. The user can see live, interactive previews of their data evolving as they ask questions, complete with dynamic filtering and premium hover physics.
+2. **Studio View Output**: A dedicated workspace mode that allows users to quickly generate a fixed, highly-polished dashboard preview outside of a conversational flow. This mode provides a focused, immediate visual confirmation of the dataset before exporting to Power BI.
