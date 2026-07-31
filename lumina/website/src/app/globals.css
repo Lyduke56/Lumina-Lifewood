@@ -326,6 +326,9 @@ body {
           padding: 6px 12px; border-radius: 999px; cursor: pointer;
           border: 1px solid var(--emerald); background: var(--white);
           font-size: 12px; font-weight: 600; color: var(--emerald);
+          /* Wraps rather than clips. A button reading "totals for Planned and Completed V"
+             sends the whole sentence while showing half of it. */
+          max-width: 100%; text-align: left; white-space: normal; line-height: 1.35;
         }
         .ll-suggestions button:hover { background: var(--emerald); color: var(--white); }
 
