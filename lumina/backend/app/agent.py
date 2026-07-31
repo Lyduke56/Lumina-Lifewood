@@ -93,6 +93,50 @@ RATE_LIMIT_ATTEMPTS = 4
 RATE_LIMIT_PAUSE_CAP = 65.0
 
 
+# An "Other — please specify" button sends the words "Other — please specify", which is
+# not an answer to anything. The model offered one and the customer, reasonably, pressed
+# it. The box beneath is always there for anything not on the list, so a button saying
+# "something else" is at best a wasted tap and at worst a dead end.
+_NOT_AN_ANSWER = (
+    "other",
+    "something else",
+    "none of",
+    "please specify",
+    "specify",
+    "custom",
+    "tell me",
+    "let me know",
+    "i'll type",
+    "i'll tell",
+    "type it",
+    "type my",
+    "type your",
+)
+
+# Long enough for "Group it by studio as well", short enough to read at a glance. A
+# button whose words run off the end sends words the customer could not read.
+LONGEST_SUGGESTION = 48
+
+
+def _offerable(suggestions) -> list[str]:
+    """The suggested replies worth showing as buttons.
+
+    Instructions ask for this too, and a model that ignores them has already been seen
+    doing so; this is the part that holds.
+    """
+    good: list[str] = []
+    for raw in suggestions or []:
+        said = " ".join(str(raw).split())
+        # Dropped rather than cut off: a truncated button would send truncated words.
+        if not said or len(said) > LONGEST_SUGGESTION:
+            continue
+        if said.lower().startswith(_NOT_AN_ANSWER):
+            continue
+        if said not in good:
+            good.append(said)
+    return good[:3]
+
+
 def _retry_after(error: Exception) -> float | None:
     """How long to wait, or None if waiting will not help.
 
@@ -596,11 +640,7 @@ def respond(
                     "text": arguments.get("message", ""),
                     # Likely answers, offered as buttons. A customer who can tap "Yes,
                     # build it" neither types it nor mis-hits Enter on their way to it.
-                    "suggestions": [
-                        str(s)[:60]
-                        for s in (arguments.get("suggestions") or [])
-                        if str(s).strip()
-                    ][:3],
+                    "suggestions": _offerable(arguments.get("suggestions")),
                     **credit,
                 }
                 history.append(

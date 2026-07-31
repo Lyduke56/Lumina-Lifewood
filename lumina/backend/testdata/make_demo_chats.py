@@ -160,12 +160,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--email", required=True)
     parser.add_argument("--dry-run", action="store_true")
+    # So one demo chat can be redone without disturbing the others, which is what
+    # happens whenever a conversation is worth having again.
+    parser.add_argument("--only", help="Only workbooks whose name contains this")
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="Delete this account's existing conversations about the same workbook first",
+    )
     chosen = parser.parse_args()
 
     plan = first_production_plan()
     if plan:
         DEMOS[2]["workbook"] = plan
     demos = [d for d in DEMOS if d["workbook"] and Path(d["workbook"]).exists()]
+    if chosen.only:
+        demos = [d for d in demos if chosen.only.lower() in Path(d["workbook"]).name.lower()]
 
     client = get_client()
     users = [
@@ -185,6 +195,35 @@ def main() -> int:
         print(f"  MISSING {demo['workbook']}")
     if chosen.dry_run:
         return 0
+
+    if chosen.replace:
+        wanted = {Path(d["workbook"]).stem for d in demos}
+        existing = (
+            client.table("conversations")
+            .select("id, title")
+            .eq("user_id", owner)
+            .execute()
+            .data
+        )
+        doomed = [r["id"] for r in existing if r.get("title") in wanted]
+        if doomed:
+            # Storage first: a file whose record has gone can never be found again.
+            files = (
+                client.table("generated_files")
+                .select("storage_path")
+                .in_("conversation_id", doomed)
+                .execute()
+                .data
+            )
+            paths = [
+                f["storage_path"] for f in files
+                if f.get("storage_path") and not str(f["storage_path"]).startswith("stub://")
+            ]
+            if paths:
+                client.storage.from_("generated-files").remove(paths)
+            client.table("conversations").delete().in_("id", doomed).execute()
+            print(f"replaced: deleted {len(doomed)} existing conversation(s) "
+                  f"and {len(paths)} stored file(s)")
 
     made = []
     for demo in demos:
