@@ -154,6 +154,10 @@ def _shaped(conversation_id: str) -> list[dict]:
                     "role": m["role"],
                     "text": m["content"],
                     "report": payload.get("report"),
+                    # Reopening a conversation shows the screenshots that were sent with
+                    # it, or a message asking to move a chart reads as though it arrived
+                    # with nothing to point at.
+                    "images": payload.get("images"),
                 }
             )
     return entries
@@ -357,6 +361,7 @@ async def take_back(conversation_id: str, authorization: str = Header(...)) -> d
 async def send_message(
     conversation_id: str,
     message: str = Body(..., embed=True),
+    images: list[str] = Body(default=[], embed=True),
     authorization: str = Header(...),
 ) -> StreamingResponse:
     """Say something, and stream back what the agent does about it.
@@ -371,6 +376,14 @@ async def send_message(
     except conversations.ConversationError as e:
         raise HTTPException(404, str(e))
 
+    for picture in images:
+        if not picture.startswith(("data:image/png", "data:image/jpeg", "data:image/webp")):
+            raise HTTPException(400, "Screenshots must be PNG, JPEG or WebP.")
+        # Roughly 4MB of base64 is 3MB of picture, which is beyond what the free models
+        # accept and far beyond what a screenshot of a dashboard needs.
+        if len(picture) > 4_000_000:
+            raise HTTPException(400, "That screenshot is too large. Send a smaller one.")
+
     opening = message
     if conversation.workbook and not conversation.history:
         # The agent's tools take a path, and the customer should never see one.
@@ -383,7 +396,16 @@ async def send_message(
 
     # Saved before the reply is attempted, so a turn that fails halfway still leaves the
     # customer's own words in the record rather than losing the question they asked.
-    conversations.record(conversation.id, [{"role": "you", "content": message}])
+    conversations.record(
+        conversation.id,
+        [{
+            "role": "you",
+            "content": message,
+            # Kept so reopening the conversation shows the screenshot they sent, not a
+            # message that reads as though it arrived with nothing attached.
+            **({"payload": {"images": images}} if images else {}),
+        }],
+    )
 
     # Where the agent's memory stood before this turn, so taking the turn back can put it
     # exactly there. Measured here rather than trusted to the take-back itself, which may
@@ -397,7 +419,9 @@ async def send_message(
         # round trip per step would slow the very stream it is recording.
         seen: list[dict] = []
         try:
-            for event in agent.respond(conversation.history, opening, owner_context):
+            for event in agent.respond(
+                conversation.history, opening, owner_context, images=images
+            ):
                 if event["type"] == "message":
                     seen.append(
                         {

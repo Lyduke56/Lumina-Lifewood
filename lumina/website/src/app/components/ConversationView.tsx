@@ -17,6 +17,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  ImagePlus,
   Send,
   Square,
   X,
@@ -40,6 +41,13 @@ const STEPS: Record<string, { label: string; Icon: typeof Search }> = {
   add_headline_figure: { label: "Adding a headline figure", Icon: Gauge },
   add_report_chart: { label: "Adding a chart", Icon: BarChart3 },
   build_report_file: { label: "Building your Power BI file", Icon: PackageCheck },
+  // Changing a report that already exists, rather than adding to it.
+  show_report_contents: { label: "Checking what is on the report", Icon: Search },
+  remove_from_the_report: { label: "Taking something off the report", Icon: X },
+  change_report_chart: { label: "Changing a chart", Icon: BarChart3 },
+  change_report_headline_figure: { label: "Changing a headline figure", Icon: Gauge },
+  restyle_report: { label: "Restyling the report", Icon: Sparkles },
+  look_at_screenshot: { label: "Looking at your screenshot", Icon: ImagePlus },
   // Which model is answering. Shown as its own row once, and again only when it changes,
   // rather than repeated against every step — the answer to "which model built this"
   // needs to be visible, not restated nine times.
@@ -69,7 +77,7 @@ type Step = {
 };
 
 type Entry =
-  | { kind: "said"; role: "you" | "lumina"; text: string; report?: Report; model?: string }
+  | { kind: "said"; role: "you" | "lumina"; text: string; report?: Report; model?: string; images?: string[] }
   | { kind: "steps"; steps: Step[] };
 
 interface ConversationViewProps {
@@ -107,6 +115,11 @@ export function ConversationView({ session, resume = true, conversationId: openI
   // reading a value that has not been applied yet.
   const entriesRef = useRef<Entry[]>([]);
   const [stopping, setStopping] = useState(false);
+  // Screenshots waiting to go with the next message. A customer looking at a report they
+  // have just been given points at what they want changed far more easily than they
+  // describe it.
+  const [attached, setAttached] = useState<string[]>([]);
+  const imageInput = useRef<HTMLInputElement>(null);
 
   // Keep the newest entry in view; a reply can arrive a while after it was asked for.
   useEffect(() => {
@@ -261,12 +274,28 @@ export function ConversationView({ session, resume = true, conversationId: openI
     }
   }
 
+  /** Read a picture as a data URL, which is the shape the models take one in. */
+  function attach(files: FileList | File[] | null) {
+    for (const file of Array.from(files ?? [])) {
+      if (!file.type.startsWith("image/")) continue;
+      const reader = new FileReader();
+      reader.onload = () =>
+        setAttached((list) => [...list, String(reader.result)].slice(0, 3));
+      reader.readAsDataURL(file);
+    }
+  }
+
   async function send(text: string) {
-    if (!conversationId || !auth || !text.trim()) return;
+    if (!conversationId || !auth || (!text.trim() && !attached.length)) return;
     setError(null);
     setDraft("");
+    const pictures = attached;
+    setAttached([]);
     turnBeganAt.current = entriesRef.current.length;
-    setEntries((list) => [...list, { kind: "said", role: "you", text }]);
+    setEntries((list) => [
+      ...list,
+      { kind: "said", role: "you", text, images: pictures.length ? pictures : undefined },
+    ]);
     setBusy(true);
     setThinking("Thinking");
 
@@ -276,7 +305,7 @@ export function ConversationView({ session, resume = true, conversationId: openI
       const res = await fetch(`${BACKEND}/conversation/${conversationId}/message`, {
         method: "POST",
         headers: { ...auth, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, images: pictures }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
@@ -491,6 +520,15 @@ export function ConversationView({ session, resume = true, conversationId: openI
                   strung along one line, and a question absorbed into the last item. */}
               {entry.role === "you" ? entry.text : <Markdown remarkPlugins={[remarkGfm]}>{tidyMarkdown(entry.text)}</Markdown>}
 
+              {entry.images && entry.images.length > 0 && (
+                <div className="ll-said-images">
+                  {entry.images.map((picture, at) => (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img key={at} src={picture} alt={`Screenshot ${at + 1}`} />
+                  ))}
+                </div>
+              )}
+
               {entry.report && (
                 <div className="ll-report-card">
                   <FileSpreadsheet size={20} color="var(--emerald)" />
@@ -548,9 +586,30 @@ export function ConversationView({ session, resume = true, conversationId: openI
       </div>
 
       <div className="ll-composer">
+        {attached.length > 0 && (
+          <div className="ll-attached">
+            {attached.map((picture, i) => (
+              <div key={i} className="ll-attached-item">
+                {/* The customer's own screenshot, held in the page and never fetched
+                    from anywhere, so next/image would only get in the way. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={picture} alt={`Screenshot ${i + 1}`} />
+                <button
+                  onClick={() => setAttached((list) => list.filter((_, at) => at !== i))}
+                  title="Remove this screenshot"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="ll-composer-box">
           <div className="ll-icon-btn" onClick={() => fileInput.current?.click()} title="Use a different file">
             <Paperclip size={16} />
+          </div>
+          <div className="ll-icon-btn" onClick={() => imageInput.current?.click()} title="Show Lumina a screenshot">
+            <ImagePlus size={16} />
           </div>
           <input
             style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "var(--forest)" }}
@@ -559,6 +618,17 @@ export function ConversationView({ session, resume = true, conversationId: openI
             disabled={busy}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !busy) send(draft); }}
+            // Snip a bit of the report and paste it straight in, which is how anybody
+            // actually shares what they are looking at.
+            onPaste={(e) => {
+              const pictures = Array.from(e.clipboardData.files).filter((f) =>
+                f.type.startsWith("image/"),
+              );
+              if (pictures.length) {
+                e.preventDefault();
+                attach(pictures);
+              }
+            }}
           />
           {busy ? (
             <button
@@ -570,7 +640,11 @@ export function ConversationView({ session, resume = true, conversationId: openI
               <Square size={13} fill="currentColor" />
             </button>
           ) : (
-            <button className="ll-send-btn" onClick={() => send(draft)} disabled={!draft.trim()}>
+            <button
+              className="ll-send-btn"
+              onClick={() => send(draft)}
+              disabled={!draft.trim() && !attached.length}
+            >
               <Send size={15} />
             </button>
           )}
@@ -586,6 +660,17 @@ export function ConversationView({ session, resume = true, conversationId: openI
           const file = e.target.files?.[0];
           if (file) { setConversationId(null); setEntries([]); startFrom(file); }
         }}
+      />
+
+      {/* Separate from the spreadsheet input: choosing a picture must not be mistaken for
+          starting a new conversation about a new workbook. */}
+      <input
+        ref={imageInput}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        hidden
+        onChange={(e) => { attach(e.target.files); e.target.value = ""; }}
       />
     </main>
   );

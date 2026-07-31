@@ -362,16 +362,133 @@ def _detail(name: str, session) -> str | None:
     return None
 
 
+SEEING_PROMPT = """A Lifewood production manager has sent screenshots along with a message about a Power BI report. Describe what the screenshots show, factually and in detail, so that a colleague who cannot see them can act on the request.
+
+Say what visuals are on the page and what each is called, where they sit relative to one another, and anything the customer is plainly pointing at — an arrow, a circle, a highlight. If something looks wrong — text cut off, a label overlapping, an empty space, a colour that clashes — say so and where.
+
+Do not guess at figures you cannot read clearly, and do not offer opinions about what should change. Describe only what is there."""
+
+
+def _describe(message: str, images: list[str]) -> str | None:
+    """Have a model that can see put the screenshots into words.
+
+    One call, no tools, and its answer becomes ordinary text in the conversation. See the
+    note in `respond` for why the picture is not simply passed along instead.
+
+    Returns None when no supplier that can see is reachable — a screenshot nobody can
+    look at is a reason to ask the customer to describe it, not to fail their message.
+    """
+    suppliers = available_suppliers(seeing=True)
+    if not suppliers:
+        log.warning("a screenshot arrived and no supplier that can see was available")
+        return None
+
+    asked = [
+        {"role": "system", "content": SEEING_PROMPT},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": f"The customer wrote: {message}"},
+                *[{"type": "image_url", "image_url": {"url": url}} for url in images],
+            ],
+        },
+    ]
+    for supplier in suppliers:
+        try:
+            answer = supplier.client.chat.completions.create(
+                model=supplier.seeing_model,
+                messages=asked,
+                temperature=0,
+                max_tokens=800,
+            )
+            # A model that answers with no choices at all is not an exception, and one of
+            # these does exactly that. Reading through it blindly raised a TypeError that
+            # read like our own fault rather than a supplier declining.
+            choices = answer.choices or []
+            said = (choices[0].message.content or "").strip() if choices else ""
+            if said:
+                return said
+            log.warning("%s answered nothing about the screenshot", supplier.name)
+        except Exception as e:
+            log.warning(
+                "%s could not look at the screenshot (%s); trying the next",
+                supplier.name,
+                str(e).splitlines()[0][:120],
+            )
+        # Deliberately not set aside. A supplier that cannot look at a picture may be
+        # perfectly good at the conversation itself, and the first version of this took
+        # it out of the whole exchange for failing at the one thing it was not asked to
+        # do for the rest of it.
+    return None
+
+
 def respond(
-    history: list[dict], message: str, owner: dict | None = None
+    history: list[dict],
+    message: str,
+    owner: dict | None = None,
+    images: list[str] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Answer the customer, using tools as needed. Yields events as work happens.
 
     `history` is the conversation so far in the model's own format, and is appended to
     in place so the caller can keep it for the next turn.
+
+    `images` are data URLs for screenshots the customer attached — usually of the report
+    they have just been given, pointing at what they want changed. They apply to this
+    turn only: the picture is replaced in the record afterwards by a note that it was
+    sent. Keeping it would re-send the whole image on every later request, and would
+    break the moment a supplier that cannot see took over, which is the ordinary way this
+    system carries on when a free allowance runs out.
     """
     if not history:
         history.append({"role": "system", "content": SYSTEM_PROMPT})
+    if images:
+        # Looked at once, described in words, and the words are what the conversation
+        # carries from then on.
+        #
+        # Sending the picture into the conversation itself was tried first and does not
+        # work. Of the free models that can see, the small one reads a picture but cannot
+        # drive tools — it produced malformed calls and changed nothing — and the large
+        # one requires its own reasoning tokens replayed with every later tool call,
+        # which the cross-supplier portability this system depends on deliberately strips.
+        # Neither could both look and work.
+        #
+        # Describing first splits the job along the line the models are actually good at:
+        # a model that sees does the seeing, and the strong text model that already runs
+        # this conversation does the work. It also keeps the picture out of the record, so
+        # nothing is re-sent on every later request and no supplier is ruled out for the
+        # rest of the conversation.
+        yield {"type": "tool_started", "tool": "look_at_screenshot"}
+        try:
+            saw = _describe(message, images)
+            outcome = "ok"
+        except Exception as e:
+            log.warning("could not look at the screenshot: %s", e)
+            saw = None
+            outcome = "broken"
+        yield {
+            "type": "tool_finished",
+            "tool": "look_at_screenshot",
+            "outcome": outcome,
+            "detail": (
+                f"{len(images)} screenshot(s) read"
+                if saw
+                else "Could not look at the screenshot"
+            ),
+        }
+        if saw:
+            message = (
+                f"{message}\n\n[The customer attached {len(images)} screenshot(s). You "
+                f"cannot see them yourself, but they have been described for you:\n\n"
+                f"{saw}\n\n"
+                f"That is a description of a picture, not figures from a tool. Act on "
+                f"what it says, but never quote a number out of it.]"
+            )
+        else:
+            message = (
+                f"{message}\n\n[The customer attached a screenshot, but it could not be "
+                f"read. Ask them to describe in words what they want changed.]"
+            )
     history.append({"role": "user", "content": message})
 
     # Every tool used so far. Kept as we go rather than read back from the conversation,

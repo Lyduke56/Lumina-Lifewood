@@ -18,7 +18,18 @@ from __future__ import annotations
 
 import workbench
 from column_roles import Assignment, Role, RoleError, describe, set_column_roles
-from report_builder import ReportError, add_chart, add_kpi, build_powerbi, web_preview
+from report_builder import (
+    ReportError,
+    add_chart,
+    add_kpi,
+    build_powerbi,
+    change_chart,
+    change_headline_figure,
+    change_report_style,
+    remove_from_report,
+    report_contents,
+    web_preview,
+)
 from sheet_profiler import list_sheets, profile_sheet
 from supabase_client import (
     save_dataset,
@@ -342,6 +353,95 @@ def add_report_chart(
     )
 
 
+def show_report_contents(session_id: str) -> str:
+    """List what is on the report, by name, so a change can be asked for.
+
+    Args:
+        session_id: From open_workbook.
+    """
+    return report_contents(workbench.get(session_id).spec)
+
+
+def remove_from_the_report(session_id: str, name: str) -> str:
+    """Take a chart or a headline figure off the report.
+
+    Args:
+        session_id: From open_workbook.
+        name: The title of the chart or figure, as the report shows it.
+    """
+    session = workbench.get(session_id)
+    said = remove_from_report(session.spec, name)
+    return (
+        f"{said} The report now has {len(session.spec.kpis)} headline figure(s) and "
+        f"{len(session.spec.charts)} chart(s). Rebuild it for the customer to see this."
+    )
+
+
+def change_report_chart(
+    session_id: str,
+    chart: str,
+    title: str | None = None,
+    kind: str | None = None,
+    measures: list[str] | None = None,
+    group_by: str | None = None,
+    position: int | None = None,
+) -> str:
+    """Change a chart already on the report. Only what you give is changed.
+
+    Args:
+        session_id: From open_workbook.
+        chart: The title of the chart to change, as the report shows it.
+        title: A new title.
+        kind: line, bar or table.
+        measures: The figures it should show instead.
+        group_by: What its horizontal axis should run along instead.
+        position: Where it should sit, counting from 1.
+    """
+    session = workbench.get(session_id)
+    summary = workbench.require_summary(session)
+    said = change_chart(
+        session.spec, summary, chart, title, kind, measures, group_by, position
+    )
+    return f"{said} Rebuild the report for the customer to see this."
+
+
+def change_report_headline_figure(
+    session_id: str,
+    figure: str,
+    title: str | None = None,
+    measure: str | None = None,
+    position: int | None = None,
+) -> str:
+    """Rename a headline figure, point it at a different total, or move it.
+
+    Args:
+        session_id: From open_workbook.
+        figure: The title of the figure to change, as the report shows it.
+        title: What it should read instead.
+        measure: A different figure from summarise_figures for it to total.
+        position: Where it should sit, counting from 1.
+    """
+    session = workbench.get(session_id)
+    summary = workbench.require_summary(session)
+    said = change_headline_figure(session.spec, summary, figure, title, measure, position)
+    return f"{said} Rebuild the report for the customer to see this."
+
+
+def restyle_report(
+    session_id: str, title: str | None = None, colours: list[str] | None = None
+) -> str:
+    """Rename the whole report, or change the colours its charts are drawn in.
+
+    Args:
+        session_id: From open_workbook.
+        title: What the report should be called.
+        colours: Hex colours for the chart series, in order, like ["#046241", "#FFB347"].
+    """
+    session = workbench.get(session_id)
+    said = change_report_style(session.spec, title, colours)
+    return f"{said} Rebuild the report for the customer to see this."
+
+
 def build_report_file(
     session_id: str, dataset_id: str, title: str | None = None
 ) -> str:
@@ -419,7 +519,10 @@ def build_report_file(
     )
 
 
-# The six tools of Decision 8, in the order they are meant to be used.
+# The tools of Decision 8, in the order they are meant to be used, followed by the ones
+# for changing a report that already exists. Those came later: until then the only edit
+# possible was another addition, so a customer who asked for a chart to be *removed* got
+# a fourth chart beside the three they did not want.
 TOOLS = [
     reply_to_customer,
     open_workbook,
@@ -429,6 +532,11 @@ TOOLS = [
     add_headline_figure,
     add_report_chart,
     build_report_file,
+    show_report_contents,
+    remove_from_the_report,
+    change_report_chart,
+    change_report_headline_figure,
+    restyle_report,
 ]
 
 BY_NAME = {fn.__name__: fn for fn in TOOLS}
@@ -566,6 +674,15 @@ _STAGE_TOOLS = {
         "add_report_chart",
         "build_report_file",
         "summarise_figures",
+        # Changing what is already there. Reachable from here rather than needing a stage
+        # of their own: once the customer has been told about a finished report and has
+        # answered, the conversation is back at "summarised" and asking for a change is
+        # the ordinary next thing to do.
+        "show_report_contents",
+        "remove_from_the_report",
+        "change_report_chart",
+        "change_report_headline_figure",
+        "restyle_report",
     ],
     # Column meanings have been recorded but not put to the customer. Decision 3
     # attached this as a condition rather than a preference: the target-to-actual

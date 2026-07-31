@@ -3102,7 +3102,67 @@ a scrollbar down its side, because two lines of 20pt and 10pt do not fit in 64 p
 
 ---
 
-## 55. Still to be decided
+## 55. Adding is not editing
+
+John Peter asked whether a customer can suggest changes after the Power BI file is made —
+including by sending a screenshot of what they do not like.
+
+The honest answer was *partly*. Asking for a change in words already reopened the tools, but
+**the only edit the software could make was another addition.** Ask for a chart to be removed
+and it could add a fourth beside the three you did not want; ask for different colours, a
+different title, a different order, and there was no tool for any of it. That gap had gone
+unnoticed because every test built a report and stopped there.
+
+Five tools now cover it: remove a chart or headline figure, change a chart, change a headline
+figure, restyle the report, and list what is on it. Two details were got wrong first and are
+worth recording, because both were found by using them rather than by reading them:
+
+- **"The studio chart" did not match "Achievement Rate by Studio."** Matching was on substrings,
+  and neither of those contains the other, so the most natural way for a customer to refer to a
+  chart failed outright. Matched on shared meaningful words now, and only when one thing wins
+  outright — asking which is better than changing the wrong chart.
+- **Turning a line into a table renamed it.** "Planned vs Completed Over Time" became "Detail by
+  Month" for being asked to change shape. A title the customer chose now survives; a title we
+  generated ourselves is regenerated, since "by Month" on a chart now drawn by studio is worse
+  than a new one.
+
+A change is checked by the same rules as an addition before it replaces anything, so asking for
+a rate beside a count is refused and the report is left exactly as it was.
+
+---
+
+## 56. Showing Lumina a screenshot
+
+The other half of the same question, and the interesting one.
+
+**None of the free models can both see a picture and use tools.** Established by trying, not by
+reading a table. Groq's entire catalogue is text and audio, so a screenshot does not merely
+change the model there — it rules the supplier out. Of the two that can see, the small one reads
+a picture correctly on its own but collapses when given tools, producing malformed calls and
+changing nothing; the large one demands its own reasoning tokens be replayed with every
+subsequent tool call, which the cross-supplier portability this system depends on deliberately
+strips (Section 34).
+
+So the picture never enters the conversation. **A model that can see is asked to describe the
+screenshots in words, once, with no tools; the description becomes ordinary text and the strong
+text model that already runs the conversation does the work.** The job is split along the line
+the models are actually good at.
+
+Three things fall out of that, all of them better than the design it replaced. The record holds
+words rather than a base64 image, so nothing is re-sent on every later request. No supplier is
+ruled out for the rest of the conversation. And the description is passed with an explicit
+warning that it is an account of a picture and not figures from a tool — the figure guard of
+Section 47 still stands behind it.
+
+Customers can attach a screenshot or paste one straight from a snipping tool, and it is shown
+back to them in the conversation, including when they return to it later.
+
+**What this cannot do:** the description is one model's account of a picture and may be wrong.
+It guides an edit; it never supplies a number.
+
+---
+
+## 57. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -3130,7 +3190,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 56. Change history
+## 58. Change history
 
 | Date | Change |
 |------|--------|
@@ -3159,6 +3219,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 31 July 2026 | Added Sections 55 and 56, after John Peter asked whether a customer can suggest changes once the Power BI file exists. **Adding is not editing**: asking for a change already reopened the tools, but the only edit possible was another addition — ask for a chart to be removed and it could add a fourth beside the three you did not want. Five tools now remove, change, reorder and restyle, checked by the same rules as an addition so a bad change leaves the report as it was. Two faults found by using them: "the studio chart" did not match "Achievement Rate by Studio" under substring matching, and changing a chart's shape silently renamed it. **And screenshots**: none of the free models can both see a picture and use tools — Groq offers no vision model at all, the small one that sees cannot drive tools, and the large one needs reasoning tokens replayed that our cross-supplier portability strips. So a seeing model describes the screenshot once, in words, and the strong text model does the work. The picture never enters the record, no supplier is ruled out for the rest of the conversation, and the description is passed as a description — never as figures. |
 | 31 July 2026 | Added Sections 53 and 54, both from John Peter running the whole thing in the browser himself. **A stray keystroke was an instruction**: a mis-hit Enter sent a single letter and Lumina answered it, and the letter then sat in the agent's memory shaping every later turn. Stop now takes the message back — the reply halts, the turn is removed from both the transcript and the agent's own memory, and the words go back in the box. Refusing messages that "look accidental" was rejected as guessing at what a customer meant. **And the preview was not showing the report**: the Power BI file was correct while the page beside it drew sixteen points labelled "Jan 2026" four times, and a chart of achievement *by studio* came out as months. One cause — the preview was handed a single grouping for the whole report and each chart's own was dropped — and it is the **second time a correct report has been misrepresented by the thing the customer actually looks at**. Also: markdown from the model is tidied before rendering, since it strings bullets along one line and lets a question be swallowed into a list. |
 | 31 July 2026 | Added Section 51: **made the report look like a dashboard**, working from a real Lifewood report and the published examples John Peter sent — explicitly as standards to meet rather than a layout to copy, since what a report contains depends on the conversation. Visuals now sit in white cards with soft borders, a title band names the report and says how much of the sheet went into it, and a **written panel explains what the figures say** in sentences, the feature he singled out. **The Lifewood logo is now on every page**, extracted from inside the website's own SVG rather than redrawn. Looking at the result found three faults that every automated check had passed: a card height that clipped the caption under the number, a header claiming "238 months", and an insights panel naming the best *row* as the best month. **A fourth was found by the unattended harness rather than by a person** — a workbook's grand-total row was being counted as data whenever the figures were not placed on a timeline, roughly doubling every figure on the page. The rule skipping undated rows had only ever applied to timelines. **Third total-row fault in two days, and the first the harness caught before a customer could.** |
 | 30 July 2026 | Added Section 48: **Microsoft's validator, and the colours that never applied.** Chasing one cosmetic defect — 2,966 and 2,563 both displayed as "3K" — led to Microsoft's report-authoring CLI, which is the source of truth for property names and also validates a PBIR report. The abbreviation fix needed an enum value, not a new property: the name had been right and 0 means *Auto*, so it asked for the default. **Run against a report we had just shipped, the validator found seven errors** — six of them `fontColor` on chart axes and legends, where the property is `labelColor`, meaning every axis and legend in both flows had been Microsoft's default grey rather than Lifewood green since the code was written, with nothing ever complaining; and a theme registered without its `.json` extension, which Microsoft say makes a published report apply the theme incorrectly. Both fixed, both flows validate clean, and **the validator now runs on every build**. This supersedes Section 46's claim that only a person could check the visuals. **Third time in two days that a published capability was found only because a customer pushed back on "there is no way to check this from here".** |
