@@ -320,12 +320,26 @@ def _hazards(
                 and i < len(r)
                 and isinstance(r[i], (int, float))
             ]
-            if isinstance(top, (int, float)) and others and top > 5 * max(others):
+            if not isinstance(top, (int, float)) or not others:
+                continue
+
+            # A total row is one that *adds up* to the others, so that is what is tested.
+            # The rule used to be "more than five times the largest row below", which is
+            # not what a total is and misfires badly on any figure that crosses zero: a
+            # variance of +6 among later variances of −1 is five times the largest, and a
+            # perfectly ordinary row was flagged as a grand total on that basis. Worse, it
+            # was then dropped — quietly costing a customer fourteen of their own videos.
+            #
+            # Only a sample of rows is held, so the comparison is against that sample's
+            # total and has to be generous. A genuine total row is a whole multiple of
+            # what it sums; ordinary rows are not.
+            total = sum(others)
+            if total and 0.9 <= top / total <= 1.1 and abs(top) > abs(total / len(others)):
                 profile.suspected_total_row = data_start
                 warnings.append(
                     f"Row {data_start} looks like a grand total rather than an ordinary "
-                    f'row — under "{c.heading or f"column {c.position}"}" it is far '
-                    f"larger than the rows below. Including it would distort every chart."
+                    f'row — under "{c.heading or f"column {c.position}"}" it is close to '
+                    f"the sum of the rows below. Including it would double every figure."
                 )
                 break
 

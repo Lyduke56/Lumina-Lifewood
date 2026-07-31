@@ -14,6 +14,8 @@ and any disagreement is reported back to them rather than silently overwritten.
 
 from __future__ import annotations
 
+import re
+
 import datetime as dt
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -26,9 +28,55 @@ from sheet_profiler import SheetProfile
 
 # More groups than this makes an unreadable chart, and is the point at which the tool
 # declines and suggests a top-N instead rather than producing something useless.
-MAX_GROUPS = 60
+# How many rows a report may carry. This limits the *file*, not what any chart shows:
+# a table grouped by month, studio and editor holds a hundred rows, and a chart drawn
+# against any one of those columns still shows four bars, or twenty-eight, because Power BI
+# adds up the rest. Conflating the two is what stopped a report having a monthly chart, a
+# studio chart and an editor table at once — the customer was told to choose.
+MAX_ROWS = 5_000
 
 PERIODS = ("day", "week", "month", "quarter", "none")
+
+# What the timeline is called in the finished report. Defined here rather than in
+# report_builder because the naming of the *other* grouping columns has to avoid it: a
+# workbook with its own "Month" column, summarised by month, produced two columns called
+# Month in one table and Power BI refused to open the file at all.
+PERIOD_LABEL = {"day": "Date", "week": "Week", "month": "Month", "quarter": "Quarter"}
+
+# Carried on every row and never shown: the earliest date that fell into that group.
+# Grouping by a label loses the timeline, and a report grouped by a month *name* then
+# ordered its axis April, August, July, June, May, September — the alphabet's idea of a
+# year, which reads as though production collapsed in the second month rather than the
+# fifth. This is what the finished report sorts by.
+ORDER_KEY = "__first_seen"
+
+
+def _iso(value) -> str:
+    """A sortable text form of a date, whatever shape the spreadsheet gave us."""
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def _column_name(profile, position: int, taken: set[str]) -> str:
+    """What to call a grouping column in the report: its own heading.
+
+    Was `column_2`, which is our name for it and appeared on the axis of every chart
+    grouped that way. Falls back to the old form when a heading is missing or would
+    collide with something else in the table.
+    """
+    heading = next(
+        (c.heading for c in profile.columns if c.position == position), None
+    )
+    cleaned = re.sub(r"[^0-9A-Za-z _-]+", "", str(heading or "")).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    if not cleaned or cleaned.lower() == "period":
+        return f"column_{position}"
+    # Distinguished rather than discarded: the heading is still the most useful name, and
+    # falling back to "column_2" puts our word for it on the customer's axis. Underscored
+    # rather than "Month (2)" so it needs no escaping in either Power BI language — the
+    # bracketed form produced a file Power BI would not parse.
+    if cleaned in taken:
+        return f"{cleaned.replace(' ', '_')}_{position}"
+    return cleaned
 
 
 @dataclass
@@ -37,6 +85,10 @@ class Summary:
 
     group_by: list[str]
     measures: list[str]
+    # Whether the timeline was gathered by day, week, month or quarter. Carried through
+    # because the report has to *label* it — an axis headed "period" is our word for it,
+    # not the customer's.
+    period: str = "day"
     rows: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     reconciliation: list[str] = field(default_factory=list)
@@ -122,6 +174,9 @@ def summarise(
         # per-row, so they can only be compared where a bucket holds exactly one row —
         # comparing a day's completion rate against a month's would always "disagree".
         bucket_rows: dict[tuple, int] = {}
+        # The earliest date in each group, so a report grouped by label can still be
+        # put in chronological order rather than alphabetical.
+        first_seen: dict[tuple, object] = {}
         used = skipped = 0
         checks: dict[int, list[tuple]] = {c: [] for c in schema.cross_checks}
 
@@ -134,8 +189,14 @@ def summarise(
 
             date_value = row[schema.date_column - 1] if schema.date_column <= len(row) else None
             key_period = _period_key(date_value, period)
-            if period != "none" and key_period is None:
-                skipped += 1  # no date, so it cannot be placed on a timeline
+            # A row with no date is skipped whether or not the figures are being placed on
+            # a timeline. It used to be skipped only when they were, so grouping by label
+            # alone let an unlabelled grand total through as though it were a studio's
+            # work: 2,966 planned became 6,020, the difference being the total row itself.
+            # A dated sheet with an undated row is missing something, not reporting a
+            # category, and the count of skipped rows is already told to the customer.
+            if date_value is None or (period != "none" and key_period is None):
+                skipped += 1
                 continue
 
             figures = {
@@ -153,6 +214,10 @@ def summarise(
             )
             bucket = buckets.setdefault(key, {c: None for c in measure_columns})
             bucket_rows[key] = bucket_rows.get(key, 0) + 1
+            if date_value is not None:
+                seen = first_seen.get(key)
+                if seen is None or date_value < seen:
+                    first_seen[key] = date_value
             for c, v in figures.items():
                 if v is not None:
                     bucket[c] = (bucket[c] or 0) + v
@@ -165,9 +230,21 @@ def summarise(
     finally:
         wb.close()
 
+    # Seeded with whatever the timeline column will end up being called, not with
+    # "period" — that is the internal name, and it is renamed before Power BI sees it.
+    names: set[str] = {"period"}
+    if period != "none":
+        names.add(PERIOD_LABEL.get(period, "Date"))
+    label_names = []
+    for g in group_by:
+        name = _column_name(profile, g, names)
+        names.add(name)
+        label_names.append(name)
+
     summary = Summary(
-        group_by=(["period"] if period != "none" else []) + [f"column_{g}" for g in group_by],
+        group_by=(["period"] if period != "none" else []) + label_names,
         measures=[],
+        period=period,
         source_rows_used=used,
         source_rows_skipped=skipped,
     )
@@ -185,6 +262,11 @@ def summarise(
         out: dict = {}
         for i, name in enumerate(summary.group_by):
             out[name] = key[i]
+        if key in first_seen:
+            # As text, not a date. These rows are stored as JSON and handed to the
+            # website, and a datetime cannot be either — which is what broke four
+            # attempts to build a report while every step still showed a tick.
+            out[ORDER_KEY] = _iso(first_seen[key])
         for pair in schema.pairs:
             unit = pair.unit or "units"
             planned = sums.get(pair.target)
@@ -206,7 +288,9 @@ def summarise(
                 out[f"cumulative_actual_{unit}"] = acc["a"]
         summary.rows.append(out)
 
-    summary.measures = [k for k in summary.rows[0] if k not in summary.group_by]
+    summary.measures = [
+        k for k in summary.rows[0] if k not in summary.group_by and k != ORDER_KEY
+    ]
     summary.reconciliation = _reconcile(schema, summary, checks, bucket_rows, group_by)
 
     if skipped:
@@ -227,11 +311,12 @@ def _apply_top_n(buckets, summary, period, group_by, top_n, measure_columns):
         return buckets
 
     distinct = len({k[len([1] if period != "none" else []) :] for k in buckets})
-    if top_n is None and distinct > MAX_GROUPS:
+    if top_n is None and len(buckets) > MAX_ROWS:
         raise SummaryError(
-            f"Grouping this way produces {distinct} groups, which no chart can show "
-            f"readably. Ask for a top ten instead, or group by something with fewer "
-            f"values."
+            f"That grouping produces {len(buckets):,} rows, more than a report should "
+            f"carry. Ask for a top ten, or summarise by a longer period. Note that "
+            f"grouping by several columns is fine in itself — each chart draws against "
+            f"one of them and the rest are added up."
         )
     if top_n is None or distinct <= top_n:
         return buckets

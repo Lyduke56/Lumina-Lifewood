@@ -12,6 +12,8 @@ for anyone who has not chosen.
 """
 
 import os
+import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -76,6 +78,66 @@ if not API_KEY:
     )
 
 client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
+
+
+@dataclass
+class Supplier:
+    """One place we can get an answer from."""
+
+    name: str
+    client: OpenAI
+    model: str
+
+
+# A supplier that has run out stays out for a while. Without this, every step of
+# every conversation pays the cost of asking two exhausted suppliers before reaching the
+# working one — which is what made a conversation feel like it had hung: the allowances
+# reset daily, but the software kept hopefully asking, several times a minute.
+EXHAUSTED_FOR_SECONDS = 15 * 60
+
+# A supplier that failed for some other reason — a withdrawn model, a rejected key, a
+# network blip — is set aside for much less time. Long enough that a conversation stops
+# paying for the same failure at every step, short enough that a passing problem does not
+# cost us a working supplier for a quarter of an hour.
+FAILED_FOR_SECONDS = 2 * 60
+
+_exhausted: dict[str, float] = {}
+
+
+def mark_exhausted(name: str, seconds: float = EXHAUSTED_FOR_SECONDS) -> None:
+    """Remember that this supplier is not worth asking for a while."""
+    _exhausted[name] = time.time() + seconds
+
+
+def available_suppliers() -> list[Supplier]:
+    """Every supplier we hold a key for, preferred one first.
+
+    Free tiers run out — of requests, of tokens, of patience — and each supplier runs
+    out differently and on its own schedule. Being told "no" by one is not a reason to
+    abandon a customer's conversation when another is sitting there with an unused
+    allowance, so the agent works down this list rather than needing somebody to edit a
+    setting and restart, which is what happened the first time Groq's daily tokens ran
+    dry mid-sentence.
+    """
+    order = [PROVIDER] + [p for p in PROVIDERS if p != PROVIDER]
+    suppliers: list[Supplier] = []
+    for stale in [n for n, until in _exhausted.items() if until <= time.time()]:
+        del _exhausted[stale]  # allowances come back; give them another chance
+    for name in order:
+        base, key_var, default_model = PROVIDERS[name]
+        key = os.getenv(key_var, "")
+        if name == PROVIDER:
+            key = API_KEY  # honours LUMINA_LLM_API_KEY and LUMINA_LLM_BASE_URL
+            base = BASE_URL
+            default_model = DEFAULT_MODEL
+        if not key:
+            continue
+        if _exhausted.get(name, 0) > time.time():
+            continue
+        suppliers.append(
+            Supplier(name, OpenAI(base_url=base, api_key=key), default_model)
+        )
+    return suppliers
 
 # Trying several models in turn is an OpenRouter feature; other providers serve one
 # model per request and reject the extra field.

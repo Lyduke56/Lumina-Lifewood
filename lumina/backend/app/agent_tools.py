@@ -18,9 +18,14 @@ from __future__ import annotations
 
 import workbench
 from column_roles import Assignment, Role, RoleError, describe, set_column_roles
-from report_builder import ReportError, add_chart, add_kpi, build_powerbi
+from report_builder import ReportError, add_chart, add_kpi, build_powerbi, web_preview
 from sheet_profiler import list_sheets, profile_sheet
-from summariser import SummaryError, summarise
+from supabase_client import (
+    save_dataset,
+    save_generated_file,
+    upload_generated_file,
+)
+from summariser import ORDER_KEY, SummaryError, summarise
 
 
 def reply_to_customer(message: str) -> str:
@@ -182,19 +187,88 @@ def summarise_figures(
     session = workbench.get(session_id)
     schema = workbench.require_schema(session)
     profile = session.profiles[schema.sheet]
+
+    # What the report already depends on. Summarising used to empty it without a word,
+    # so an agent that added four figures and two charts, then summarised again to reach
+    # a different breakdown, silently lost the lot — and added them again, and again,
+    # until it ran out of steps and gave up on a report it had built four times.
+    axes = {c.group_by for c in session.spec.charts}
+    figures = {k.measure for k in session.spec.kpis} | {
+        m for c in session.spec.charts for m in c.measures
+    }
+
     summary = summarise(
         session.workbook, profile, schema, period=period, group_by=group_by, top_n=top_n
     )
-    session.summary = summary
-    session.spec.charts.clear()
-    session.spec.kpis.clear()
 
+    # Refused only if the new totals genuinely cannot carry what is already on the page.
+    # A blanket refusal would be a dead end instead of a loop: three breakdowns will not
+    # always fit in one summary — month by studio by editor is 107 groups, more than any
+    # chart can show — so summarising again has to stay possible.
+    lost_axes = sorted(a for a in axes if a not in summary.group_by)
+    lost_figures = sorted(f for f in figures if f not in summary.measures)
+    if lost_axes or lost_figures:
+        raise workbench.SessionError(
+            f"Totalling the figures that way would leave the report broken: "
+            + (f"nothing would be grouped by {', '.join(lost_axes)}. " if lost_axes else "")
+            + (f"{', '.join(lost_figures)} would not exist. " if lost_figures else "")
+            + f"The figures are still grouped by "
+            f"{', '.join(session.summary.group_by) if session.summary else 'nothing'} and "
+            f"the report is untouched — chart against those, or decide every breakdown you "
+            f"need before totalling, because each chart takes its axis from this grouping."
+        )
+
+    # Kept, not cleared. Everything on the report still has its axis and its figures.
+    session.summary = summary
+
+    total = summary.source_rows_used + summary.source_rows_skipped
     lines = [
         f"Summarised into {summary.group_count} rows from "
-        f"{summary.source_rows_used:,} rows of the sheet.",
-        "",
-        f"Figures available: {', '.join(summary.measures)}",
+        f"{summary.source_rows_used:,} of {total:,} rows in the sheet.",
     ]
+    if summary.source_rows_skipped:
+        # Said here as well as at the examining step, because this is the moment it
+        # matters and a warning given several exchanges earlier does not get passed on.
+        lines += [
+            "",
+            f"{summary.source_rows_skipped:,} row(s) were left out — they had no usable "
+            f"figures, or no date to place them on. TELL THE CUSTOMER this, and how many: "
+            f"they are entitled to know their own rows were not all counted.",
+        ]
+    lines += ["", f"Figures available: {', '.join(summary.measures)}"]
+
+    # What else these figures could be split by. The description of the sheet is dropped
+    # from the conversation once the columns are agreed, to save re-sending 500 tokens on
+    # every step — so by the time charts are chosen the agent no longer knows which
+    # columns were suitable to group by, and cannot offer the short list Decision 6 asks
+    # for. Restated here, where it is needed, rather than carried the whole way.
+    profile = session.profiles.get(session.schema.sheet)
+    if profile:
+        used = {p for p in group_by or []}
+        others = []
+        for position in session.schema.labels:
+            if position in used:
+                continue
+            column = next(
+                (c for c in profile.columns if c.position == position), None
+            )
+            if column is None or column.breakdown_suitability == "unsuitable":
+                continue
+            note = (
+                f"{column.heading} ({column.distinct} values"
+                + (", ask for a top ten" if column.breakdown_suitability == "top-n-only" else "")
+                + ")"
+            )
+            others.append(f"{position}: {note}")
+        if others:
+            lines += [
+                "",
+                "These figures could also be broken down by. To chart against one of "
+                "these, summarise ONCE including it — every chart takes its axis from "
+                "this grouping, and summarising again is refused once the report has "
+                "anything on it:",
+            ]
+            lines += [f"  {o}" for o in others]
     preview = summary.rows[:6]
     if preview:
         lines += ["", "First rows:"]
@@ -203,7 +277,8 @@ def summarise_figures(
                 "  "
                 + ", ".join(
                     f"{k}={'-' if v is None else (f'{v:,.2f}'.rstrip('0').rstrip('.') if isinstance(v, (int, float)) else v)}"
-                    for k, v in row.items()
+                    # The ordering value is for the finished report, not for reading.
+                    for k, v in row.items() if k != ORDER_KEY
                 )
             )
         if summary.group_count > len(preview):
@@ -216,25 +291,24 @@ def summarise_figures(
     return "\n".join(lines)
 
 
-def add_headline_figure(
-    session_id: str,
-    measure: str,
-    title: str | None = None,
-    good_threshold: float | None = None,
-    neutral_threshold: float | None = None,
-) -> str:
+def add_headline_figure(session_id: str, measure: str, title: str | None = None) -> str:
     """Put a single large number on the report.
+
+    Deliberately does not offer colour thresholds, though add_kpi supports them. Two
+    reasons. They are a second baseline — a judgement about how much shortfall counts as
+    acceptable — and nobody at Lifewood has made it; the 90% and 75% in the older flow are
+    the previous developer's defaults. And the DAX that colours a card has never been
+    opened in Power BI Desktop, so letting the agent reach it would ship output nobody has
+    checked. Available in code for whoever decides to use it on purpose.
 
     Args:
         session_id: From open_workbook.
         measure: One of the figures listed by summarise_figures.
         title: What to call it. Defaults to a readable version of the figure's name.
-        good_threshold: At or above this it is shown green, e.g. 0.9 for 90%.
-        neutral_threshold: At or above this, amber; below it, red.
     """
     session = workbench.get(session_id)
     summary = workbench.require_summary(session)
-    add_kpi(session.spec, summary, measure, title, good_threshold, neutral_threshold)
+    add_kpi(session.spec, summary, measure, title)
     return (
         f"Added headline figure '{session.spec.kpis[-1].title}'. "
         f"The report now has {len(session.spec.kpis)} headline figure(s) and "
@@ -268,20 +342,80 @@ def add_report_chart(
     )
 
 
-def build_report_file(session_id: str, dataset_id: str) -> str:
+def build_report_file(
+    session_id: str, dataset_id: str, title: str | None = None
+) -> str:
     """Write the Power BI file from everything added so far.
 
     Args:
         session_id: From open_workbook.
         dataset_id: A unique name for this report's folder.
+        title: What to call the report — it names the file the customer downloads, the
+            project Power BI opens and the page inside it. Say what the report is *about*,
+            in their words: "Video Production Plan", not "Report" or "Dashboard".
+            Defaults to the workbook's own name.
     """
     session = workbench.get(session_id)
+    if title and title.strip():
+        session.spec.title = title.strip()
     summary = workbench.require_summary(session)
     folder = build_powerbi(session.spec, summary, dataset_id)
-    return (
-        f"Wrote the Power BI project to {folder}, with "
+
+    built = (
         f"{len(session.spec.kpis)} headline figure(s) and "
-        f"{len(session.spec.charts)} chart(s) over {summary.group_count} rows."
+        f"{len(session.spec.charts)} chart(s) over {summary.group_count} rows"
+    )
+
+    # Writing the file to the server is not delivering it. Without this the report
+    # existed only in a folder on our machine — it never reached the customer's Files
+    # list and there was nothing for them to download, while the agent cheerfully
+    # reported it as ready.
+    if not session.owner:
+        return (
+            f"Built the report ({built}), saved at {folder}. The job is finished — tell "
+            f"the customer and stop. Do not build again unless they ask for a change."
+        )
+
+    dataset = save_dataset(
+        source_file_path=str(session.workbook),
+        parsed_rows=summary.rows,
+        conversation_id=session.owner["conversation_id"],
+    )
+    storage_path = upload_generated_file(
+        folder,
+        user_id=session.owner["user_id"],
+        dataset_id=dataset["id"],
+        report_name=session.spec.title,
+    )
+    record = save_generated_file(
+        dataset_id=dataset["id"],
+        layout_json={
+            "headline_figures": [k.title for k in session.spec.kpis],
+            "charts": [c.title for c in session.spec.charts],
+        },
+        # The report described for the website to draw beside the conversation. Until
+        # now this was left empty, and the website filled the gap with invented numbers —
+        # a preview showing 1.3k and 92% for a report that says 352,626 and 100%.
+        chart_preview_json=web_preview(session.spec, summary),
+        conversation_id=session.owner["conversation_id"],
+        storage_path=storage_path,
+    )
+    # Set last of all, once the record exists. Set any earlier and a failure here still
+    # offered the customer a download and told the step it had succeeded — which is how
+    # a broken save presented itself as a finished report, and why the agent, seeing the
+    # refusal it was actually given, went round again adding charts and rebuilding.
+    session.last_report = {
+        # The record's own id, so the conversation can offer to open the report on screen
+        # as well as download it — the preview is drawn from this row.
+        "file_id": record["id"],
+        "storage_path": storage_path,
+        "title": session.spec.title,
+    }
+    return (
+        f"Built the report ({built}) and saved it to the customer's account, where it is "
+        f"ready to download. The job is finished: tell them it is ready and stop there. "
+        f"Do not add anything else or build again unless they ask for a change, and do "
+        f"not mention folders or file paths."
     )
 
 
@@ -407,3 +541,103 @@ def register(mcp) -> None:
     """Add the six tools to an MCP server, leaving anything already there alone."""
     for fn in TOOLS:
         mcp.tool(fn)
+
+
+# Which tools are worth offering, given how far the conversation has got. Every tool
+# description is re-sent on every single call, and all eight cost about 1,100 tokens —
+# roughly 9,000 across a conversation, spent describing work that cannot be done yet.
+# Offering only what is reachable also removes a way to go wrong: the model cannot ask
+# to build a file before anything has been summarised if that tool is not on the table.
+# Starting again is always allowed. It was not, and an agent that reached a genuine
+# dead end — a report grouped one way, a customer asking for another — told the customer
+# "the system isn't letting me reopen the workbook right now", which is a fair report of
+# a gate that should never have been closed. Whatever else is true, beginning afresh is a
+# legitimate thing to want.
+_ALWAYS = ["reply_to_customer", "open_workbook"]
+
+_STAGE_TOOLS = {
+    "start": _ALWAYS,
+    "opened": [*_ALWAYS, "examine_sheet"],
+    "examined": [*_ALWAYS, "record_column_meanings", "examine_sheet"],
+    "confirmed": [*_ALWAYS, "summarise_figures", "record_column_meanings"],
+    "summarised": [
+        *_ALWAYS,
+        "add_headline_figure",
+        "add_report_chart",
+        "build_report_file",
+        "summarise_figures",
+    ],
+    # Column meanings have been recorded but not put to the customer. Decision 3
+    # attached this as a condition rather than a preference: the target-to-actual
+    # matching must be confirmed, because getting it wrong produces a confident, wrong
+    # dashboard that nobody can tell is wrong by looking. Asked for in the instructions
+    # too, but a model that skipped it went from spreadsheet to finished file without a
+    # word — so it is a guardrail now, in the spirit of Decision 6.
+    "agreed": _ALWAYS,
+    # Once a file exists there is nothing left to do but hand it over. Without this
+    # stage the agent would add another chart, rebuild, add another chart, rebuild —
+    # producing a file per step until the step limit stopped it, because nothing in the
+    # tools said the job was finished.
+    "built": _ALWAYS,
+}
+
+
+def _called(history: list[dict]) -> list[str]:
+    """Every tool asked for so far, in order."""
+    return [
+        call["function"]["name"]
+        for message in history
+        if isinstance(message, dict)
+        for call in (message.get("tool_calls") or [])
+    ]
+
+
+def stage_of(order: list[str]) -> str:
+    """How far along we are, judged by which tools have already been used."""
+    done = set(order)
+
+    # A file built since the last thing we said to the customer means the customer has
+    # not been told yet. Judged by position rather than mere presence, so that somebody
+    # asking for a change *after* being handed a file can still have one made.
+    def last(name: str) -> int:
+        return max((i for i, n in enumerate(order) if n == name), default=-1)
+
+    spoke = last("reply_to_customer")
+    if last("build_report_file") > spoke:
+        return "built"
+    # Judged by position, so this asks once: after the customer has been told and has
+    # answered, the full set is available again and the work carries on.
+    if last("record_column_meanings") > spoke and "summarise_figures" not in done:
+        return "agreed"
+
+    if "summarise_figures" in done:
+        return "summarised"
+    if "record_column_meanings" in done:
+        return "confirmed"
+    if "examine_sheet" in done:
+        return "examined"
+    if "open_workbook" in done:
+        return "opened"
+    return "start"
+
+
+def _stage(history: list[dict]) -> str:
+    return stage_of(_called(history))
+
+
+def permitted(order: list[str]) -> set[str]:
+    """Which tools may be used next, given everything used so far.
+
+    Separate from schemas_for because the two are asked at different moments. The
+    definitions are chosen once per reply, but a model can put several tool calls in one
+    reply — and did: four requests to build the report arrived together, so the stage was
+    never consulted between them and a guardrail that reads "once a file exists, only
+    speak" was bypassed without being broken.
+    """
+    return set(_STAGE_TOOLS[stage_of(order)])
+
+
+def schemas_for(history: list[dict]) -> list[dict]:
+    """Tool definitions worth sending, given where the conversation has got to."""
+    allowed = permitted(_called(history))
+    return [d for d in schemas() if d["function"]["name"] in allowed]
