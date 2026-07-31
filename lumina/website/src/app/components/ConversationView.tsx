@@ -13,7 +13,6 @@ import {
   Gauge,
   Hourglass,
   PackageCheck,
-  Paperclip,
   RefreshCw,
   RotateCcw,
   Search,
@@ -700,7 +699,7 @@ export function ConversationView({ session, resume = true, conversationId: openI
             <span className="ll-step-icon"><Hourglass size={16} /></span>
             <span className="ll-step-text">
               <strong>This conversation has been kept, but its spreadsheet has not</strong>
-              <small>Attach the file again to carry on making changes</small>
+              <small>Start a new report with the same file to carry on making changes</small>
             </span>
           </div>
         )}
@@ -734,9 +733,6 @@ export function ConversationView({ session, resume = true, conversationId: openI
           </div>
         )}
         <div className="ll-composer-box">
-          <div className="ll-icon-btn" onClick={() => fileInput.current?.click()} title="Use a different file">
-            <Paperclip size={16} />
-          </div>
           <div className="ll-icon-btn" onClick={() => imageInput.current?.click()} title="Show Lumina a screenshot">
             <ImagePlus size={16} />
           </div>
@@ -780,16 +776,6 @@ export function ConversationView({ session, resume = true, conversationId: openI
         </div>
       </div>
 
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".xlsx"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) { setConversationId(null); setEntries([]); startFrom(file); }
-        }}
-      />
     </div>
 
       <ReportHistory
