@@ -154,6 +154,11 @@ def _shaped(conversation_id: str) -> list[dict]:
                     "role": m["role"],
                     "text": m["content"],
                     "report": payload.get("report"),
+                    "suggestions": payload.get("suggestions"),
+                    # Reopening a conversation shows the screenshots that were sent with
+                    # it, or a message asking to move a chart reads as though it arrived
+                    # with nothing to point at.
+                    "images": payload.get("images"),
                 }
             )
     return entries
@@ -337,6 +342,96 @@ async def begin_conversation(
     }
 
 
+def _what_changed(before: dict | None, after: dict) -> list[str]:
+    """How this version of a report differs from the one before it, in plain words.
+
+    The first build has nothing to compare against and says what it contains instead —
+    "nothing changed" would be true and useless.
+    """
+    def contents(of: dict) -> tuple[list[str], list[str]]:
+        return list(of.get("headline_figures") or []), list(of.get("charts") or [])
+
+    figures, charts = contents(after)
+    if before is None:
+        made = []
+        if figures:
+            made.append(f"{len(figures)} headline figure{'' if len(figures) == 1 else 's'}")
+        if charts:
+            made.append(f"{len(charts)} chart{'' if len(charts) == 1 else 's'}")
+        return ["Built with " + " and ".join(made)] if made else ["First build"]
+
+    was_figures, was_charts = contents(before)
+    said: list[str] = []
+    for now, then, what in ((figures, was_figures, "figure"), (charts, was_charts, "chart")):
+        for gone in [t for t in then if t not in now]:
+            said.append(f"Removed {gone}")
+        for added in [n for n in now if n not in then]:
+            said.append(f"Added {added}")
+        if not said and now != then and sorted(now) == sorted(then):
+            said.append(f"Reordered the {what}s")
+    return said or ["Rebuilt with the same contents"]
+
+
+@app.get("/conversation/{conversation_id}/reports")
+async def conversation_reports(
+    conversation_id: str, authorization: str = Header(...)
+) -> dict:
+    """Every report built during this conversation, newest first.
+
+    A conversation can build a report several times — one already holds eighteen — and
+    until now the only place they all appeared was the Files tab, mixed in with every
+    report from every other conversation. Which of those eighteen came from asking to
+    take a chart off, and which came before, was not answerable.
+    """
+    owner = _caller(authorization)
+    try:
+        conversation = conversations.get(conversation_id, owner)
+    except conversations.ConversationError as e:
+        raise HTTPException(404, str(e))
+
+    rows = (
+        get_client()
+        .table("generated_files")
+        .select("id, created_at, storage_path, layout_json, chart_preview_json, status")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    reports = []
+    for index, row in enumerate(rows):
+        layout = row.get("layout_json") or {}
+        # What this version changed. "11:13" and "11:19" say nothing about which report
+        # a customer wants; "studio chart removed" does. Worked out here rather than in
+        # the browser because the ordering is already established here, and a list that
+        # disagrees with itself about what came first would be worse than no list.
+        older = rows[index + 1].get("layout_json") or {} if index + 1 < len(rows) else None
+        reports.append({
+            "changes": _what_changed(older, layout),
+            "file_id": row["id"],
+            "storage_path": row.get("storage_path") or "",
+            # The preview has always carried the report's name; the record itself only
+            # started to. Read from both, so reports built before that still show their
+            # own name rather than the word "Report".
+            "title": (
+                layout.get("title")
+                or (row.get("chart_preview_json") or {}).get("title")
+                or "Report"
+            ),
+            "created_at": row["created_at"],
+            "headline_figures": layout.get("headline_figures") or [],
+            "charts": layout.get("charts") or [],
+            # Counting up from the first, so the oldest is version 1 however many
+            # there are — a number that changes meaning as the list grows is worse
+            # than none.
+            "version": len(rows) - index,
+            "latest": index == 0,
+            "downloadable": not str(row.get("storage_path", "")).startswith("stub://"),
+        })
+    return {"reports": reports}
+
+
 @app.post("/conversation/{conversation_id}/take-back")
 async def take_back(conversation_id: str, authorization: str = Header(...)) -> dict:
     """Forget the last thing the customer said, and what Lumina did about it.
@@ -357,6 +452,7 @@ async def take_back(conversation_id: str, authorization: str = Header(...)) -> d
 async def send_message(
     conversation_id: str,
     message: str = Body(..., embed=True),
+    images: list[str] = Body(default=[], embed=True),
     authorization: str = Header(...),
 ) -> StreamingResponse:
     """Say something, and stream back what the agent does about it.
@@ -371,6 +467,14 @@ async def send_message(
     except conversations.ConversationError as e:
         raise HTTPException(404, str(e))
 
+    for picture in images:
+        if not picture.startswith(("data:image/png", "data:image/jpeg", "data:image/webp")):
+            raise HTTPException(400, "Screenshots must be PNG, JPEG or WebP.")
+        # Roughly 4MB of base64 is 3MB of picture, which is beyond what the free models
+        # accept and far beyond what a screenshot of a dashboard needs.
+        if len(picture) > 4_000_000:
+            raise HTTPException(400, "That screenshot is too large. Send a smaller one.")
+
     opening = message
     if conversation.workbook and not conversation.history:
         # The agent's tools take a path, and the customer should never see one.
@@ -383,7 +487,16 @@ async def send_message(
 
     # Saved before the reply is attempted, so a turn that fails halfway still leaves the
     # customer's own words in the record rather than losing the question they asked.
-    conversations.record(conversation.id, [{"role": "you", "content": message}])
+    conversations.record(
+        conversation.id,
+        [{
+            "role": "you",
+            "content": message,
+            # Kept so reopening the conversation shows the screenshot they sent, not a
+            # message that reads as though it arrived with nothing attached.
+            **({"payload": {"images": images}} if images else {}),
+        }],
+    )
 
     # Where the agent's memory stood before this turn, so taking the turn back can put it
     # exactly there. Measured here rather than trusted to the take-back itself, which may
@@ -397,7 +510,9 @@ async def send_message(
         # round trip per step would slow the very stream it is recording.
         seen: list[dict] = []
         try:
-            for event in agent.respond(conversation.history, opening, owner_context):
+            for event in agent.respond(
+                conversation.history, opening, owner_context, images=images
+            ):
                 if event["type"] == "message":
                     seen.append(
                         {
@@ -406,6 +521,9 @@ async def send_message(
                             "payload": {
                                 "supplier": event.get("supplier"),
                                 "model": event.get("model"),
+                                # Kept, so reopening a conversation still offers the
+                                # buttons rather than only the question.
+                                "suggestions": event.get("suggestions") or None,
                             },
                         }
                     )

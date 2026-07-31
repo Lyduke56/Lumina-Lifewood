@@ -211,6 +211,141 @@ body {
           cursor: pointer; flex-shrink: 0;
         }
         .ll-icon-btn:hover { background: var(--line); }
+
+        /* Screenshots waiting to be sent, and screenshots already sent. Small: they are
+           a reminder of what is attached, not the thing being looked at. */
+        /* The conversation, with the reports it has built alongside it. The panel is
+           a fixed column rather than a share of the width, so the conversation itself
+           does not narrow as the list grows. */
+        .ll-chat-with-history { display: flex; flex: 1; min-width: 0; overflow: hidden; }
+        .ll-chat-with-history > .ll-chat { flex: 1; min-width: 0; }
+
+        .ll-history {
+          width: 268px; flex-shrink: 0; border-left: 1px solid var(--line);
+          background: var(--white); display: flex; flex-direction: column; overflow: hidden;
+        }
+        .ll-history > header {
+          display: flex; align-items: center; gap: 8px;
+          padding: 14px 16px; border-bottom: 1px solid var(--line);
+          font-size: 13px; font-weight: 600; color: var(--forest);
+        }
+        .ll-history > header small {
+          margin-left: auto; font-weight: 600; font-size: 11px;
+          background: var(--offwhite); border-radius: 999px; padding: 2px 8px;
+          color: rgba(19,48,32,0.6);
+        }
+        .ll-history > header .ll-history-collapse {
+          display: flex; align-items: center; justify-content: center;
+          width: 22px; height: 22px; margin-left: 2px; padding: 0;
+          border: none; border-radius: 6px; cursor: pointer;
+          background: transparent; color: rgba(19,48,32,0.55);
+        }
+        .ll-history > header .ll-history-collapse:hover { background: var(--offwhite); color: var(--forest); }
+
+        /* Collapsed: a rail carrying the count, so the list is out of the way without
+           being out of mind. */
+        .ll-history.is-collapsed { width: 44px; }
+        .ll-history.is-collapsed button {
+          width: 100%; padding: 14px 0; border: none; background: transparent;
+          cursor: pointer; color: var(--forest);
+          display: flex; flex-direction: column; align-items: center; gap: 5px;
+        }
+        .ll-history.is-collapsed button:hover { background: var(--offwhite); }
+        .ll-history.is-collapsed span {
+          font-size: 10px; font-weight: 700; min-width: 18px; padding: 1px 0;
+          border-radius: 999px; background: var(--emerald); color: var(--white);
+        }
+
+        .ll-history-changed {
+          margin: 0; font-size: 11px; line-height: 1.45; color: var(--emerald); font-weight: 600;
+        }
+
+        .ll-history-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .ll-history-item {
+          border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px;
+          background: var(--offwhite); display: flex; flex-direction: column; gap: 6px;
+        }
+        .ll-history-item.is-open { border-color: var(--emerald); }
+        .ll-history-head { display: flex; align-items: center; gap: 6px; }
+        .ll-history-head strong {
+          font-size: 12.5px; color: var(--forest); line-height: 1.3;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ll-history-head em {
+          margin-left: auto; flex-shrink: 0; font-style: normal; font-size: 10px;
+          font-weight: 600; padding: 1px 6px; border-radius: 999px;
+          background: var(--emerald); color: var(--white);
+        }
+        .ll-history-when {
+          display: flex; align-items: center; gap: 4px;
+          font-size: 11px; color: rgba(19,48,32,0.55);
+        }
+        .ll-history-holds { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+        .ll-history-holds li {
+          font-size: 10.5px; line-height: 1.4; padding: 2px 6px; border-radius: 6px;
+          background: var(--white); border: 1px solid var(--line); color: rgba(19,48,32,0.7);
+          max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ll-history-holds li.is-chart { border-style: dashed; }
+        .ll-history-actions { display: flex; gap: 6px; margin-top: 2px; }
+        .ll-history-actions button {
+          flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+          font-size: 11px; font-weight: 600; padding: 5px 0; cursor: pointer;
+          border: 1px solid var(--line); border-radius: 7px;
+          background: var(--white); color: var(--forest);
+        }
+        .ll-history-actions button:hover:not(:disabled) { background: var(--line); }
+        .ll-history-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* On a narrow screen the conversation matters more than the list. */
+        @media (max-width: 1100px) { .ll-history { display: none; } }
+
+        /* A finished run of steps, folded to one line. */
+        .ll-steps-folded {
+          display: flex; align-items: center; gap: 8px; align-self: flex-start;
+          padding: 6px 12px 6px 8px; border-radius: 999px; cursor: pointer;
+          border: 1px solid var(--line); background: var(--white);
+          font-size: 12px; font-weight: 600; color: rgba(19,48,32,0.65);
+        }
+        .ll-steps-folded:hover { background: var(--offwhite); color: var(--forest); }
+        .ll-steps-folded .ll-steps-tick {
+          display: flex; align-items: center; justify-content: center;
+          width: 16px; height: 16px; border-radius: 50%;
+          background: var(--emerald); color: var(--white);
+        }
+        .ll-steps-fold {
+          align-self: flex-start; display: flex; align-items: center; gap: 4px;
+          margin-bottom: 2px; padding: 2px 6px; border: none; background: transparent;
+          font-size: 11px; font-weight: 600; color: rgba(19,48,32,0.5); cursor: pointer;
+        }
+        .ll-steps-fold:hover { color: var(--forest); }
+
+        /* The likely answers to what Lumina just asked. */
+        .ll-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .ll-suggestions button {
+          padding: 6px 12px; border-radius: 999px; cursor: pointer;
+          border: 1px solid var(--emerald); background: var(--white);
+          font-size: 12px; font-weight: 600; color: var(--emerald);
+        }
+        .ll-suggestions button:hover { background: var(--emerald); color: var(--white); }
+
+        .ll-attached { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 2px 10px; }
+        .ll-attached-item { position: relative; }
+        .ll-attached-item img {
+          height: 56px; width: auto; max-width: 140px; object-fit: cover;
+          border-radius: 8px; border: 1px solid var(--line); display: block;
+        }
+        .ll-attached-item button {
+          position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+          border-radius: 50%; border: none; cursor: pointer; padding: 0;
+          background: var(--forest); color: var(--white);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .ll-said-images { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .ll-said-images img {
+          max-height: 180px; max-width: 100%; border-radius: 8px;
+          border: 1px solid rgba(255,255,255,0.25); display: block;
+        }
         .ll-send-btn {
           width: 32px; height: 32px; border-radius: 8px; background: var(--emerald); color: var(--white);
           display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; border: none;

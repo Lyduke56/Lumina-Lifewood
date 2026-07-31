@@ -88,6 +88,26 @@ export type ChatSummary = {
 };
 
 /** Either shape may be stored against a generated file. */
+/**
+ * One Power BI file built during a conversation.
+ *
+ * A conversation can build several — one already holds eighteen — and until now the only
+ * place they all appeared was the Files tab, mixed in with every other conversation's.
+ */
+export type ConversationReport = {
+  file_id: string;
+  storage_path: string;
+  title: string;
+  created_at: string;
+  headline_figures: string[];
+  charts: string[];
+  /** How this version differs from the one before it, in plain words. */
+  changes: string[];
+  version: number;
+  latest: boolean;
+  downloadable: boolean;
+};
+
 export type AnyPreview = ChartPreviewJson | FlexiblePreview;
 
 export function isFlexible(preview: unknown): preview is FlexiblePreview {

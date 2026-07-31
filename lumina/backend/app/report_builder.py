@@ -273,6 +273,192 @@ def add_chart(
     return spec
 
 
+# ── Changing a report that already exists ────────────────────────────────────
+#
+# Until now the only edits possible were additions. A customer who had been handed a
+# report and asked for a chart to be *removed*, or its colours changed, or the order
+# altered, was refused — the agent could add a fourth chart beside the three they did not
+# want, and nothing else. Adding is not editing.
+
+
+# Words that carry no information about which chart is meant. "The studio chart" and
+# "Achievement Rate by Studio" have exactly one word in common once these are dropped,
+# and that word is the whole answer.
+_NOISE = {
+    "the", "a", "an", "of", "by", "for", "and", "or", "on", "in", "to", "vs", "over",
+    "chart", "graph", "figure", "table", "visual", "card", "number", "one", "that", "this",
+}
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in re.split(r"[^a-z0-9]+", text.lower()) if w and w not in _NOISE}
+
+
+def _find(items: list, name: str, what: str):
+    """The one thing the customer means, matched on its title rather than its position.
+
+    Customers say "the studio chart", not "chart 2", and a title read off a screen is
+    rarely typed back exactly. Substring matching was tried first and is not enough:
+    "the studio chart" is not a substring of "Achievement Rate by Studio" nor the other
+    way round, so the most natural way to ask failed outright. Matched on shared
+    meaningful words instead, and only when one thing wins outright — asking which is
+    better than changing the wrong chart.
+    """
+    wanted = name.strip().lower()
+    exact = [i for i in items if i.title.lower() == wanted]
+    if len(exact) == 1:
+        return items.index(exact[0])
+    if not items:
+        raise ReportError(f"The report has no {what}s to change.")
+
+    asked = _words(name)
+    scored = [(len(asked & _words(i.title)), i) for i in items]
+    best = max((score for score, _ in scored), default=0)
+    if best:
+        winners = [item for score, item in scored if score == best]
+        if len(winners) == 1:
+            return items.index(winners[0])
+        raise ReportError(
+            f"{name!r} could mean more than one {what}: "
+            f"{', '.join(repr(i.title) for i in winners)}. Say which."
+        )
+    raise ReportError(
+        f"The report has no {what} called {name!r}. It has: "
+        f"{', '.join(repr(i.title) for i in items)}."
+    )
+
+
+def remove_from_report(spec: ReportSpec, name: str) -> str:
+    """Take a chart or a headline figure off the report."""
+    for items, what in ((spec.charts, "chart"), (spec.kpis, "headline figure")):
+        try:
+            at = _find(items, name, what)
+        except ReportError:
+            continue
+        gone = items.pop(at)
+        return f"Removed the {what} {gone.title!r}."
+
+    everything = [i.title for i in spec.charts] + [k.title for k in spec.kpis]
+    if not everything:
+        raise ReportError("The report is empty, so there is nothing to remove.")
+    raise ReportError(
+        f"The report has nothing called {name!r}. It has: "
+        f"{', '.join(repr(t) for t in everything)}."
+    )
+
+
+def change_chart(
+    spec: ReportSpec,
+    summary: Summary,
+    chart: str,
+    title: str | None = None,
+    kind: str | None = None,
+    measures: list[str] | None = None,
+    group_by: str | None = None,
+    position: int | None = None,
+) -> str:
+    """Change a chart that is already on the report, leaving the rest of it alone."""
+    at = _find(spec.charts, chart, "chart")
+    was = spec.charts[at]
+
+    # Built and checked as a new chart before replacing the old one, so a change that
+    # would produce something unreadable — a rate beside a count, thirty bars — is
+    # refused by the same rules that govern adding, and the report is left as it was.
+    # The title a customer chose survives a change to the chart's shape — turning a line
+    # into a table is not a request to rename it, and the first attempt renamed "Planned
+    # vs Completed Over Time" to "Detail by Month" for asking. A title we generated
+    # ourselves is regenerated, because "by Month" on a chart now drawn by studio is worse
+    # than a new title.
+    ours = was.title == _chart_title(was.kind, was.measures, was.group_by, summary.period)
+    trial = ReportSpec()
+    add_chart(
+        trial,
+        summary,
+        kind or was.kind,
+        list(measures) if measures else list(was.measures),
+        group_by or was.group_by,
+        title or (None if ours else was.title),
+    )
+    spec.charts[at] = trial.charts[0]
+
+    if position is not None:
+        wanted = max(0, min(position - 1, len(spec.charts) - 1))
+        spec.charts.insert(wanted, spec.charts.pop(at))
+        at = wanted
+
+    now = spec.charts[at]
+    moved = f", now number {at + 1} of {len(spec.charts)}" if position is not None else ""
+    return f"Changed {was.title!r} to a {now.kind} chart called {now.title!r}{moved}."
+
+
+def change_headline_figure(
+    spec: ReportSpec,
+    summary: Summary,
+    figure: str,
+    title: str | None = None,
+    measure: str | None = None,
+    position: int | None = None,
+) -> str:
+    """Rename a headline figure, point it at a different total, or move it."""
+    at = _find(spec.kpis, figure, "headline figure")
+    was = spec.kpis[at]
+    if measure:
+        _check_measure(summary, measure)
+        was.measure = measure
+        if not title:
+            was.title = _pretty(measure)
+    if title:
+        was.title = title
+    if position is not None:
+        wanted = max(0, min(position - 1, len(spec.kpis) - 1))
+        spec.kpis.insert(wanted, spec.kpis.pop(at))
+        at = wanted
+    return (
+        f"The headline figure now reads {was.title!r}"
+        f"{f', number {at + 1} of {len(spec.kpis)}' if position is not None else ''}."
+    )
+
+
+def change_report_style(
+    spec: ReportSpec, title: str | None = None, colours: list[str] | None = None
+) -> str:
+    """Rename the report, or change the colours its charts are drawn in."""
+    said = []
+    if title:
+        spec.title = title
+        said.append(f"the report is now called {title!r}")
+    if colours:
+        good = pbi._valid_data_colors(colours)
+        # _valid_data_colors falls back to the brand palette rather than failing, which
+        # would silently ignore a customer asking for a colour they cannot have.
+        rejected = [c for c in colours if c not in good]
+        if rejected:
+            raise ReportError(
+                f"{', '.join(rejected)} are not colours I can use. Give them as hex, "
+                f"like #046241, and give at least two."
+            )
+        spec.palette = good
+        said.append(f"charts will be drawn in {', '.join(good)}")
+    if not said:
+        raise ReportError("Say what to change — a title, or the colours.")
+    return "Changed: " + " and ".join(said) + "."
+
+
+def report_contents(spec: ReportSpec) -> str:
+    """What is on the report right now, so a change can be asked for by name."""
+    if not spec.kpis and not spec.charts:
+        return "The report is empty."
+    lines = [f"'{spec.title}' contains:"]
+    for index, kpi in enumerate(spec.kpis, 1):
+        lines.append(f"  headline figure {index}: {kpi.title} ({kpi.measure})")
+    for index, chart in enumerate(spec.charts, 1):
+        lines.append(
+            f"  chart {index}: {chart.title} — a {chart.kind} of "
+            f"{', '.join(chart.measures)} by {chart.group_by}"
+        )
+    return "\n".join(lines)
+
+
 # What a derived figure is called in the report, where it differs from what the code
 # calls it. "shortfall" is achieved minus planned, which is positive in a good month and
 # negative in a bad one — so a figure called Shortfall showed −114,561 for the month
