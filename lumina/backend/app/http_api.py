@@ -154,6 +154,7 @@ def _shaped(conversation_id: str) -> list[dict]:
                     "role": m["role"],
                     "text": m["content"],
                     "report": payload.get("report"),
+                    "suggestions": payload.get("suggestions"),
                     # Reopening a conversation shows the screenshots that were sent with
                     # it, or a message asking to move a chart reads as though it arrived
                     # with nothing to point at.
@@ -341,6 +342,36 @@ async def begin_conversation(
     }
 
 
+def _what_changed(before: dict | None, after: dict) -> list[str]:
+    """How this version of a report differs from the one before it, in plain words.
+
+    The first build has nothing to compare against and says what it contains instead —
+    "nothing changed" would be true and useless.
+    """
+    def contents(of: dict) -> tuple[list[str], list[str]]:
+        return list(of.get("headline_figures") or []), list(of.get("charts") or [])
+
+    figures, charts = contents(after)
+    if before is None:
+        made = []
+        if figures:
+            made.append(f"{len(figures)} headline figure{'' if len(figures) == 1 else 's'}")
+        if charts:
+            made.append(f"{len(charts)} chart{'' if len(charts) == 1 else 's'}")
+        return ["Built with " + " and ".join(made)] if made else ["First build"]
+
+    was_figures, was_charts = contents(before)
+    said: list[str] = []
+    for now, then, what in ((figures, was_figures, "figure"), (charts, was_charts, "chart")):
+        for gone in [t for t in then if t not in now]:
+            said.append(f"Removed {gone}")
+        for added in [n for n in now if n not in then]:
+            said.append(f"Added {added}")
+        if not said and now != then and sorted(now) == sorted(then):
+            said.append(f"Reordered the {what}s")
+    return said or ["Rebuilt with the same contents"]
+
+
 @app.get("/conversation/{conversation_id}/reports")
 async def conversation_reports(
     conversation_id: str, authorization: str = Header(...)
@@ -371,7 +402,13 @@ async def conversation_reports(
     reports = []
     for index, row in enumerate(rows):
         layout = row.get("layout_json") or {}
+        # What this version changed. "11:13" and "11:19" say nothing about which report
+        # a customer wants; "studio chart removed" does. Worked out here rather than in
+        # the browser because the ordering is already established here, and a list that
+        # disagrees with itself about what came first would be worse than no list.
+        older = rows[index + 1].get("layout_json") or {} if index + 1 < len(rows) else None
         reports.append({
+            "changes": _what_changed(older, layout),
             "file_id": row["id"],
             "storage_path": row.get("storage_path") or "",
             "title": layout.get("title") or "Report",
@@ -477,6 +514,9 @@ async def send_message(
                             "payload": {
                                 "supplier": event.get("supplier"),
                                 "model": event.get("model"),
+                                # Kept, so reopening a conversation still offers the
+                                # buttons rather than only the question.
+                                "suggestions": event.get("suggestions") or None,
                             },
                         }
                     )

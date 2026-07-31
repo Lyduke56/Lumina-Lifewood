@@ -101,6 +101,8 @@ export type ConversationReport = {
   created_at: string;
   headline_figures: string[];
   charts: string[];
+  /** How this version differs from the one before it, in plain words. */
+  changes: string[];
   version: number;
   latest: boolean;
   downloadable: boolean;

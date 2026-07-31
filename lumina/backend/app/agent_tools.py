@@ -39,7 +39,7 @@ from supabase_client import (
 from summariser import ORDER_KEY, SummaryError, summarise
 
 
-def reply_to_customer(message: str) -> str:
+def reply_to_customer(message: str, suggestions: list[str] | None = None) -> str:
     """Say something to the customer. This is the ONLY way they hear from you.
 
     Anything written outside a tool is discarded and never reaches them, so use this for
@@ -49,6 +49,9 @@ def reply_to_customer(message: str) -> str:
         message: Plain language for a busy, non-technical production manager. No column
             numbers, no tool names, no thinking out loud — just what they need to know
             or decide. A few sentences at most.
+        suggestions: Two or three likely answers, as the customer would type them, shown
+            as buttons they can tap instead of typing. Only when you have asked something
+            with a small number of sensible answers.
     """
     return "Sent. Wait for their reply before doing anything further."
 

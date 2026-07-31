@@ -594,6 +594,13 @@ def respond(
                 yield {
                     "type": "message",
                     "text": arguments.get("message", ""),
+                    # Likely answers, offered as buttons. A customer who can tap "Yes,
+                    # build it" neither types it nor mis-hits Enter on their way to it.
+                    "suggestions": [
+                        str(s)[:60]
+                        for s in (arguments.get("suggestions") or [])
+                        if str(s).strip()
+                    ][:3],
                     **credit,
                 }
                 history.append(

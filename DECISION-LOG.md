@@ -3162,7 +3162,44 @@ It guides an edit; it never supplies a number.
 
 ---
 
-## 57. Still to be decided
+## 57. The chat itself
+
+Five changes to the conversation, four of them John Peter's picks from a list, one his own
+observation — that since a chat can build several Power BI files, a customer ought to be able
+to see all of them.
+
+He is right, and the numbers made the case: **one conversation had already built eighteen
+files.** The only one a customer could reach was whichever card happened to be scrolled to in
+the transcript; the rest sat in the Files tab mixed in with every other conversation's. Which
+version had the studio chart on it, and which came after asking for it to be taken off, was
+not an answerable question.
+
+There is now a panel beside the conversation listing every report it has built, newest first,
+and it **collapses to a rail** carrying the count when the conversation needs the width. Each
+entry says **what that version changed** — "Removed Achievement Rate by Studio" — rather than
+only when it was made, because "11:13" and "11:19" tell a customer nothing about which one they
+want. The same line now appears on the report card in the transcript.
+
+**The steps fold up.** A build leaves nine or ten rows of ticks on the page, worth watching
+while they happen and clutter the moment they stop — they were pushing the conversation itself
+off the screen. A finished run collapses to "6 steps ✓" and opens again on a click. **A run
+containing anything that broke stays open**, since that is exactly what somebody scrolls back
+for.
+
+**Lumina offers the likely answers as buttons.** They come from the model itself, passed
+alongside the message it is already sending, because the thing that just asked the question is
+the thing that knows what the sensible answers are. In its first real conversation it offered
+"Video Production Plan / Upload Log", then "Yes, that's correct / No, something's different",
+then "By week / By studio / By editor" — all of which a customer would otherwise have typed.
+This also closes the misclick of Section 53 from the other end: an answer that can be tapped is
+an answer nobody mis-hits Enter on their way to.
+
+And **the header names the conversation** rather than always saying "Talk to Lumina", which
+meant checking the sidebar to know which chat you were in.
+
+---
+
+## 58. Still to be decided
 
 These are open. They are recorded so they do not get forgotten or decided by accident.
 
@@ -3190,7 +3227,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 
 ---
 
-## 58. Change history
+## 59. Change history
 
 | Date | Change |
 |------|--------|
@@ -3219,6 +3256,7 @@ Section 18), branding the report page itself (done — see Section 18), which ty
 | 29 July 2026 | Added Section 26: **the conversation from Decision 1 now works.** A real exchange on the untouched official workbook produced a real Power BI file — six monthly rows, a headline completion rate and a target-versus-actual chart. Notably the AI got the column meanings wrong twice, was refused by the tools both times, read the explanation and corrected itself unprompted — the guardrails from Decisions 6 and 7 working as intended. **The remaining obstacle is the AI model, not our software:** the OpenRouter account is nearly out of credits, and the free model that works spills its own reasoning into what the customer reads. A decision for Lifewood, changeable in seconds once made. |
 | 29 July 2026 | Revised Section 26 after John Peter challenged the conclusion that free models were not good enough. **He was right.** Fourteen free models support the tool use this needs, and several produce clean professional replies when tested on the exact step that had failed. The real obstacle was a **daily allowance of 50 requests** — about three conversations — not model quality; roughly **$10 once** raises it to 1000 a day at no per-report cost. Also corrected our own omission (the existing model-fallback arrangement was not being used by the agent), gave the AI a ready-made column list to stop it wasting requests on retries, and made the customer's view come only from a dedicated tool so a model can no longer spill its reasoning in front of them. |
 | 29 July 2026 | Made the AI supplier a setting, after John Peter asked whether we could simply use a different one. **We can, and it is the better answer.** Google's free tier allows about 1,500 requests a day and Groq's about 1,000, against OpenRouter's 50 — roughly a hundred conversations a day instead of three, still free and still without a card. Because these suppliers share a common protocol the change is a web address and a key rather than a rewrite. Google, Groq, Cerebras and OpenRouter are built in, it still defaults to OpenRouter so nothing changes for anyone who has not chosen, and a missing key now says exactly which one to set. **The earlier conclusion that Lifewood must pay per report was wrong twice over.** |
+| 31 July 2026 | Added Section 57: **the chat itself.** A conversation can build several Power BI files — one had already built eighteen — and the only one reachable was whichever card happened to be scrolled to, with the rest mixed into the Files tab. There is now a collapsible panel listing every report the chat has built, each saying **what that version changed** rather than only when it was made. The steps fold to one line once finished, since ten rows of ticks were pushing the conversation off the screen, and a run containing a failure stays open. **Lumina now offers the likely answers as buttons**, supplied by the model alongside the message it is already sending — which also closes the misclick of Section 53 from the other end, since an answer that can be tapped is one nobody mis-hits Enter on the way to. And the header names the conversation instead of always saying "Talk to Lumina". |
 | 31 July 2026 | Added Sections 55 and 56, after John Peter asked whether a customer can suggest changes once the Power BI file exists. **Adding is not editing**: asking for a change already reopened the tools, but the only edit possible was another addition — ask for a chart to be removed and it could add a fourth beside the three you did not want. Five tools now remove, change, reorder and restyle, checked by the same rules as an addition so a bad change leaves the report as it was. Two faults found by using them: "the studio chart" did not match "Achievement Rate by Studio" under substring matching, and changing a chart's shape silently renamed it. **And screenshots**: none of the free models can both see a picture and use tools — Groq offers no vision model at all, the small one that sees cannot drive tools, and the large one needs reasoning tokens replayed that our cross-supplier portability strips. So a seeing model describes the screenshot once, in words, and the strong text model does the work. The picture never enters the record, no supplier is ruled out for the rest of the conversation, and the description is passed as a description — never as figures. |
 | 31 July 2026 | Added Sections 53 and 54, both from John Peter running the whole thing in the browser himself. **A stray keystroke was an instruction**: a mis-hit Enter sent a single letter and Lumina answered it, and the letter then sat in the agent's memory shaping every later turn. Stop now takes the message back — the reply halts, the turn is removed from both the transcript and the agent's own memory, and the words go back in the box. Refusing messages that "look accidental" was rejected as guessing at what a customer meant. **And the preview was not showing the report**: the Power BI file was correct while the page beside it drew sixteen points labelled "Jan 2026" four times, and a chart of achievement *by studio* came out as months. One cause — the preview was handed a single grouping for the whole report and each chart's own was dropped — and it is the **second time a correct report has been misrepresented by the thing the customer actually looks at**. Also: markdown from the model is tidied before rendering, since it strings bullets along one line and lets a question be swallowed into a list. |
 | 31 July 2026 | Added Section 51: **made the report look like a dashboard**, working from a real Lifewood report and the published examples John Peter sent — explicitly as standards to meet rather than a layout to copy, since what a report contains depends on the conversation. Visuals now sit in white cards with soft borders, a title band names the report and says how much of the sheet went into it, and a **written panel explains what the figures say** in sentences, the feature he singled out. **The Lifewood logo is now on every page**, extracted from inside the website's own SVG rather than redrawn. Looking at the result found three faults that every automated check had passed: a card height that clipped the caption under the number, a header claiming "238 months", and an insights panel naming the best *row* as the best month. **A fourth was found by the unattended harness rather than by a person** — a workbook's grand-total row was being counted as data whenever the figures were not placed on a timeline, roughly doubling every figure on the page. The rule skipping undated rows had only ever applied to timelines. **Third total-row fault in two days, and the first the harness caught before a customer could.** |

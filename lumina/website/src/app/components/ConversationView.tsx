@@ -18,6 +18,8 @@ import {
   RotateCcw,
   Search,
   ImagePlus,
+  ChevronDown,
+  ChevronRight,
   Send,
   Square,
   X,
@@ -79,7 +81,7 @@ type Step = {
 };
 
 type Entry =
-  | { kind: "said"; role: "you" | "lumina"; text: string; report?: Report; model?: string; images?: string[] }
+  | { kind: "said"; role: "you" | "lumina"; text: string; report?: Report; model?: string; images?: string[]; suggestions?: string[] }
   | { kind: "steps"; steps: Step[] };
 
 interface ConversationViewProps {
@@ -116,6 +118,18 @@ export function ConversationView({ session, resume = true, conversationId: openI
   // The transcript as a ref as well as state, so a turn can note where it began without
   // reading a value that has not been applied yet.
   const entriesRef = useRef<Entry[]>([]);
+
+  /** The model last announced, so it is named once rather than on every step. */
+  const shownModel = useRef<string | null>(null);
+
+  /** Announce the model when it first answers, and whenever it changes. A change means a
+   *  supplier ran out and another took over, which is worth seeing in the transcript. */
+  function noteModel(model?: string) {
+    if (!model || shownModel.current === model) return;
+    shownModel.current = model;
+    addNotice("model", model);
+  }
+
   const [stopping, setStopping] = useState(false);
   // Screenshots waiting to go with the next message. A customer looking at a report they
   // have just been given points at what they want changed far more easily than they
@@ -125,6 +139,12 @@ export function ConversationView({ session, resume = true, conversationId: openI
   // Every report this conversation has built, so a customer can go back to an earlier
   // one rather than scrolling the transcript for the card that offered it.
   const [reports, setReports] = useState<ConversationReport[]>([]);
+  // Which finished runs of steps the customer has opened again. A build produces nine or
+  // ten rows, and left expanded they push the conversation itself off the screen.
+  const [openSteps, setOpenSteps] = useState<Set<number>>(new Set());
+  // Which conversation this is. The header said "Talk to Lumina" whichever chat you were
+  // in, so the only way to tell was to look back at the sidebar.
+  const [title, setTitle] = useState<string | null>(null);
 
   // Keep the newest entry in view; a reply can arrive a while after it was asked for.
   useEffect(() => {
@@ -178,6 +198,7 @@ export function ConversationView({ session, resume = true, conversationId: openI
         const saved = await res.json();
         if (!current || !saved.conversation_id) return;
         setConversationId(saved.conversation_id);
+        setTitle(saved.title ?? null);
         setWorkbook(saved.workbook ?? null);
         setEntries(saved.entries ?? []);
         // So a follow-up does not re-announce a model the restored transcript already names.
@@ -195,17 +216,6 @@ export function ConversationView({ session, resume = true, conversationId: openI
     })();
     return () => { current = false; };
   }, [token, resume, openId]);
-
-  /** The model last announced, so it is named once rather than on every step. */
-  const shownModel = useRef<string | null>(null);
-
-  /** Announce the model when it first answers, and whenever it changes. A change means a
-   *  supplier ran out and another took over, which is worth seeing in the transcript. */
-  function noteModel(model?: string) {
-    if (!model || shownModel.current === model) return;
-    shownModel.current = model;
-    addNotice("model", model);
-  }
 
   /** Add a step to the run in progress, starting a new run if the last thing said was
    *  a message rather than a step. */
@@ -364,7 +374,13 @@ export function ConversationView({ session, resume = true, conversationId: openI
             setThinking(null);
             setEntries((list) => [
               ...list,
-              { kind: "said", role: "lumina", text: event.text, model: event.model },
+              {
+                kind: "said",
+                role: "lumina",
+                text: event.text,
+                model: event.model,
+                suggestions: event.suggestions,
+              },
             ]);
           } else if (event.type === "tool_started") {
             noteModel(event.model);
@@ -418,6 +434,81 @@ export function ConversationView({ session, resume = true, conversationId: openI
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not download that file.");
     }
+  }
+
+  /** One thing that was said — by the customer or by Lumina. */
+  function renderSaid(entry: Extract<Entry, { kind: "said" }>, i: number) {
+    // What this version of the report changed, read from the list beside the
+    // conversation. Scrolling back to an older card and being told only its title
+    // answers the wrong question: what a customer wants to know is how it differs.
+    const changed = entry.report?.file_id
+      ? reports.find((r) => r.file_id === entry.report!.file_id)
+      : undefined;
+
+    return (
+      <div key={i} className={entry.role === "you" ? "ll-msg-user" : "ll-msg-assistant"}>
+        {/* Models write in markdown by habit. Rendering it beats forbidding it —
+            a list of columns genuinely reads better as a list, and it has already
+            produced a table when describing figures. Unrendered, a customer sees
+            stray asterisks. Tidied first, because they also write it wrongly: bullets
+            strung along one line, and a question absorbed into the last item. */}
+        {entry.role === "you" ? entry.text : <Markdown remarkPlugins={[remarkGfm]}>{tidyMarkdown(entry.text)}</Markdown>}
+
+        {entry.images && entry.images.length > 0 && (
+          <div className="ll-said-images">
+            {entry.images.map((picture, at) => (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img key={at} src={picture} alt={`Screenshot ${at + 1}`} />
+            ))}
+          </div>
+        )}
+
+        {entry.report && (
+          <div className="ll-report-card">
+            <FileSpreadsheet size={20} color="var(--emerald)" />
+            <span style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+              <strong style={{ display: "block", color: "var(--forest)" }}>{entry.report.title}</strong>
+              <small style={{ opacity: 0.7 }}>
+                {changed
+                  ? `Version ${changed.version} · ${changed.changes.join(" · ")}`
+                  : "Power BI project"}
+              </small>
+            </span>
+            {/* Two ways to have it: on screen now, or as a file. Downloading and
+                opening Power BI Desktop to check a figure is a lot of work for a
+                manager who only wanted to look. */}
+            {entry.report.file_id && onOpenReport && (
+              <button
+                className="ll-report-action"
+                onClick={() => onOpenReport(entry.report!.file_id!)}
+              >
+                <Eye size={14} /> Preview
+              </button>
+            )}
+            <button className="ll-report-action" onClick={() => download(entry.report!)}>
+              <Download size={14} /> Download
+            </button>
+          </div>
+        )}
+
+        {/* The likely answers, offered as buttons. Tapping one neither costs a busy
+            manager any typing nor gives them a chance to mis-hit Enter on the way.
+            Only on the newest message: an old question has already been answered. */}
+        {entry.role === "lumina" &&
+          entry.suggestions &&
+          entry.suggestions.length > 0 &&
+          i === entries.length - 1 &&
+          !busy && (
+            <div className="ll-suggestions">
+              {entry.suggestions.map((suggestion) => (
+                <button key={suggestion} onClick={() => send(suggestion)}>
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
+      </div>
+    );
   }
 
   // ── Fetching the last conversation ─────────────────────────────────────────
@@ -494,8 +585,11 @@ export function ConversationView({ session, resume = true, conversationId: openI
     <main className="ll-chat-with-history">
     <div className="ll-chat">
       <div className="ll-chat-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--forest)" }}>
-          <Sparkles size={18} color="var(--emerald)" /> Talk to Lumina
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: "var(--forest)", minWidth: 0 }}>
+          <Sparkles size={18} color="var(--emerald)" style={{ flexShrink: 0 }} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {title ?? "Talk to Lumina"}
+          </span>
         </div>
         {workbook && (
           <span className="ll-badge-sync">
@@ -508,9 +602,55 @@ export function ConversationView({ session, resume = true, conversationId: openI
         className="ll-scrollbar"
         style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 12 }}
       >
-        {entries.map((entry, i) =>
-          entry.kind === "steps" ? (
+        {entries.map((entry, i) => {
+          if (entry.kind !== "steps") return renderSaid(entry, i);
+
+          // A finished run of steps folds to one line. Ten rows of ticks are worth
+          // watching while they happen and are clutter the moment they stop — they were
+          // pushing the conversation itself off the screen. Anything that refused or
+          // broke stays open, because that is exactly what somebody scrolls back for.
+          const finished = entry.steps.every((st) => st.done);
+          const wrong = entry.steps.filter((st) => st.outcome === "broken").length;
+          const retried = entry.steps.filter((st) => st.outcome === "refused").length;
+          const worthFolding = finished && entry.steps.length > 3 && !wrong;
+          const folded = worthFolding && !openSteps.has(i);
+
+          if (folded) {
+            const named = entry.steps.filter((st) => st.tool !== "model" && !st.notice);
+            return (
+              <button
+                key={i}
+                className="ll-steps-folded"
+                onClick={() =>
+                  setOpenSteps((open) => new Set(open).add(i))
+                }
+              >
+                <ChevronRight size={14} />
+                <span>
+                  {named.length} step{named.length === 1 ? "" : "s"}
+                  {retried > 0 && `, ${retried} retried`}
+                </span>
+                <span className="ll-steps-tick"><Check size={12} strokeWidth={3} /></span>
+              </button>
+            );
+          }
+
+          return (
             <div key={i} className="ll-steps">
+              {worthFolding && (
+                <button
+                  className="ll-steps-fold"
+                  onClick={() =>
+                    setOpenSteps((open) => {
+                      const next = new Set(open);
+                      next.delete(i);
+                      return next;
+                    })
+                  }
+                >
+                  <ChevronDown size={13} /> Hide these steps
+                </button>
+              )}
               {entry.steps.map((step, j) => {
                 const known = STEPS[step.tool];
                 const Icon = known?.Icon ?? Sparkles;
@@ -542,50 +682,8 @@ export function ConversationView({ session, resume = true, conversationId: openI
                 );
               })}
             </div>
-          ) : (
-            <div key={i} className={entry.role === "you" ? "ll-msg-user" : "ll-msg-assistant"}>
-              {/* Models write in markdown by habit. Rendering it beats forbidding it —
-                  a list of columns genuinely reads better as a list, and it has already
-                  produced a table when describing figures. Unrendered, a customer sees
-                  stray asterisks. Tidied first, because they also write it wrongly: bullets
-                  strung along one line, and a question absorbed into the last item. */}
-              {entry.role === "you" ? entry.text : <Markdown remarkPlugins={[remarkGfm]}>{tidyMarkdown(entry.text)}</Markdown>}
-
-              {entry.images && entry.images.length > 0 && (
-                <div className="ll-said-images">
-                  {entry.images.map((picture, at) => (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img key={at} src={picture} alt={`Screenshot ${at + 1}`} />
-                  ))}
-                </div>
-              )}
-
-              {entry.report && (
-                <div className="ll-report-card">
-                  <FileSpreadsheet size={20} color="var(--emerald)" />
-                  <span style={{ flex: 1, textAlign: "left" }}>
-                    <strong style={{ display: "block", color: "var(--forest)" }}>{entry.report.title}</strong>
-                    <small style={{ opacity: 0.7 }}>Power BI project</small>
-                  </span>
-                  {/* Two ways to have it: on screen now, or as a file. Downloading and
-                      opening Power BI Desktop to check a figure is a lot of work for a
-                      manager who only wanted to look. */}
-                  {entry.report.file_id && onOpenReport && (
-                    <button
-                      className="ll-report-action"
-                      onClick={() => onOpenReport(entry.report!.file_id!)}
-                    >
-                      <Eye size={14} /> Preview
-                    </button>
-                  )}
-                  <button className="ll-report-action" onClick={() => download(entry.report!)}>
-                    <Download size={14} /> Download
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        )}
+          );
+        })}
 
         {thinking && (
           <div className="ll-msg-assistant" style={{ display: "flex", alignItems: "center", gap: 10 }}>

@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Download, Eye, FileText } from "lucide-react";
+import { useState } from "react";
+import { ChevronRight, Clock, Download, Eye, FileText } from "lucide-react";
 import type { ConversationReport } from "@/lib/types";
 
 /**
@@ -40,7 +41,21 @@ export function ReportHistory({
   onPreview,
   onDownload,
 }: ReportHistoryProps) {
+  const [open, setOpen] = useState(true);
   if (!reports.length) return null;
+
+  // Collapsed, it becomes a rail down the edge carrying the count, so the conversation
+  // gets the width back without the list disappearing from the customer's mind.
+  if (!open) {
+    return (
+      <aside className="ll-history is-collapsed">
+        <button onClick={() => setOpen(true)} title="Show the reports in this chat">
+          <FileText size={14} />
+          <span>{reports.length}</span>
+        </button>
+      </aside>
+    );
+  }
 
   return (
     <aside className="ll-history">
@@ -48,6 +63,13 @@ export function ReportHistory({
         <FileText size={14} />
         <span>Reports in this chat</span>
         <small>{reports.length}</small>
+        <button
+          className="ll-history-collapse"
+          onClick={() => setOpen(false)}
+          title="Hide this panel"
+        >
+          <ChevronRight size={15} />
+        </button>
       </header>
 
       <div className="ll-history-list">
@@ -67,6 +89,12 @@ export function ReportHistory({
               <span>·</span>
               Version {report.version}
             </div>
+
+            {/* What this version changed, which is the question a customer is actually
+                asking when they scroll back through them. */}
+            {report.changes.length > 0 && (
+              <p className="ll-history-changed">{report.changes.join(" · ")}</p>
+            )}
 
             {/* What is actually on this one, so two versions can be told apart without
                 opening both. */}
