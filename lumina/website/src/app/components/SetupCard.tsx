@@ -24,11 +24,11 @@ type ColorPreset = {
 
 const COLOR_PRESETS: ColorPreset[] = [
   { id: "lifewood", label: "Lifewood", sub: "",
-    colors: ["#133020","#FFB347","#046241","#FFC370","#417256","#C17710","#708E7C","#9CA..."] },
+    colors: ["#133020","#FFB347","#046241","#FFC370","#417256","#C17710","#708E7C","#9CAFA4"] },
   { id: "plum-citrus", label: "Plum + Citrus", sub: "",
-    colors: ["#4A235A","#F4D03F","#7D3C98","#F8C471","#6C3483","#F5B041","#A569BD","#F3..."] },
+    colors: ["#4A235A","#F4D03F","#7D3C98","#F8C471","#6C3483","#F5B041","#A569BD","#F3D9A4"] },
   { id: "slate-coral", label: "Slate + Coral", sub: "",
-    colors: ["#334155","#F87171","#475569","#FCA5A5","#1E293B","#EF4444","#647488","#FEC..."] },
+    colors: ["#334155","#F87171","#475569","#FCA5A5","#1E293B","#EF4444","#647488","#FECACA"] },
   { id: "custom", label: "Custom", sub: "", colors: [] },
 ];
 
@@ -46,6 +46,8 @@ const FONT_PRESETS: {
   body: string;
   googleName?: string;
 }[] = [
+  // Manrope is Lifewood's brand typeface — Semibold for headings, Regular for body.
+  { id: "manrope",         heading: "Manrope SemiBold", body: "Manrope", googleName: "Manrope:wght@400;600" },
   { id: "inter-inter",     heading: "Inter",            body: "Inter"    },
   { id: "playfair-inter",  heading: "Playfair Display", body: "Inter",   googleName: "Playfair+Display:wght@700" },
   { id: "montserrat-lato", heading: "Montserrat",       body: "Lato",    googleName: "Montserrat:wght@700&family=Lato:wght@400" },
@@ -54,11 +56,11 @@ const FONT_PRESETS: {
 ];
 
 const HEADING_FONT_OPTIONS = [
-  "Inter", "Playfair Display", "Montserrat", "Fraunces",
-  "DM Sans", "Lato", "Poppins", "Raleway", "Merriweather",
+  "Manrope SemiBold", "Manrope", "Inter", "Playfair Display", "Montserrat",
+  "Fraunces", "DM Sans", "Lato", "Poppins", "Raleway", "Merriweather",
 ];
 const BODY_FONT_OPTIONS = [
-  "Inter", "Lato", "DM Sans", "Roboto",
+  "Manrope", "Inter", "Lato", "DM Sans", "Roboto",
   "Open Sans", "Source Sans 3", "Nunito", "Mulish",
 ];
 
@@ -137,7 +139,7 @@ export function SetupCard({ onComplete, onCancel, inline = false, compact = fals
 
 
   // Typography
-  const [fontPreset,    setFontPreset]    = useState<FontPresetId>("fraunces-dm");
+  const [fontPreset,    setFontPreset]    = useState<FontPresetId>("manrope");
   const [customHeading, setCustomHeading] = useState("Inter");
   const [customBody,    setCustomBody]    = useState("Inter");
 

@@ -139,8 +139,8 @@ export function WebDashboard({
   const rawSeries = chartData?.records ?? MOCK_SERIES;
   const isActualMock = isMock || !chartData;
 
-  const headingFont = chartData?.heading_font || "Fraunces";
-  const bodyFont = chartData?.body_font || "DM Sans";
+  const headingFont = chartData?.heading_font || "Manrope SemiBold";
+  const bodyFont = chartData?.body_font || "Manrope";
 
   const c0 = dataColors[0] ?? DEFAULT_COLORS[0];
   const c1 = dataColors[1] ?? DEFAULT_COLORS[1];

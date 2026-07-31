@@ -12,6 +12,7 @@ from supabase_client import (
     save_dataset,
     save_generated_file,
     get_conversation_owner,
+    get_user_profile,
     upload_generated_file,
     get_or_create_whatsapp_conversation,
 )
@@ -32,8 +33,8 @@ def run_pipeline(
     report_name: str = "",
     instructions: str | None = None,
     data_colors: list[str] | None = None,
-    heading_font: str = "Fraunces",
-    body_font: str = "DM Sans",
+    heading_font: str = "Manrope SemiBold",
+    body_font: str = "Manrope",
     good_threshold: float | None = None,
     neutral_threshold: float | None = None,
 ) -> dict:
@@ -70,7 +71,10 @@ def run_pipeline(
         neutral_threshold=neutral_threshold,
     )
     object_path = upload_generated_file(
-        output_dir, user_id=user_id, dataset_id=dataset["id"]
+        output_dir,
+        user_id=user_id,
+        dataset_id=dataset["id"],
+        report_name=report_name,
     )
 
     generated_file = save_generated_file(
@@ -86,6 +90,7 @@ def run_pipeline(
         "generated_file_id": generated_file["id"],
         "record_count": len(records),
         "storage_path": object_path,
+        "user_profile": get_user_profile(user_id),
     }
 
 
@@ -117,8 +122,8 @@ def process_production_plan(
     report_name: str = "",
     instructions: str = "",
     data_colors: list[str] | None = None,
-    heading_font: str = "Fraunces",
-    body_font: str = "DM Sans",
+    heading_font: str = "Manrope SemiBold",
+    body_font: str = "Manrope",
     good_threshold: float | None = None,
     neutral_threshold: float | None = None,
 ) -> dict:
@@ -148,6 +153,15 @@ def process_production_plan(
         good_threshold,
         neutral_threshold,
     )
+
+
+# The six tools of Decision 8, added alongside process_production_plan rather than
+# replacing it. Decision 9: the existing path keeps serving both the website and
+# WhatsApp untouched, so nobody's experience changes until a surface is deliberately
+# pointed at these.
+import agent_tools
+
+agent_tools.register(mcp)
 
 
 @mcp.custom_route("/health", methods=["GET"])

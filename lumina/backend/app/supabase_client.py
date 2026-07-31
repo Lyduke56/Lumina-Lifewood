@@ -1,4 +1,6 @@
 import os
+import re
+from datetime import date
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
@@ -85,6 +87,40 @@ def get_conversation_owner(conversation_id: str) -> str:
     return result.data[0]["user_id"]
 
 
+def get_user_profile(user_id: str) -> dict:
+    """Return display-friendly profile info (full_name, email) for a user.
+
+    Falls back gracefully if fields are missing.
+    """
+    client = get_client()
+    # Get full_name from profiles table
+    profile_result = (
+        client.table("profiles")
+        .select("full_name, username")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    full_name = None
+    username = None
+    if profile_result.data:
+        full_name = profile_result.data[0].get("full_name")
+        username = profile_result.data[0].get("username")
+
+    # Get email from auth.users via admin API
+    try:
+        auth_result = client.auth.admin.get_user_by_id(user_id)
+        email = auth_result.user.email if auth_result and auth_result.user else None
+    except Exception:
+        email = None
+
+    display_name = full_name or username or email or "your account"
+    return {
+        "display_name": display_name,
+        "email": email,
+    }
+
+
 def get_user_id_by_phone(phone_number: str) -> str:
     """Resolve a WhatsApp phone number to a Supabase user via profiles.contact_number."""
     from phone_utils import phones_match
@@ -142,18 +178,43 @@ def get_or_create_whatsapp_conversation(phone_number: str) -> dict:
     }
 
 
-def upload_generated_file(local_dir: Path, user_id: str, dataset_id: str) -> str:
+FALLBACK_REPORT_NAME = "Production Plan"
+
+# Characters Windows forbids in a filename, plus control characters. The download
+# lands on the user's own machine, so the name has to be legal there — not just in
+# object storage.
+_ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def download_filename(report_name: str, on: date | None = None) -> str:
+    """Build the name the user sees when they download, e.g. "Test 1 - 2026-07-28.zip".
+
+    The date is included because regenerating the same report is routine — without it
+    the browser silently appends "(1)", "(2)" and the user cannot tell the versions
+    apart. `report_name` is untrusted user input, so path separators and characters
+    illegal on Windows are stripped rather than escaped.
+    """
+    cleaned = _ILLEGAL_FILENAME_CHARS.sub(" ", report_name or "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")[:80].strip(" .")
+    return f"{cleaned or FALLBACK_REPORT_NAME} - {(on or date.today()).isoformat()}.zip"
+
+
+def upload_generated_file(
+    local_dir: Path, user_id: str, dataset_id: str, report_name: str = ""
+) -> str:
     """Zip a generated PBIP folder and upload it to the generated-files bucket.
 
     Returns the object path within the bucket, e.g.
-    "{user_id}/{dataset_id}/production_plan_reference.zip" — the first path
-    segment must be the owning user's ID to satisfy the storage RLS policy.
+    "{user_id}/{dataset_id}/Test 1 - 2026-07-28.zip". The first path segment must be
+    the owning user's ID to satisfy the storage RLS policy, and the website derives
+    the download filename from the last segment — so the user-facing name lives here.
+    The dataset_id keeps the path unique, so two reports may share a display name.
     """
     client = get_client()
     zip_base = Path(tempfile.mkdtemp()) / dataset_id
     shutil.make_archive(str(zip_base), "zip", root_dir=local_dir)
 
-    object_path = f"{user_id}/{dataset_id}/production_plan_reference.zip"
+    object_path = f"{user_id}/{dataset_id}/{download_filename(report_name)}"
     with open(f"{zip_base}.zip", "rb") as f:
         client.storage.from_("generated-files").upload(
             object_path,

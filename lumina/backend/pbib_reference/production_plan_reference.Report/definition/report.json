@@ -11,10 +11,10 @@
       "type": "SharedResources"
     },
     "customTheme": {
-      "name": "LuminaTheme",
+      "name": "LuminaTheme.json",
       "reportVersionAtImport": {
-        "visual": "2.10.0",
-        "report": "3.4.0",
+        "visual": "2.9.0",
+        "report": "3.3.0",
         "page": "2.3.1"
       },
       "type": "RegisteredResources"
@@ -65,7 +65,7 @@
       "type": "RegisteredResources",
       "items": [
         {
-          "name": "LuminaTheme",
+          "name": "LuminaTheme.json",
           "path": "LuminaTheme.json",
           "type": "CustomTheme"
         }
@@ -78,6 +78,6 @@
     "defaultDrillFilterOtherVisuals": true,
     "allowChangeFilterTypes": true,
     "useEnhancedTooltips": true,
-    "useDefaultAggregateDisplayName": true
+    "useDefaultAggregateDisplayName": false
   }
 }
