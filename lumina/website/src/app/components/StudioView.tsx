@@ -63,7 +63,8 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
     formData.append("neutral_threshold", String(config.neutralThreshold));
 
     try {
-      const res = await fetch("http://localhost:8000/generate-dashboard", {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      const res = await fetch(`${backendUrl}/generate-dashboard`, {
         method: "POST",
         headers: session?.access_token
           ? { Authorization: `Bearer ${session.access_token}` }
@@ -101,7 +102,7 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
 
       onFileGenerated(result.generated_file_id, chartPreviewJson);
     } catch {
-      setError("Could not reach the backend. Make sure it's running on :8000.");
+      setError("Could not reach the backend API. Please check your connection or NEXT_PUBLIC_BACKEND_URL.");
       setState({ phase: "idle" });
     }
   }
@@ -133,7 +134,7 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create signed URL");
-      
+
       const a = document.createElement("a");
       a.href = data.signedUrl;
       a.download = state.storagePath.split("/").pop() || "Report.zip";
@@ -210,9 +211,9 @@ export function StudioView({ session, onFileGenerated }: StudioViewProps) {
 
       {/* ── Web Dashboard panel (right, only after generate) ─────── */}
       {isGenerated && (
-        <div 
-          className="ll-studio-preview" 
-          style={{ 
+        <div
+          className="ll-studio-preview"
+          style={{
             backgroundColor: "#F9F7F7",
             backgroundImage: `radial-gradient(circle at 10% 20%, ${hexToRgba(state.dataColors[0] || "#E7F0EA", 0.05)} 0%, transparent 40%, ${hexToRgba(state.dataColors[1] || "#FFEFD6", 0.08)} 100%)`,
             position: "relative"
