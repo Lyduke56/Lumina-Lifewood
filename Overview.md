@@ -1,5 +1,8 @@
 # Lumina | Lifewood Overview
 
+## The Name "Lumina"
+The name **Lumina** is derived from the Latin plural of *lumen*, meaning lights, brightness, or openings. In the context of this project, raw production data can often feel like a dark, impenetrable void. Lumina serves to pierce through that darkness—illuminating complex datasets and transforming them into clear, actionable insights through beautiful, immediate visualization.
+
 ## What the Project Does
 Lumina | Lifewood is an end-to-end AI agent integrated with WhatsApp via OpenClaw, designed to automate production plan data visualization. The system seamlessly ingests Excel-based production plans from users via WhatsApp, processes the data through an automated ETL pipeline, and generates live Power BI datasets (.pbip). It features an immersive, glassmorphism-inspired web dashboard for instant visualization and tracking of key performance indicators (KPIs) such as Target vs. Actual quantities, hours, and completion rates.
 
